@@ -1,0 +1,118 @@
+name: Data Validation
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'  # Monthly on the 1st
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  validate-structures:
+    name: Validate Structural Database
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        pip install biopython requests pandas
+
+    - name: Validate ADAR2 structures
+      run: |
+        python scripts/validate_structures.py \
+          --proteins P78563 \
+          --output validation_report.json
+
+    - name: Check AlphaFold database freshness
+      run: |
+        python scripts/check_alphafold_versions.py \
+          --proteomes yeast human dictyostelium
+
+    - name: Validate PDB entries
+      run: |
+        python scripts/validate_pdb_entries.py \
+          --pdb-ids 1ZY7,5HDT,5ICN,4A69,1MAI,1BTK
+
+    - name: Upload validation report
+      uses: actions/upload-artifact@v4
+      with:
+        name: validation-report
+        path: validation_report.json
+
+  check-apis:
+    name: Check External API Status
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        pip install requests aiohttp
+
+    - name: Check AlphaFold API
+      run: |
+        python -c "
+import requests
+import sys
+
+try:
+    # Check AlphaFold EBI API
+    response = requests.get('https://alphafold.ebi.ac.uk/api/prediction/P78563', timeout=10)
+    if response.status_code == 200:
+        print('✓ AlphaFold API: OK')
+    else:
+        print(f'✗ AlphaFold API: {response.status_code}')
+        sys.exit(1)
+except Exception as e:
+    print(f'✗ AlphaFold API: {e}')
+    sys.exit(1)
+        "
+
+    - name: Check PDB API
+      run: |
+        python -c "
+import requests
+import sys
+
+try:
+    # Check RCSB PDB API
+    response = requests.get('https://data.rcsb.org/rest/v1/core/entry/1ZY7', timeout=10)
+    if response.status_code == 200:
+        print('✓ RCSB PDB API: OK')
+    else:
+        print(f'✗ RCSB PDB API: {response.status_code}')
+        sys.exit(1)
+except Exception as e:
+    print(f'✗ RCSB PDB API: {e}')
+    sys.exit(1)
+        "
+
+    - name: Check UniProt API
+      run: |
+        python -c "
+import requests
+import sys
+
+try:
+    # Check UniProt API
+    response = requests.get('https://rest.uniprot.org/uniprotkb/P78563', timeout=10)
+    if response.status_code == 200:
+        print('✓ UniProt API: OK')
+    else:
+        print(f'✗ UniProt API: {response.status_code}')
+        sys.exit(1)
+except Exception as e:
+    print(f'✗ UniProt API: {e}')
+    sys.exit(1)
+        "
