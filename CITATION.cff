@@ -1,0 +1,49 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Cryptic IP Binding Sites: Systematic Discovery Pipeline"
+version: 0.1.0
+date-released: 2026-02-03
+authors:
+  - family-names: "Marena"
+    given-names: "Tommaso R."
+    email: "marena@cua.edu"
+    affiliation: "The Catholic University of America"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+repository-code: "https://github.com/Tommaso-R-Marena/cryptic-ip-binding-sites"
+url: "https://github.com/Tommaso-R-Marena/cryptic-ip-binding-sites"
+license: MIT
+keywords:
+  - structural biology
+  - computational biology
+  - inositol phosphates
+  - protein structure
+  - AlphaFold
+  - bioinformatics
+abstract: |
+  Computational pipeline for systematically identifying cryptic inositol
+  phosphate binding sites in protein structures. Uses AlphaFold predictions
+  combined with structural bioinformatics tools to detect buried IP-binding
+  pockets where inositol phosphates function as structural cofactors rather
+  than signaling molecules.
+references:
+  - type: article
+    authors:
+      - family-names: "Macbeth"
+        given-names: "Mark R."
+      - family-names: "Schubert"
+        given-names: "Heidi L."
+      - family-names: "Vandemark"
+        given-names: "Andrew P."
+      - family-names: "Lingam"
+        given-names: "Ashwin T."
+      - family-names: "Hill"
+        given-names: "Christopher P."
+      - family-names: "Bass"
+        given-names: "Brenda L."
+    title: "Inositol hexakisphosphate is bound in the ADAR2 core and required for RNA editing"
+    journal: "Science"
+    volume: 309
+    issue: 5740
+    year: 2005
+    pages: "1534-1539"
+    doi: "10.1126/science.1115248"
