@@ -1,32 +1,30 @@
-# Core dependencies
-numpy>=1.21.0
+# Core scientific computing
+numpy>=1.20.0
 scipy>=1.7.0
 pandas>=1.3.0
-biopython>=1.79
-
-# Structure analysis
-prody>=2.0
 
 # Visualization
 matplotlib>=3.4.0
 seaborn>=0.11.0
 
-# Progress bars and utilities
+# Structural biology
+biopython>=1.79
+prody>=2.0.0
+
+# Data fetching
+requests>=2.26.0
+aiohttp>=3.8.0
+
+# Utilities
 tqdm>=4.62.0
-click>=8.0.0
+pyyaml>=6.0
+typing-extensions>=4.0.0
 
-# Data handling
-pyyaml>=5.4.0
-joblib>=1.0.0
-
-# Jupyter support (optional)
-jupyter>=1.0.0
-ipywidgets>=7.6.0
-
-# Testing
-pytest>=6.2.0
-pytest-cov>=2.12.0
-
-# Documentation
-sphinx>=4.0.0
-sphinx-rtd-theme>=0.5.0
+# Development dependencies (install with pip install -e ".[dev]")
+# pytest>=7.0.0
+# pytest-cov>=3.0.0
+# pytest-xdist>=2.5.0
+# black>=22.0.0
+# flake8>=4.0.0
+# isort>=5.10.0
+# mypy>=0.950
