@@ -19,7 +19,7 @@ Some proteins don't just bind inositol phosphates (IPs) for signaling—**they c
 ### The Paradigm: ADAR2
 
 [Macbeth et al. (2005, *Science* 309:1534-1539)](https://doi.org/10.1126/science.1115248) solved the ADAR2 crystal structure and found an **IP6 molecule completely buried** inside the enzyme:
-- SASA ≈ 0 ΅ (only an 8.4 × 4.6 ΅ window to exterior)
+- SASA ≈ 0 ų (only an 8.4 × 4.6 ų window to exterior)
 - Zero catalytic activity without IP6
 - Six basic residues coordinate the IP6 directly
 - The protein **literally cannot exist** without the cofactor
@@ -40,9 +40,9 @@ Explore the complete analysis pipeline through executable Jupyter notebooks:
 |----------|-------------|-------------------|
 | **01_Quick_Start** | Installation validation and basic usage | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Tommaso-R-Marena/cryptic-ip-binding-sites/main?filepath=notebooks/01_Quick_Start.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/01_Quick_Start.ipynb) |
 | **02_ADAR2_Analysis** | Complete ADAR2 validation with real crystal structure data | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Tommaso-R-Marena/cryptic-ip-binding-sites/main?filepath=notebooks/02_ADAR2_Analysis.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/02_ADAR2_Analysis.ipynb) |
-| **03_Proteome_Screening** | Large-scale screening workflow | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Tommaso-R-Marena/cryptic-ip-binding-sites/main?filepath=notebooks/03_Proteome_Screening.ipynb) |
+| **03_Proteome_Screening** | Large-scale screening workflow | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Tommaso-R-Marena/cryptic-ip-binding-sites/main?filepath=notebooks/03_Proteome_Screening.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/03_Proteome_Screening.ipynb) |
 | **04_Validation_Analysis** | Positive/negative control validation suite | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Tommaso-R-Marena/cryptic-ip-binding-sites/main?filepath=notebooks/04_Validation_Analysis.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/04_Validation_Analysis.ipynb) |
-| **05_Results_Analysis** | Comparative proteomics and statistical analysis | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Tommaso-R-Marena/cryptic-ip-binding-sites/main?filepath=notebooks/05_Results_Analysis.ipynb) |
+| **05_Results_Analysis** | Comparative proteomics and statistical analysis | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Tommaso-R-Marena/cryptic-ip-binding-sites/main?filepath=notebooks/05_Results_Analysis.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/05_Results_Analysis.ipynb) |
 
 **All notebooks use real data** from:
 - AlphaFold Protein Structure Database ([alphafold.ebi.ac.uk](https://alphafold.ebi.ac.uk))
@@ -74,11 +74,11 @@ Cryptic IP-binding site candidates must satisfy:
 
 | Criterion | Threshold | Rationale |
 |-----------|-----------|----------|
-| **Pocket Depth** | >15 ΅ | Deeply buried, not surface-accessible |
-| **Solvent Accessibility** | SASA <5 ΅ | Minimal water exposure |
+| **Pocket Depth** | >15 ų | Deeply buried, not surface-accessible |
+| **Solvent Accessibility** | SASA <5 ų | Minimal water exposure |
 | **Electrostatic Potential** | >+5 kT/e | Strong positive charge for phosphate coordination |
 | **Basic Residue Cluster** | ≥4 Arg/Lys/His | Direct coordination of phosphates |
-| **Pocket Volume** | 300–800 ΅³ | Appropriate for IP3–IP6 |
+| **Pocket Volume** | 300–800 ų³ | Appropriate for IP3–IP6 |
 | **Structure Confidence** | pLDDT ≥70 | High AlphaFold confidence |
 
 ### Validation Strategy
@@ -190,7 +190,7 @@ from cryptic_ip.database import PDBClient
 
 client = PDBClient()
 entry = client.fetch_entry_info('1ZY7')
-print(entry['resolution'])  # 1.7 ΅
+print(entry['resolution'])  # 1.7 ų
 print(entry['method'])      # X-RAY DIFFRACTION
 ```
 
@@ -243,8 +243,8 @@ result = pipeline.analyze(
 
 # Access results
 print(f"Top pocket score: {result.top_candidate['score']:.3f}")
-print(f"Depth: {result.top_candidate['depth']:.1f} ΅")
-print(f"SASA: {result.top_candidate['sasa']:.2f} ΅")
+print(f"Depth: {result.top_candidate['depth']:.1f} ų")
+print(f"SASA: {result.top_candidate['sasa']:.2f} ų")
 print(f"Basic residues: {result.top_candidate['n_basic']}")
 
 # Visualize
