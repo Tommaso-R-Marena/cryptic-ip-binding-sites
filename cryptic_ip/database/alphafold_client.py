@@ -2,6 +2,7 @@
 
 import logging
 import requests
+import gzip
 from pathlib import Path
 from typing import Dict, Optional, List
 import time
@@ -12,13 +13,13 @@ logger = logging.getLogger(__name__)
 class AlphaFoldClient:
     """Client for AlphaFold Protein Structure Database.
     
-    Uses the official EBI AlphaFold API:
-    https://alphafold.ebi.ac.uk/api/docs
+    Uses the AlphaFold API for metadata and FTP for file downloads:
+    - API: https://alphafold.ebi.ac.uk/api-docs
+    - FTP: https://ftp.ebi.ac.uk/pub/databases/alphafold/latest/
     """
     
-    BASE_URL = "https://alphafold.ebi.ac.uk"
-    API_URL = f"{BASE_URL}/api"
-    FILES_URL = f"{BASE_URL}/files"
+    API_BASE = "https://alphafold.ebi.ac.uk/api"
+    FTP_BASE = "https://ftp.ebi.ac.uk/pub/databases/alphafold/latest"
     
     def __init__(self, cache_dir: Optional[Path] = None):
         """Initialize AlphaFold client.
@@ -35,6 +36,8 @@ class AlphaFoldClient:
     
     def fetch_structure(self, uniprot_id: str, version: int = 4) -> Path:
         """Download AlphaFold structure for a UniProt ID.
+        
+        Downloads from FTP as gzipped files and decompresses.
         
         Args:
             uniprot_id: UniProt accession (e.g., 'P78563' for ADAR2)
@@ -55,17 +58,20 @@ class AlphaFoldClient:
             logger.info(f"Using cached structure: {cached_file}")
             return cached_file
         
-        # Download structure
-        url = f"{self.FILES_URL}/{filename}"
-        logger.info(f"Downloading {uniprot_id} from AlphaFold: {url}")
+        # Download from FTP (files are gzipped)
+        ftp_url = f"{self.FTP_BASE}/AF-{uniprot_id}-F1-model_v{version}.pdb.gz"
+        logger.info(f"Downloading {uniprot_id} from AlphaFold FTP: {ftp_url}")
         
         try:
-            response = self.session.get(url, timeout=30)
+            response = self.session.get(ftp_url, timeout=30)
             response.raise_for_status()
             
-            # Save to cache
+            # Decompress gzipped content
+            decompressed = gzip.decompress(response.content)
+            
+            # Save decompressed PDB
             with open(cached_file, 'wb') as f:
-                f.write(response.content)
+                f.write(decompressed)
             
             logger.info(f"Downloaded structure to {cached_file}")
             return cached_file
@@ -73,8 +79,9 @@ class AlphaFoldClient:
         except requests.HTTPError as e:
             if e.response.status_code == 404:
                 raise ValueError(
-                    f"UniProt ID {uniprot_id} not found in AlphaFold Database. "
-                    f"Check ID or visit {self.BASE_URL}/entry/{uniprot_id}"
+                    f"UniProt ID {uniprot_id} not found in AlphaFold Database.\n"
+                    f"Check if the protein exists at: https://alphafold.ebi.ac.uk/entry/{uniprot_id}\n"
+                    f"FTP URL attempted: {ftp_url}"
                 )
             raise
     
@@ -87,7 +94,7 @@ class AlphaFoldClient:
         Returns:
             Dictionary with prediction metadata
         """
-        url = f"{self.API_URL}/prediction/{uniprot_id}"
+        url = f"{self.API_BASE}/prediction/{uniprot_id}"
         
         try:
             response = self.session.get(url, timeout=10)
@@ -102,6 +109,7 @@ class AlphaFoldClient:
             
             return {
                 'uniprot_id': entry['uniprotAccession'],
+                'entry_id': entry.get('entryId', f"AF-{uniprot_id}-F1"),
                 'gene': entry.get('gene', ''),
                 'organism': entry.get('organismScientificName', ''),
                 'sequence_length': entry.get('uniprotSequenceLength', 0),
@@ -174,12 +182,27 @@ if __name__ == "__main__":
     
     client = AlphaFoldClient()
     
-    # Download ADAR2
-    adar2_path = client.fetch_structure('P78563')
-    print(f"ADAR2 structure: {adar2_path}")
+    print("Testing AlphaFold client...\n")
     
-    # Get metadata
-    metadata = client.get_metadata('P78563')
-    print(f"\nADAR2 metadata:")
-    for key, value in metadata.items():
-        print(f"  {key}: {value}")
+    # Test 1: Get metadata
+    print("1. Fetching ADAR2 metadata...")
+    try:
+        metadata = client.get_metadata('P78563')
+        print(f"   Gene: {metadata['gene']}")
+        print(f"   Organism: {metadata['organism']}")
+        print(f"   Length: {metadata['sequence_length']} aa")
+        print(f"   ✓ Metadata OK\n")
+    except Exception as e:
+        print(f"   ✗ Metadata failed: {e}\n")
+    
+    # Test 2: Download structure
+    print("2. Downloading ADAR2 structure...")
+    try:
+        adar2_path = client.fetch_structure('P78563')
+        print(f"   File: {adar2_path}")
+        print(f"   Size: {adar2_path.stat().st_size / 1024:.1f} KB")
+        print(f"   ✓ Download OK\n")
+    except Exception as e:
+        print(f"   ✗ Download failed: {e}\n")
+    
+    print("Testing complete!")
