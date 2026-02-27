@@ -7,6 +7,9 @@ pandas>=1.3.0
 matplotlib>=3.4.0
 seaborn>=0.11.0
 
+matplotlib-venn>=0.11.0
+goatools>=1.3.0
+
 # Structural biology
 biopython>=1.79
 prody>=2.0.0
