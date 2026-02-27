@@ -14,12 +14,21 @@ Modules:
 __version__ = "0.1.0"
 __author__ = "Tommaso R. Marena"
 
-from .analysis import ProteinAnalyzer, PocketScorer
+from .analysis import (
+    ProteinAnalyzer,
+    PocketScorer,
+    CrypticSiteMLClassifier,
+    MLPocketScorer,
+    FEATURE_COLUMNS,
+)
 from .validation import validate_adar2, ValidationSuite
 
 __all__ = [
     "ProteinAnalyzer",
     "PocketScorer",
+    "CrypticSiteMLClassifier",
+    "MLPocketScorer",
+    "FEATURE_COLUMNS",
     "validate_adar2",
     "ValidationSuite",
 ]
