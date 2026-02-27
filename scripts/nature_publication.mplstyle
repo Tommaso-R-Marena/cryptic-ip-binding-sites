@@ -1,0 +1,21 @@
+figure.dpi: 150
+savefig.dpi: 600
+figure.facecolor: white
+axes.facecolor: white
+axes.edgecolor: #222222
+axes.linewidth: 0.8
+axes.grid: False
+font.family: DejaVu Sans
+font.size: 8
+axes.titlesize: 9
+axes.labelsize: 8
+xtick.labelsize: 7
+ytick.labelsize: 7
+legend.fontsize: 7
+legend.title_fontsize: 7
+pdf.fonttype: 42
+ps.fonttype: 42
+lines.linewidth: 1.8
+lines.markersize: 4
+patch.linewidth: 0.8
+image.cmap: viridis
