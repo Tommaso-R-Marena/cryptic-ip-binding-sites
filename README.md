@@ -471,3 +471,23 @@ This software is provided for research and educational purposes. External tools 
   ·
   <a href="docs/TUTORIAL.md">View Tutorial</a>
 </p>
+## 🌐 Streamlit Web Interface
+
+A deployable Streamlit app is available at `streamlit_app.py` for community-facing, single-protein analysis.
+
+### Highlights
+
+- Input via UniProt ID (AlphaFold), PDB ID (RCSB), or uploaded structure
+- Real-time progress updates through the full prediction workflow
+- Interactive 3D structure rendering with highlighted candidate pockets
+- Electrostatic summary, ranked score table, JSON/CSV exports, and downloadable PyMOL script
+- Example gallery, tutorial references, citation guidance, and collaboration contact form
+
+### Quick start
+
+```bash
+pip install -r requirements.txt
+streamlit run streamlit_app.py
+```
+
+Deployment guidance is available in [`docs/WEB_APP_DEPLOYMENT.md`](docs/WEB_APP_DEPLOYMENT.md).
