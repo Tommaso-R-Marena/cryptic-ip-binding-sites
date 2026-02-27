@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  analysis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cryptic-ip:latest
+    container_name: cryptic-ip-analysis
+    entrypoint: ["/bin/bash", "-lc"]
+    command: "cryptic-ip --help"
+    volumes:
+      - ./data:/workspace/data
+      - ./results:/workspace/results
+      - ./scripts:/workspace/scripts:ro
+    environment:
+      CRYPTIC_IP_DATA_DIR: /workspace/data
+      CRYPTIC_IP_RESULTS_DIR: /workspace/results
+      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-4}
+      OPENMM_CPU_THREADS: ${OPENMM_CPU_THREADS:-4}
+    mem_limit: ${ANALYSIS_MEM_LIMIT:-8g}
+    cpus: ${ANALYSIS_CPUS:-4}
+    deploy:
+      resources:
+        limits:
+          memory: ${ANALYSIS_MEM_LIMIT:-8g}
+          cpus: '${ANALYSIS_CPUS:-4}'
+
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cryptic-ip:latest
+    container_name: cryptic-ip-jupyter
+    profiles: ["notebook"]
+    entrypoint: ["/bin/bash", "-lc"]
+    command: >
+      jupyter lab --ip=0.0.0.0 --port=8888 --no-browser
+      --NotebookApp.token=${JUPYTER_TOKEN:-cryptic-ip}
+      --NotebookApp.allow_origin='*'
+      --notebook-dir=/workspace
+    ports:
+      - "${JUPYTER_PORT:-8888}:8888"
+    volumes:
+      - ./:/workspace
+    environment:
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-cryptic-ip}
+    mem_limit: ${JUPYTER_MEM_LIMIT:-8g}
+    cpus: ${JUPYTER_CPUS:-4}
+    deploy:
+      resources:
+        limits:
+          memory: ${JUPYTER_MEM_LIMIT:-8g}
+          cpus: '${JUPYTER_CPUS:-4}'
