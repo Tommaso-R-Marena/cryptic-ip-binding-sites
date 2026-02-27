@@ -8,6 +8,7 @@ from .filters import CandidateFilter
 from .ml_classifier import CrypticSiteMLClassifier, MLPocketScorer, FEATURE_COLUMNS
 from .statistical_validation import StatisticalValidation, BootstrapCurveResult
 from .comparative_analysis import ComparativeIPAnalysis, ComparativeResult
+from .electrostatics import ElectrostaticsCalculator, PHAnalysisResult, run_apbs_wrapper, run_propka_wrapper
 
 __all__ = [
     "ProteinAnalyzer",
@@ -20,4 +21,8 @@ __all__ = [
     "BootstrapCurveResult",
     "ComparativeIPAnalysis",
     "ComparativeResult",
+    "ElectrostaticsCalculator",
+    "PHAnalysisResult",
+    "run_propka_wrapper",
+    "run_apbs_wrapper",
 ]

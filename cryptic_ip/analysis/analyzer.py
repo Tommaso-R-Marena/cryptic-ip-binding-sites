@@ -13,6 +13,7 @@ import pandas as pd
 from Bio.PDB import PDBParser, PDBIO, Select
 from prody import parsePDB, calcSASA
 
+from .electrostatics import ElectrostaticsCalculator
 from .fpocket_parser import FpocketParser
 from .scorer import PocketScorer
 
@@ -115,18 +116,28 @@ class ProteinAnalyzer:
         except Exception as e:
             raise RuntimeError(f"SASA calculation failed: {e}")
 
-    def calculate_electrostatics(self) -> Optional[np.ndarray]:
+    def calculate_electrostatics(self, ph: float = 7.4) -> Optional[float]:
         """
-        Calculate electrostatic potential using APBS.
+        Calculate electrostatic potential using pdb2pqr + APBS.
+
+        Args:
+            ph: Solution pH used during protonation assignment
 
         Returns:
-            Electrostatic potential grid (placeholder - requires APBS installation)
+            Scalar APBS electrostatic energy proxy, or ``None`` on failure.
         """
-        # This is a placeholder - full APBS integration requires
-        # pdb2pqr conversion and APBS execution
-        print("Warning: Electrostatic calculation requires APBS installation")
-        print("See: http://www.poissonboltzmann.org/")
-        return None
+        calculator = ElectrostaticsCalculator()
+        electro_dir = self.work_dir / "electrostatics"
+
+        try:
+            pqr_path = calculator.generate_pqr(self.pdb_path, ph=ph, output_dir=electro_dir)
+            potential = calculator.run_apbs(pqr_path=pqr_path, output_dir=electro_dir)
+        except RuntimeError as exc:
+            print(f"Warning: Electrostatics calculation failed: {exc}")
+            return None
+
+        self.electrostatic_data = potential
+        return potential
 
     def get_pocket_residues(self, pocket_id: int, distance_cutoff: float = 5.0) -> List[int]:
         """
