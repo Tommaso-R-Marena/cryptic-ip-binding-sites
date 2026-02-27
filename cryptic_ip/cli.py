@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .analysis import ProteinAnalyzer
 from .validation import validate_adar2, ValidationSuite
+from .validation.md_validation import OpenMMMDValidationPipeline
 from .database import ProteomeDownloader, ProteomeManager
 
 
@@ -155,6 +156,24 @@ def screen(proteome_dir, output, score_threshold, max_structures):
         click.secho(f"Results saved to {output}", fg='green')
     else:
         click.secho("\nNo candidates found above threshold", fg='yellow')
+
+
+@main.command("md-validate")
+@click.argument('candidates_csv', type=click.Path(exists=True))
+@click.option('--output-dir', '-o', default='results/md_validation', help='Output directory')
+@click.option('--top-n', default=20, show_default=True, help='Top candidates to validate')
+def md_validate(candidates_csv, output_dir, top_n):
+    """Validate top candidates with OpenMM MD and pocket dynamics analysis."""
+    click.echo(f"Running MD validation for top {top_n} candidates from {candidates_csv}...")
+
+    pipeline = OpenMMMDValidationPipeline(output_dir=output_dir)
+    report = pipeline.validate_top_candidates(candidates_csv=candidates_csv, top_n=top_n)
+
+    report_path = Path(output_dir) / 'md_validation_report.csv'
+    stable_count = (report['classification'] == 'stably buried').sum()
+
+    click.secho(f"✓ MD validation complete: {report_path}", fg='green')
+    click.echo(f"Stable pockets retained: {stable_count}/{len(report)}")
 
 
 if __name__ == '__main__':
