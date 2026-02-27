@@ -125,6 +125,27 @@ If buried IP-binding co-evolved with cellular IP metabolism:
 
 **Either result is publishable and biologically significant.**
 
+### Comparative Statistics & Figure Pipeline (Phase 5)
+
+After completing proteome screening for each organism, run the comparative analysis script to generate manuscript-ready statistics and figures:
+
+```bash
+python scripts/phase5_comparative_analysis.py \
+  --hits results/combined_hits.csv \
+  --orthologs results/ortholog_groups.csv \
+  --go-associations-json "{\"S_cerevisiae\": \"data/goa_sc.csv\", \"H_sapiens\": \"data/goa_hs.csv\", \"D_discoideum\": \"data/goa_dd.csv\"}" \
+  --go-obo data/go-basic.obo \
+  --output-dir results/comparative_analysis
+```
+
+Outputs include:
+- Normalized hit rates with Wilson confidence intervals
+- Spearman IP6-vs-hit-rate correlation statistics
+- Pairwise chi-square and Fisher exact tests
+- Ortholog conservation summaries
+- GOATOOLS enrichment results
+- Publication-style figures (bar plot, Venn diagram, heatmap, scatter plot)
+
 ---
 
 ## 🚀 Installation
