@@ -1,0 +1,24 @@
+# Template configuration for scripts/generate_publication_figures.py
+output_dir: figures/publication
+style_file: scripts/nature_publication.mplstyle
+
+figure1:
+  adar2_structure: data/structures/adar2_ip6.pdb
+  ip6_resn: IP6
+  validation_roc_csv: results/validation/roc_curves.csv
+
+figure2:
+  hit_rates_csv: results/comparative/hit_rates.csv
+  correlation_csv: results/comparative/ip6_vs_hit_rate.csv
+  go_heatmap_csv: results/comparative/go_enrichment_heatmap.csv
+  phylo_conservation_csv: results/comparative/phylogenetic_conservation.csv
+
+figure3:
+  top_candidates_csv: results/top_candidates/gallery_inputs.csv
+  top_n: 10
+
+# Optional override. If omitted, default legends are written.
+# figure_legends: |
+#   Figure 1 | ...
+#   Figure 2 | ...
+#   Figure 3 | ...
