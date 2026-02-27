@@ -4,5 +4,13 @@ Database module for proteome data management.
 
 from .downloader import ProteomeDownloader
 from .manager import ProteomeManager
+from .batch_processing import AnalysisCache, AlphaFoldBatchDownloader, ParallelProcessor, append_results_to_file
 
-__all__ = ["ProteomeDownloader", "ProteomeManager"]
+__all__ = [
+    "ProteomeDownloader",
+    "ProteomeManager",
+    "AnalysisCache",
+    "AlphaFoldBatchDownloader",
+    "ParallelProcessor",
+    "append_results_to_file",
+]
