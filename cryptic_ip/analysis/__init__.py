@@ -6,6 +6,7 @@ from .analyzer import ProteinAnalyzer
 from .scorer import PocketScorer
 from .filters import CandidateFilter
 from .ml_classifier import CrypticSiteMLClassifier, MLPocketScorer, FEATURE_COLUMNS
+from .statistical_validation import StatisticalValidation, BootstrapCurveResult
 
 __all__ = [
     "ProteinAnalyzer",
@@ -14,4 +15,6 @@ __all__ = [
     "CrypticSiteMLClassifier",
     "MLPocketScorer",
     "FEATURE_COLUMNS",
+    "StatisticalValidation",
+    "BootstrapCurveResult",
 ]
