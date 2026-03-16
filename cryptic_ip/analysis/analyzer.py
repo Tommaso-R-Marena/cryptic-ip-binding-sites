@@ -15,6 +15,7 @@ from prody import parsePDB, calcSASA
 
 from .electrostatics import ElectrostaticsCalculator
 from .fpocket_parser import FpocketParser
+from .ml_classifier import CrypticSiteMLClassifier, MLPocketScorer
 from .scorer import PocketScorer
 
 
@@ -26,7 +27,14 @@ class ProteinAnalyzer:
     and APBS for electrostatics.
     """
 
-    def __init__(self, pdb_path: str, work_dir: Optional[str] = None, scorer: Optional[Any] = None):
+    def __init__(
+        self,
+        pdb_path: str,
+        work_dir: Optional[str] = None,
+        scorer: Optional[Any] = None,
+        use_ml_model: bool = False,
+        model_path: Optional[str] = None,
+    ):
         """
         Initialize analyzer with a protein structure.
 
@@ -36,6 +44,8 @@ class ProteinAnalyzer:
             scorer: Optional scorer object implementing
                 ``calculate_composite_score`` and ``classify_site``.
                 Uses threshold-based :class:`PocketScorer` when omitted.
+            use_ml_model: When True, attempt to load a pre-trained ML scorer.
+            model_path: Optional path to serialized ML model.
         """
         self.pdb_path = Path(pdb_path)
         self.work_dir = Path(work_dir) if work_dir else Path(tempfile.mkdtemp())
@@ -47,12 +57,32 @@ class ProteinAnalyzer:
 
         # Initialize components
         self.fpocket_parser = FpocketParser()
-        self.scorer = scorer or PocketScorer()
+        self.model_path = self._resolve_model_path(model_path)
+        self.scorer = scorer or self._build_default_scorer(use_ml_model)
 
         # Storage for results
         self.pockets = None
         self.sasa_data = None
         self.electrostatic_data = None
+
+    def _resolve_model_path(self, model_path: Optional[str]) -> Path:
+        if model_path:
+            return Path(model_path)
+        return Path(__file__).resolve().parents[2] / "models" / "cryptic_ip_classifier_v1.pkl"
+
+    def _build_default_scorer(self, use_ml_model: bool) -> Any:
+        if not use_ml_model:
+            return PocketScorer()
+
+        try:
+            classifier = CrypticSiteMLClassifier.load(str(self.model_path))
+            return MLPocketScorer(classifier)
+        except Exception as exc:  # noqa: BLE001 - fallback by design
+            print(
+                f"Warning: Unable to load ML model from {self.model_path} ({exc}). "
+                "Falling back to threshold scoring."
+            )
+            return PocketScorer()
 
     def detect_pockets(self, min_alpha_sphere: int = 3) -> pd.DataFrame:
         """

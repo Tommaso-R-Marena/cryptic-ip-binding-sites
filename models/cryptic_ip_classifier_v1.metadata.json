@@ -1,0 +1,68 @@
+{
+  "model_version": "v1",
+  "trained_at_utc": "2026-02-28T20:21:59.841672+00:00",
+  "dataset_csv": "data/validation/ip_binding_validation_dataset.csv",
+  "num_structures": 24,
+  "num_pockets": 24,
+  "feature_columns": [
+    "pocket_depth",
+    "sasa",
+    "electrostatic_potential",
+    "n_basic_residues",
+    "pocket_volume",
+    "plddt_confidence"
+  ],
+  "model_candidates": {
+    "random_forest": {
+      "best_params": {
+        "classifier__class_weight": null,
+        "classifier__max_depth": null,
+        "classifier__min_samples_leaf": 1,
+        "classifier__min_samples_split": 2,
+        "classifier__n_estimators": 200
+      },
+      "roc_auc": 1.0,
+      "pr_auc": 1.0,
+      "roc_auc_ci": [
+        1.0,
+        1.0
+      ],
+      "pr_auc_ci": [
+        1.0,
+        1.0
+      ],
+      "cv_roc_auc": 1.0,
+      "cv_pr_auc": 1.0
+    },
+    "xgboost": {
+      "best_params": {
+        "classifier__colsample_bytree": 0.8,
+        "classifier__learning_rate": 0.03,
+        "classifier__max_depth": 3,
+        "classifier__n_estimators": 200,
+        "classifier__subsample": 0.8
+      },
+      "roc_auc": 0.9888888888888889,
+      "pr_auc": 0.9909090909090907,
+      "roc_auc_ci": [
+        0.9333333333333333,
+        1.0
+      ],
+      "pr_auc_ci": [
+        0.9444444444444444,
+        1.0
+      ],
+      "cv_roc_auc": 0.9888888888888889,
+      "cv_pr_auc": 0.9909090909090907
+    }
+  },
+  "selected_model_type": "random_forest",
+  "selected_hyperparameters": {
+    "classifier__class_weight": null,
+    "classifier__max_depth": null,
+    "classifier__min_samples_leaf": 1,
+    "classifier__min_samples_split": 2,
+    "classifier__n_estimators": 200
+  },
+  "dataset_sha256": "6404b4cd50bcfab58d0af4ece3e42edce7709f0d7e6ff09bfbbff71d16907dfa"
+}
