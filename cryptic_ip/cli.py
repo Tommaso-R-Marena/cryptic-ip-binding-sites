@@ -26,14 +26,16 @@ def main():
 @click.argument('pdb_file', type=click.Path(exists=True))
 @click.option('--output', '-o', type=click.Path(), help='Output file for results')
 @click.option('--score-threshold', '-t', default=0.60, help='Minimum score threshold')
-def analyze(pdb_file, output, score_threshold):
+@click.option('--use-ml-model', is_flag=True, help='Use trained ML classifier if available')
+@click.option('--model-path', type=click.Path(exists=False), default='models/cryptic_ip_classifier_v1.pkl', help='Path to serialized ML model')
+def analyze(pdb_file, output, score_threshold, use_ml_model, model_path):
     """
     Analyze a single protein structure for cryptic IP binding sites.
     """
     click.echo(f"Analyzing {pdb_file}...\n")
     
     # Create analyzer
-    analyzer = ProteinAnalyzer(pdb_file)
+    analyzer = ProteinAnalyzer(pdb_file, use_ml_model=use_ml_model, model_path=model_path)
     
     # Detect and score pockets
     click.echo("Detecting pockets...")
@@ -108,7 +110,9 @@ def download(organism, data_dir):
 @click.option('--output', '-o', default='screening_results.csv', help='Output CSV file')
 @click.option('--score-threshold', '-t', default=0.60, help='Minimum score threshold')
 @click.option('--max-structures', '-n', type=int, help='Maximum structures to process')
-def screen(proteome_dir, output, score_threshold, max_structures):
+@click.option('--use-ml-model', is_flag=True, help='Use trained ML classifier if available')
+@click.option('--model-path', type=click.Path(exists=False), default='models/cryptic_ip_classifier_v1.pkl', help='Path to serialized ML model')
+def screen(proteome_dir, output, score_threshold, max_structures, use_ml_model, model_path):
     """
     Screen entire proteome for cryptic IP binding sites.
     """
@@ -129,7 +133,7 @@ def screen(proteome_dir, output, score_threshold, max_structures):
         for idx, row in bar:
             try:
                 pdb_path = row['filepath']
-                analyzer = ProteinAnalyzer(pdb_path)
+                analyzer = ProteinAnalyzer(pdb_path, use_ml_model=use_ml_model, model_path=model_path)
                 scored = analyzer.score_all_pockets()
                 
                 # Add metadata
