@@ -19,6 +19,8 @@ from cryptic_ip.analysis.analyzer import ProteinAnalyzer
 from cryptic_ip.analysis.scorer import PocketScorer
 from cryptic_ip.database.alphafold_client import AlphaFoldClient
 from cryptic_ip.database.pdb_client import PDBClient
+from cryptic_ip.errors import UserFacingError
+from cryptic_ip.utils.input_validation import validate_structure_file
 
 
 APP_TITLE = "Cryptic IP-Binding Site Explorer"
@@ -75,6 +77,7 @@ def _prepare_structure(
         handle.write(uploaded_file.getvalue())
         tmp_path = Path(handle.name)
 
+    validate_structure_file(tmp_path)
     return tmp_path, {"source": "upload", "id": uploaded_file.name}
 
 
@@ -160,6 +163,15 @@ def main() -> None:
     st.title(APP_TITLE)
     st.caption("Single-protein cryptic inositol phosphate (IP) binding site prediction in ~2-3 minutes.")
 
+    with st.expander("System health", expanded=False):
+        health = {
+            "status": "ok",
+            "timestamp": datetime.utcnow().isoformat(),
+            "last_run_ts": st.session_state.get("last_run_ts"),
+            "python_tmp_dir": tempfile.gettempdir(),
+        }
+        st.json(health)
+
     with st.sidebar:
         st.header("Input")
         source_type = st.radio(
@@ -241,8 +253,15 @@ def main() -> None:
                 st.session_state["source_meta"] = source_meta
                 st.session_state["electrostatic_potential"] = potential
                 st.session_state["work_dir"] = str(analyzer.work_dir)
+            except UserFacingError as exc:
+                st.error(str(exc))
+                return
             except Exception as exc:
-                st.error(f"Analysis failed: {exc}")
+                st.error(
+                    "Analysis failed while processing your structure. "
+                    "Please verify the file format/identifier and retry. "
+                    f"Details: {exc}. See docs/TROUBLESHOOTING.md"
+                )
                 return
 
     with results_tab:

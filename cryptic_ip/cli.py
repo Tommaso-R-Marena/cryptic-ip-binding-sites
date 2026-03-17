@@ -11,6 +11,8 @@ from .validation import validate_adar2, ValidationSuite, StructureValidator, Res
 from .validation.md_validation import OpenMMMDValidationPipeline
 from .database import ProteomeDownloader, ProteomeManager, DatabaseIntegrityChecker
 from .reproducibility import deterministic_sort_dataframe, set_global_seed
+from .utils.input_validation import validate_structure_file
+from .errors import ValidationError
 
 
 @click.group()
@@ -40,6 +42,14 @@ def analyze(pdb_file, output, score_threshold, use_ml_model, seed, model_path):
     """
     Analyze a single protein structure for cryptic IP binding sites.
     """
+    try:
+        validate_structure_file(pdb_file)
+    except ValidationError as exc:
+        raise click.BadParameter(str(exc), param_hint="pdb_file") from exc
+
+    if not 0.0 <= score_threshold <= 1.0:
+        raise click.BadParameter("--score-threshold must be between 0.0 and 1.0")
+
     click.echo(f"Analyzing {pdb_file}...\n")
 
     set_global_seed(seed)
