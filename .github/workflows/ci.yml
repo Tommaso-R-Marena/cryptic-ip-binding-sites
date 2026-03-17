@@ -111,6 +111,11 @@ jobs:
       run: |
         pytest tests/ -v --cov=cryptic_ip --cov-report=xml --cov-report=term -n auto
 
+    - name: Run benchmark regression tests
+      shell: bash -l {0}
+      run: |
+        pytest tests/benchmarks -v
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:

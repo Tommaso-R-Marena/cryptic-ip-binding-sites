@@ -1,0 +1,29 @@
+{
+  "taskGroups": [
+    {
+      "taskSpec": {
+        "runnables": [
+          {
+            "script": {
+              "text": "python scripts/phase3_screen_proteome.py --workers 16 --output-dir gs://cryptic-ip/results"
+            }
+          }
+        ],
+        "computeResource": {
+          "cpuMilli": 16000,
+          "memoryMib": 65536
+        }
+      },
+      "taskCount": 1
+    }
+  ],
+  "allocationPolicy": {
+    "instances": [
+      {
+        "policy": {
+          "machineType": "n2-standard-16"
+        }
+      }
+    ]
+  }
+}

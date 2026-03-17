@@ -68,13 +68,19 @@ def test_analysis_cache_roundtrip_and_invalidate(tmp_path):
     db_path = tmp_path / "cache.sqlite"
     cache = AnalysisCache(db_path, pipeline_version="v1", pipeline_params={"threshold": 0.6})
     cache.set_cached_result("P12345", "test_org", {"score": 0.9})
+    cache.set_cached_results_batch([
+        ("P99999", "test_org", {"score": 0.7}),
+        ("P11111", "test_org", {"score": 0.2}),
+    ])
 
     assert cache.get_cached_result("P12345", "test_org") == {"score": 0.9}
+    assert cache.get_cached_result("P99999", "test_org") == {"score": 0.7}
 
     csv_path = cache.export_results(tmp_path / "cache.csv", "csv")
     json_path = cache.export_results(tmp_path / "cache.json", "json")
     assert csv_path.exists()
     assert json_path.exists()
+    cache.vacuum()
     cache.close()
 
     other = AnalysisCache(db_path, pipeline_version="v2", pipeline_params={"threshold": 0.7})

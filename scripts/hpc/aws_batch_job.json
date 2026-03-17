@@ -1,0 +1,19 @@
+{
+  "jobName": "cryptic-ip-screening",
+  "jobQueue": "cryptic-ip-queue",
+  "jobDefinition": "cryptic-ip-jobdef:1",
+  "containerOverrides": {
+    "command": [
+      "python",
+      "scripts/phase3_screen_proteome.py",
+      "--workers",
+      "16",
+      "--output-dir",
+      "s3://cryptic-ip/results"
+    ],
+    "resourceRequirements": [
+      {"type": "VCPU", "value": "16"},
+      {"type": "MEMORY", "value": "64000"}
+    ]
+  }
+}

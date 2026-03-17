@@ -36,6 +36,11 @@ def main() -> int:
     cache.add_argument("--output", required=True)
     cache.add_argument("--format", choices=["csv", "json", "hdf5"], required=True)
 
+    vacuum = sub.add_parser("cache-vacuum", help="Vacuum cache database")
+    vacuum.add_argument("--db", required=True)
+    vacuum.add_argument("--pipeline-version", required=True)
+    vacuum.add_argument("--pipeline-params", default="{}", help="JSON string for pipeline parameters")
+
     args = parser.parse_args()
 
     if args.command == "download":
@@ -52,6 +57,14 @@ def main() -> int:
         cache_db = AnalysisCache(args.db, pipeline_version=args.pipeline_version, pipeline_params=params)
         try:
             cache_db.export_results(args.output, args.format)
+        finally:
+            cache_db.close()
+
+    if args.command == "cache-vacuum":
+        params = json.loads(args.pipeline_params)
+        cache_db = AnalysisCache(args.db, pipeline_version=args.pipeline_version, pipeline_params=params)
+        try:
+            cache_db.vacuum()
         finally:
             cache_db.close()
 

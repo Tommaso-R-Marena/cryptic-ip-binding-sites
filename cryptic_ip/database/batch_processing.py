@@ -6,16 +6,22 @@ import csv
 import hashlib
 import json
 import multiprocessing as mp
+import os
 import sqlite3
+import tempfile
 import time
+from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
+import numpy as np
 import pandas as pd
 import requests
 from tqdm import tqdm
 
+from ..utils.profiling import timed
+from ..utils.resources import set_memory_limit
 from .alphafold_client import AlphaFoldClient
 
 
@@ -68,6 +74,7 @@ class AlphaFoldBatchDownloader:
                 time.sleep(self.backoff_seconds * (2 ** (attempt - 1)))
         raise RuntimeError("Unreachable retry branch")
 
+    @timed()
     def fetch_proteome_uniprot_ids(self, proteome_id: str) -> List[str]:
         """List all UniProt accessions for a proteome using UniProt pagination."""
         cursor: Optional[str] = None
@@ -95,6 +102,7 @@ class AlphaFoldBatchDownloader:
 
         return uniprot_ids
 
+    @timed()
     def download_proteomes(self, proteome_ids: Sequence[str], resume: bool = True) -> Dict[str, int]:
         """Download AlphaFold structures for every protein in each proteome."""
         state = self._load_state() if resume else {"completed": {}, "failed": {}}
@@ -133,13 +141,21 @@ class AlphaFoldBatchDownloader:
 class AnalysisCache:
     """SQLite-backed cache for expensive structure analysis results."""
 
-    def __init__(self, db_path: Path | str, pipeline_version: str, pipeline_params: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        db_path: Path | str,
+        pipeline_version: str,
+        pipeline_params: Optional[Dict[str, Any]] = None,
+        query_cache_size: int = 2048,
+    ):
         self.db_path = Path(db_path)
         self.pipeline_version = pipeline_version
         self.pipeline_params = pipeline_params or {}
         self.params_hash = self._hash_pipeline_params(self.pipeline_params)
         self.connection = sqlite3.connect(self.db_path)
         self.connection.row_factory = sqlite3.Row
+        self.query_cache_size = query_cache_size
+        self._query_cache: OrderedDict[Tuple[str, str, str], Dict[str, Any]] = OrderedDict()
         self._initialize_schema()
 
     @staticmethod
@@ -166,7 +182,21 @@ class AnalysisCache:
         )
         self.connection.commit()
 
+    def _cache_key(self, uniprot_id: str, organism: str) -> Tuple[str, str, str]:
+        return (uniprot_id, organism, self.params_hash)
+
+    def _update_query_cache(self, key: Tuple[str, str, str], value: Dict[str, Any]) -> None:
+        self._query_cache[key] = value
+        self._query_cache.move_to_end(key)
+        while len(self._query_cache) > self.query_cache_size:
+            self._query_cache.popitem(last=False)
+
+    @timed()
     def get_cached_result(self, uniprot_id: str, organism: str) -> Optional[Dict[str, Any]]:
+        key = self._cache_key(uniprot_id, organism)
+        if key in self._query_cache:
+            return self._query_cache[key]
+
         row = self.connection.execute(
             """
             SELECT analysis_results
@@ -181,8 +211,12 @@ class AnalysisCache:
 
         if row is None:
             return None
-        return json.loads(row["analysis_results"])
 
+        result = json.loads(row["analysis_results"])
+        self._update_query_cache(key, result)
+        return result
+
+    @timed()
     def set_cached_result(self, uniprot_id: str, organism: str, analysis_results: Dict[str, Any]) -> None:
         timestamp = datetime.now(timezone.utc).isoformat()
         self.connection.execute(
@@ -206,6 +240,41 @@ class AnalysisCache:
             ),
         )
         self.connection.commit()
+        self._update_query_cache(self._cache_key(uniprot_id, organism), analysis_results)
+
+
+    @timed()
+    def set_cached_results_batch(self, rows: Sequence[Tuple[str, str, Dict[str, Any]]]) -> int:
+        """Batch upsert cache rows in one transaction for throughput."""
+        timestamp = datetime.now(timezone.utc).isoformat()
+        payload = [
+            (
+                uniprot_id,
+                organism,
+                json.dumps(analysis_results),
+                timestamp,
+                self.pipeline_version,
+                self.params_hash,
+            )
+            for uniprot_id, organism, analysis_results in rows
+        ]
+        with self.connection:
+            self.connection.executemany(
+                """
+                INSERT INTO analysis_cache (
+                    uniprot_id, organism, analysis_results, timestamp, pipeline_version, params_hash
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(uniprot_id, pipeline_version, params_hash)
+                DO UPDATE SET
+                    organism = excluded.organism,
+                    analysis_results = excluded.analysis_results,
+                    timestamp = excluded.timestamp
+                """,
+                payload,
+            )
+        for uniprot_id, organism, analysis_results in rows:
+            self._update_query_cache(self._cache_key(uniprot_id, organism), analysis_results)
+        return len(rows)
 
     def invalidate_outdated_cache(self) -> int:
         """Remove cached entries that do not match current pipeline settings."""
@@ -219,6 +288,7 @@ class AnalysisCache:
         self.connection.commit()
         return cursor.rowcount
 
+    @timed()
     def export_results(self, output_path: Path | str, export_format: str) -> Path:
         export_path = Path(output_path)
         data = pd.read_sql_query("SELECT * FROM analysis_cache", self.connection)
@@ -233,6 +303,10 @@ class AnalysisCache:
             raise ValueError(f"Unsupported export format: {export_format}")
 
         return export_path
+
+    @timed()
+    def vacuum(self) -> None:
+        self.connection.execute("VACUUM")
 
     def close(self) -> None:
         self.connection.close()
@@ -261,11 +335,15 @@ class ParallelProcessor:
         workers: Optional[int] = None,
         chunk_size: int = 100,
         checkpoint_path: Path | str = "processing_checkpoint.json",
+        memory_limit_gb: Optional[float] = None,
+        use_memmap: bool = False,
     ) -> None:
         self.analyze_function = analyze_function
         self.workers = workers or max(1, mp.cpu_count() - 1)
         self.chunk_size = chunk_size
         self.checkpoint_path = Path(checkpoint_path)
+        self.memory_limit_gb = memory_limit_gb
+        self.use_memmap = use_memmap
 
     def _load_checkpoint(self) -> Dict[str, Any]:
         if self.checkpoint_path.exists():
@@ -279,7 +357,11 @@ class ParallelProcessor:
         for index in range(0, len(items), self.chunk_size):
             yield items[index : index + self.chunk_size]
 
+    @timed()
     def run(self, items: Sequence[Dict[str, Any]], resume: bool = True) -> List[Dict[str, Any]]:
+        if self.memory_limit_gb:
+            set_memory_limit(self.memory_limit_gb)
+
         checkpoint = self._load_checkpoint() if resume else {"processed": [], "started_at": time.time()}
         processed = set(checkpoint["processed"])
         remaining = [item for item in items if item["uniprot_id"] not in processed]
@@ -309,7 +391,34 @@ class ParallelProcessor:
         progress.close()
         return results
 
+    @timed()
+    def run_streaming(self, items: Sequence[Dict[str, Any]], resume: bool = True) -> Iterator[Dict[str, Any]]:
+        """Yield results incrementally to minimize peak memory usage."""
+        if self.memory_limit_gb:
+            set_memory_limit(self.memory_limit_gb)
 
+        checkpoint = self._load_checkpoint() if resume else {"processed": [], "started_at": time.time()}
+        processed = set(checkpoint["processed"])
+        remaining = [item for item in items if item["uniprot_id"] not in processed]
+        if not remaining:
+            return
+
+        with mp.Pool(processes=self.workers, initializer=_init_worker, initargs=(self.analyze_function,)) as pool:
+            for chunk in self._chunked(remaining):
+                for result in pool.imap_unordered(_run_worker, chunk):
+                    processed.add(result["uniprot_id"])
+                    checkpoint["processed"] = sorted(processed)
+                    self._save_checkpoint(checkpoint)
+                    yield result
+
+    @timed()
+    def create_result_memmap(self, size: int, columns: int = 8) -> np.memmap:
+        """Create a temporary memory-mapped array for large numeric outputs."""
+        memmap_path = Path(tempfile.gettempdir()) / f"cryptic_ip_{os.getpid()}_{int(time.time())}.mmap"
+        return np.memmap(memmap_path, dtype="float32", mode="w+", shape=(size, columns))
+
+
+@timed()
 def append_results_to_file(results: Iterable[Dict[str, Any]], output_path: Path | str) -> Path:
     """Append incremental run outputs to CSV in a checkpoint-safe way."""
     output_file = Path(output_path)
