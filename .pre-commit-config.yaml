@@ -38,3 +38,12 @@ repos:
       - id: mypy
         args: [--ignore-missing-imports, --no-strict-optional]
         additional_dependencies: [types-requests, types-PyYAML]
+
+
+  - repo: local
+    hooks:
+      - id: validate-test-data
+        name: Validate test data via cryptic-ip validators
+        entry: python -m pytest tests/test_validation_infrastructure.py -q
+        language: system
+        pass_filenames: false
