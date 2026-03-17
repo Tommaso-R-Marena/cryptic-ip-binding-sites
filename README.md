@@ -6,6 +6,22 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.placeholder.svg)](https://doi.org/10.5281/zenodo.placeholder)
 
+## ⚡ Quick Start
+
+```bash
+git clone https://github.com/Tommaso-R-Marena/cryptic-ip-binding-sites.git
+cd cryptic-ip-binding-sites
+pip install -e .
+cryptic-ip analyze data/1ZY7.pdb --output results/adar2.csv --use-ml-model
+```
+
+```python
+from cryptic_ip.analysis import ProteinAnalyzer
+analyzer = ProteinAnalyzer("data/1ZY7.pdb", use_ml_model=True)
+hits = analyzer.score_all_pockets().sort_values("composite_score", ascending=False)
+print(hits[["pocket_id", "composite_score"]].head())
+```
+
 ## Systematic Discovery of Buried Inositol Phosphate Binding Sites Across Proteomes
 
 > **A computational pipeline for identifying cryptic IP-binding sites where inositol phosphates function as structural folding cofactors rather than signaling molecules.**
@@ -32,37 +48,18 @@ This project builds the first **proteome-wide computational screen** to answer t
 
 ---
 
-## 📒 Interactive Notebooks
+## 📒 Interactive Notebooks (Colab-ready tutorials)
 
-Explore the complete analysis pipeline through executable Jupyter notebooks:
+All tutorials in `notebooks/tutorials/` include one-click Colab launch links.
 
-| Notebook | Description | Interactive Launch |
-|----------|-------------|-------------------|
-| **01_Quick_Start** | Installation validation and basic usage | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Tommaso-R-Marena/cryptic-ip-binding-sites/main?filepath=notebooks/01_Quick_Start.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/01_Quick_Start.ipynb) |
-| **02_ADAR2_Analysis** | Complete ADAR2 validation with real crystal structure data | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Tommaso-R-Marena/cryptic-ip-binding-sites/main?filepath=notebooks/02_ADAR2_Analysis.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/02_ADAR2_Analysis.ipynb) |
-| **03_Proteome_Screening** | Large-scale screening workflow | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Tommaso-R-Marena/cryptic-ip-binding-sites/main?filepath=notebooks/03_Proteome_Screening.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/03_Proteome_Screening.ipynb) |
-| **04_Validation_Analysis** | Positive/negative control validation suite | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Tommaso-R-Marena/cryptic-ip-binding-sites/main?filepath=notebooks/04_Validation_Analysis.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/04_Validation_Analysis.ipynb) |
-| **05_Results_Analysis** | Comparative proteomics and statistical analysis | [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/Tommaso-R-Marena/cryptic-ip-binding-sites/main?filepath=notebooks/05_Results_Analysis.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/05_Results_Analysis.ipynb) |
-| **🆕 06_Protein_Engineering** | **Full computational pipeline: Engineer IP6-dependent sfGFP with MD & QM/MM** | [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/06_Protein_Engineering_Pipeline.ipynb) |
-
-**All notebooks use real data** from:
-- AlphaFold Protein Structure Database ([alphafold.ebi.ac.uk](https://alphafold.ebi.ac.uk))
-- RCSB Protein Data Bank ([rcsb.org](https://www.rcsb.org))
-- UniProt ([uniprot.org](https://www.uniprot.org))
-
-### ✨ NEW: Protein Engineering Pipeline
-
-Notebook 06 implements a **complete computational workflow** for engineering an IP6-dependent fluorescent protein:
-
-- ✅ **Structure-based design**: Graft ADAR2-like IP6 pocket into superfolder GFP
-- ✅ **Molecular dynamics**: OpenMM simulations (± IP6, explicit solvent, 10+ ns)
-- ✅ **QM/MM calculations**: Quantum tunneling analysis with DFT
-- ✅ **Experimental protocols**: Wet-lab validation design (fluorescence, DSF, refolding kinetics)
-- ✅ **No placeholders**: All code fully implemented and executable in Colab
-
-**🎯 Goal**: Create first rationally designed protein that requires buried IP6 for folding, enabling direct experimental proof of cryptic IP cofactor mechanism and quantum effects.
-
----
+| Tutorial | Description | Colab |
+|---|---|---|
+| `Tutorial_01_Quick_Start.ipynb` | Install → analyze ADAR2 → inspect ranked pockets (~10 min) | [Open](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/tutorials/Tutorial_01_Quick_Start.ipynb) |
+| `Tutorial_02_ML_Classifier.ipynb` | Train a custom classifier on your validation set | [Open](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/tutorials/Tutorial_02_ML_Classifier.ipynb) |
+| `Tutorial_03_Batch_Screening.ipynb` | Parallel batch screening for whole proteomes | [Open](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/tutorials/Tutorial_03_Batch_Screening.ipynb) |
+| `Tutorial_04_Comparative_Analysis.ipynb` | Compare 3 organisms with stats + figures | [Open](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/tutorials/Tutorial_04_Comparative_Analysis.ipynb) |
+| `Tutorial_05_MD_Validation.ipynb` | OpenMM-based MD validation on top candidates | [Open](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/tutorials/Tutorial_05_MD_Validation.ipynb) |
+| `Tutorial_06_Web_Interface.ipynb` | Local and cloud deployment of the Streamlit app | [Open](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/tutorials/Tutorial_06_Web_Interface.ipynb) |
 
 ## ⚙️ Methodology
 
@@ -182,7 +179,14 @@ All installable via conda:
 conda install -c conda-forge fpocket freesasa apbs pdb2pqr
 ```
 
-See [INSTALLATION.md](docs/INSTALLATION.md) for detailed instructions.
+### Docker installation option
+
+```bash
+docker build -t cryptic-ip .
+docker run --rm -it -v $(pwd):/workspace cryptic-ip cryptic-ip --help
+```
+
+See [INSTALLATION.md](docs/INSTALLATION.md) and [README_DOCKER.md](README_DOCKER.md) for detailed instructions.
 
 ---
 
@@ -355,6 +359,20 @@ Current coverage: **>85%** for core analysis modules.
 
 ---
 
+## ❓ FAQ
+
+**Do I need ML mode for first runs?**  
+No. Start with rule-based scoring, then enable `--use-ml-model` once you have validated labels.
+
+**Can I run this without GPUs?**  
+Yes. Core screening is CPU-friendly; GPUs are mainly useful for larger OpenMM runs.
+
+**How should I pick score thresholds?**  
+Calibrate on controls first (ADAR2 positives + PH-domain negatives), then lock thresholds before proteome-wide runs.
+
+**Can I resume interrupted batch jobs?**  
+Yes. Use checkpoint-enabled batch processing in `cryptic_ip.database.batch_processing`.
+
 ## 📚 Citation
 
 If you use this pipeline in your research, please cite:
@@ -438,9 +456,9 @@ This software is provided for research and educational purposes. External tools 
 
 ## 🛠️ Project Status
 
-**Current Phase**: Phase 1 - Tool Validation (Complete)  
-**Next Milestone**: Phase 2 - Database Construction  
-**Target**: Phase 3 - Proteome-Wide Screening  
+**Current Phase**: Phase 5 - Comparative analysis and documentation (Complete)  
+**Next Milestone**: Large-scale execution on full proteomes  
+**Target**: manuscript submission package  
 
 ### Roadmap
 
@@ -453,7 +471,7 @@ This software is provided for research and educational purposes. External tools 
 - [ ] Yeast proteome screen
 - [ ] Human proteome screen
 - [ ] Dictyostelium proteome screen
-- [ ] Comparative analysis
+- [x] Comparative analysis
 - [ ] Manuscript preparation
 
 **Last Updated**: February 2026
@@ -471,6 +489,13 @@ This software is provided for research and educational purposes. External tools 
   ·
   <a href="docs/TUTORIAL.md">View Tutorial</a>
 </p>
+## 🖼️ Streamlit screenshots
+
+> Add your latest UI captures to `docs/images/` and update links below.
+
+- `docs/images/streamlit-home.png` (home + input panel)
+- `docs/images/streamlit-results.png` (ranked candidates + structure view)
+
 ## 🌐 Streamlit Web Interface
 
 A deployable Streamlit app is available at `streamlit_app.py` for community-facing, single-protein analysis.

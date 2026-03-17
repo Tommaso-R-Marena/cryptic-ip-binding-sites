@@ -114,3 +114,16 @@ Notebooks will create output in:
 ## Questions?
 
 See the main repository README or open an issue on GitHub.
+
+## New tutorial series (`notebooks/tutorials/`)
+
+The user-facing tutorial track is in `notebooks/tutorials/` and maps to the full pipeline:
+
+1. `Tutorial_01_Quick_Start.ipynb`
+2. `Tutorial_02_ML_Classifier.ipynb`
+3. `Tutorial_03_Batch_Screening.ipynb`
+4. `Tutorial_04_Comparative_Analysis.ipynb`
+5. `Tutorial_05_MD_Validation.ipynb`
+6. `Tutorial_06_Web_Interface.ipynb`
+
+Each notebook includes an Open-in-Colab badge.
