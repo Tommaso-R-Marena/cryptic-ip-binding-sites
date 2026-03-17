@@ -96,6 +96,16 @@ jobs:
         wget -q -O tests/data/structures/1MAI.pdb \
           https://files.rcsb.org/download/1MAI.pdb
 
+
+    - name: Run validation command on example datasets
+      run: |
+        mkdir -p tests/data/validation
+        python -c "import sqlite3; from pathlib import Path; Path('tests/data/validation/example.pdb').write_text('HEADER    EXAMPLE\nREMARK   2 RESOLUTION.    2.50 ANGSTROMS.\nATOM      1  N   ALA A   1      11.104  13.207  14.503  1.00 82.00           N\nATOM      2  CA  ALA A   1      11.551  11.823  14.240  1.00 82.00           C\nATOM      3  C   ALA A   1      12.001  11.089  15.505  1.00 82.00           C\nATOM      4  N   GLY A   2      13.104  10.207  16.503  1.00 80.00           N\nATOM      5  CA  GLY A   2      13.551   8.823  16.240  1.00 80.00           C\nTER\nEND\n'); Path('tests/data/validation/example_results.csv').write_text('pocket_id,pocket_depth,sasa,volume,composite_score\n1,4.2,320.5,210.0,0.82\n'); conn=sqlite3.connect('tests/data/validation/example.db'); conn.execute('CREATE TABLE structures (uniprot_id TEXT, model_date TEXT, file_path TEXT)'); conn.execute(\"INSERT INTO structures VALUES (NULL, '2024-01-01T00:00:00+00:00', 'tests/data/validation/example.pdb')\"); conn.commit(); conn.close()"
+        cryptic-ip validate --structure tests/data/validation/example.pdb
+        cryptic-ip validate --results tests/data/validation/example_results.csv
+        cryptic-ip validate --database tests/data/validation/example.db
+        cryptic-ip validate --all --structure tests/data/validation/example.pdb --results tests/data/validation/example_results.csv --database tests/data/validation/example.db
+
     - name: Run unit tests
       shell: bash -l {0}
       run: |

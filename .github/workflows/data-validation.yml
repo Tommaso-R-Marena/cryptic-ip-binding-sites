@@ -28,6 +28,14 @@ jobs:
           --proteins P78563 \
           --output validation_report.json
 
+
+    - name: Run validation CLI on example datasets
+      run: |
+        pip install -e .
+        mkdir -p tests/data/validation
+        python -c "import sqlite3; from pathlib import Path; Path('tests/data/validation/example.pdb').write_text('HEADER    EXAMPLE\nREMARK   2 RESOLUTION.    2.50 ANGSTROMS.\nATOM      1  N   ALA A   1      11.104  13.207  14.503  1.00 82.00           N\nATOM      2  CA  ALA A   1      11.551  11.823  14.240  1.00 82.00           C\nATOM      3  C   ALA A   1      12.001  11.089  15.505  1.00 82.00           C\nATOM      4  N   GLY A   2      13.104  10.207  16.503  1.00 80.00           N\nATOM      5  CA  GLY A   2      13.551   8.823  16.240  1.00 80.00           C\nTER\nEND\n'); Path('tests/data/validation/example_results.csv').write_text('pocket_id,pocket_depth,sasa,volume,composite_score\n1,4.2,320.5,210.0,0.82\n'); conn=sqlite3.connect('tests/data/validation/example.db'); conn.execute('CREATE TABLE structures (uniprot_id TEXT, model_date TEXT, file_path TEXT)'); conn.execute(\"INSERT INTO structures VALUES (NULL, '2024-01-01T00:00:00+00:00', 'tests/data/validation/example.pdb')\"); conn.commit(); conn.close()"
+        cryptic-ip validate --all --structure tests/data/validation/example.pdb --results tests/data/validation/example_results.csv --database tests/data/validation/example.db
+
     - name: Check AlphaFold database freshness
       run: |
         python scripts/check_alphafold_versions.py \
@@ -62,57 +70,12 @@ jobs:
 
     - name: Check AlphaFold API
       run: |
-        python -c "
-import requests
-import sys
-
-try:
-    # Check AlphaFold EBI API
-    response = requests.get('https://alphafold.ebi.ac.uk/api/prediction/P78563', timeout=10)
-    if response.status_code == 200:
-        print('✓ AlphaFold API: OK')
-    else:
-        print(f'✗ AlphaFold API: {response.status_code}')
-        sys.exit(1)
-except Exception as e:
-    print(f'✗ AlphaFold API: {e}')
-    sys.exit(1)
-        "
+        python -c "import requests,sys; r=requests.get('https://alphafold.ebi.ac.uk/api/prediction/P78563', timeout=10); print('✓ AlphaFold API: OK') if r.status_code==200 else (print(f'✗ AlphaFold API: {r.status_code}'), sys.exit(1))"
 
     - name: Check PDB API
       run: |
-        python -c "
-import requests
-import sys
-
-try:
-    # Check RCSB PDB API
-    response = requests.get('https://data.rcsb.org/rest/v1/core/entry/1ZY7', timeout=10)
-    if response.status_code == 200:
-        print('✓ RCSB PDB API: OK')
-    else:
-        print(f'✗ RCSB PDB API: {response.status_code}')
-        sys.exit(1)
-except Exception as e:
-    print(f'✗ RCSB PDB API: {e}')
-    sys.exit(1)
-        "
+        python -c "import requests,sys; r=requests.get('https://data.rcsb.org/rest/v1/core/entry/1ZY7', timeout=10); print('✓ RCSB PDB API: OK') if r.status_code==200 else (print(f'✗ RCSB PDB API: {r.status_code}'), sys.exit(1))"
 
     - name: Check UniProt API
       run: |
-        python -c "
-import requests
-import sys
-
-try:
-    # Check UniProt API
-    response = requests.get('https://rest.uniprot.org/uniprotkb/P78563', timeout=10)
-    if response.status_code == 200:
-        print('✓ UniProt API: OK')
-    else:
-        print(f'✗ UniProt API: {response.status_code}')
-        sys.exit(1)
-except Exception as e:
-    print(f'✗ UniProt API: {e}')
-    sys.exit(1)
-        "
+        python -c "import requests,sys; r=requests.get('https://rest.uniprot.org/uniprotkb/P78563', timeout=10); print('✓ UniProt API: OK') if r.status_code==200 else (print(f'✗ UniProt API: {r.status_code}'), sys.exit(1))"
