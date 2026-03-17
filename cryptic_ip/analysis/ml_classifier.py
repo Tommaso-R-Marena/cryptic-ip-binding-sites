@@ -327,6 +327,11 @@ class MLPocketScorer:
         )
         return float(self.classifier.predict_proba(sample)[0])
 
+
+    def calculate_composite_scores(self, samples: pd.DataFrame) -> np.ndarray:
+        """Vectorized probability inference over many pockets."""
+        return self.classifier.predict_proba(samples)
+
     def classify_site(self, score: float) -> str:
         """Classify model probability into confidence buckets."""
         if score >= 0.8:

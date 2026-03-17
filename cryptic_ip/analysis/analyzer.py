@@ -5,6 +5,8 @@ Protein structure analysis and pocket detection.
 import os
 import subprocess
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -17,6 +19,8 @@ from .electrostatics import ElectrostaticsCalculator
 from .fpocket_parser import FpocketParser
 from .ml_classifier import CrypticSiteMLClassifier, MLPocketScorer
 from .scorer import PocketScorer
+from ..utils.profiling import timed
+from ..utils.resources import cleanup_files, set_memory_limit
 
 
 class ProteinAnalyzer:
@@ -34,6 +38,8 @@ class ProteinAnalyzer:
         scorer: Optional[Any] = None,
         use_ml_model: bool = False,
         model_path: Optional[str] = None,
+        skip_electrostatics: bool = False,
+        memory_limit_gb: Optional[float] = None,
     ):
         """
         Initialize analyzer with a protein structure.
@@ -59,11 +65,31 @@ class ProteinAnalyzer:
         self.fpocket_parser = FpocketParser()
         self.model_path = self._resolve_model_path(model_path)
         self.scorer = scorer or self._build_default_scorer(use_ml_model)
+        self.skip_electrostatics = skip_electrostatics
+        if memory_limit_gb:
+            set_memory_limit(memory_limit_gb)
 
         # Storage for results
         self.pockets = None
         self.sasa_data = None
         self.electrostatic_data = None
+
+    @timed()
+    def run_pipeline(self, include_electrostatics: Optional[bool] = None) -> pd.DataFrame:
+        """Run the full single-protein pipeline with intra-protein parallelization."""
+        self.detect_pockets()
+        use_electrostatics = (not self.skip_electrostatics) if include_electrostatics is None else include_electrostatics
+
+        jobs = [self.calculate_sasa]
+        if use_electrostatics:
+            jobs.append(self.calculate_electrostatics)
+
+        with ThreadPoolExecutor(max_workers=len(jobs)) as executor:
+            futures = [executor.submit(job) for job in jobs]
+            for future in futures:
+                future.result()
+
+        return self.score_all_pockets()
 
     def _resolve_model_path(self, model_path: Optional[str]) -> Path:
         if model_path:
@@ -84,6 +110,7 @@ class ProteinAnalyzer:
             )
             return PocketScorer()
 
+    @timed()
     def detect_pockets(self, min_alpha_sphere: int = 3) -> pd.DataFrame:
         """
         Detect pockets using fpocket.
@@ -121,6 +148,7 @@ class ProteinAnalyzer:
 
         return self.pockets
 
+    @timed()
     def calculate_sasa(self) -> Dict[int, float]:
         """
         Calculate solvent accessible surface area for all residues.
@@ -146,6 +174,7 @@ class ProteinAnalyzer:
         except Exception as e:
             raise RuntimeError(f"SASA calculation failed: {e}")
 
+    @timed()
     def calculate_electrostatics(self, ph: float = 7.4) -> Optional[float]:
         """
         Calculate electrostatic potential using pdb2pqr + APBS.
@@ -169,6 +198,8 @@ class ProteinAnalyzer:
         self.electrostatic_data = potential
         return potential
 
+    @timed()
+    @lru_cache(maxsize=512)
     def get_pocket_residues(self, pocket_id: int, distance_cutoff: float = 5.0) -> List[int]:
         """
         Get residue numbers within distance of pocket center.
@@ -222,6 +253,7 @@ class ProteinAnalyzer:
 
         return basic_count
 
+    @timed()
     def analyze_pocket(self, pocket_id: int) -> Dict:
         """
         Complete analysis of a single pocket.
@@ -242,7 +274,8 @@ class ProteinAnalyzer:
         pocket_residues = self.get_pocket_residues(pocket_id)
 
         # Calculate average SASA for pocket residues
-        pocket_sasa = np.mean([self.sasa_data.get(r, 0) for r in pocket_residues])
+        residue_array = np.asarray(pocket_residues, dtype=int)
+        pocket_sasa = float(np.mean(np.vectorize(lambda r: self.sasa_data.get(int(r), 0.0))(residue_array)))
 
         # Count basic residues
         basic_count = self.count_basic_residues(pocket_id)
@@ -254,9 +287,11 @@ class ProteinAnalyzer:
             "sasa": pocket_sasa,
             "basic_residues": basic_count,
             "residue_count": len(pocket_residues),
+            "electrostatic_potential": self.electrostatic_data,
             "center": (pocket["center_x"], pocket["center_y"], pocket["center_z"]),
         }
 
+    @timed()
     def score_all_pockets(self) -> pd.DataFrame:
         """
         Score all detected pockets for cryptic IP binding.
@@ -270,18 +305,45 @@ class ProteinAnalyzer:
         results = []
         for pocket_id in self.pockets["pocket_id"]:
             try:
-                analysis = self.analyze_pocket(pocket_id)
-                score = self.scorer.calculate_composite_score(
-                    volume=analysis["volume"],
-                    depth=analysis["depth"],
-                    sasa=analysis["sasa"],
-                    basic_count=analysis["basic_residues"],
-                    potential=analysis.get("electrostatic_potential"),
-                )
-                analysis["composite_score"] = score
-                results.append(analysis)
+                results.append(self.analyze_pocket(pocket_id))
             except Exception as e:
                 print(f"Warning: Failed to analyze pocket {pocket_id}: {e}")
                 continue
 
+        if not results:
+            return pd.DataFrame(results)
+
+        if hasattr(self.scorer, "calculate_composite_scores"):
+            samples = pd.DataFrame(
+                [
+                    {
+                        "pocket_depth": row["depth"],
+                        "sasa": row["sasa"],
+                        "electrostatic_potential": row.get("electrostatic_potential"),
+                        "n_basic_residues": row["basic_residues"],
+                        "pocket_volume": row["volume"],
+                        "plddt_confidence": np.nan,
+                    }
+                    for row in results
+                ]
+            )
+            scores = self.scorer.calculate_composite_scores(samples)
+            for row, score in zip(results, scores):
+                row["composite_score"] = float(score)
+        else:
+            for row in results:
+                row["composite_score"] = self.scorer.calculate_composite_score(
+                    volume=row["volume"],
+                    depth=row["depth"],
+                    sasa=row["sasa"],
+                    basic_count=row["basic_residues"],
+                    potential=row.get("electrostatic_potential"),
+                )
+
         return pd.DataFrame(results).sort_values("composite_score", ascending=False)
+
+    @timed()
+    def cleanup(self) -> None:
+        """Clear analyzer intermediates from disk and reset in-memory caches."""
+        cleanup_files([self.work_dir / f"{self.pdb_path.stem}_out", self.work_dir / "electrostatics"])
+        self.get_pocket_residues.cache_clear()
