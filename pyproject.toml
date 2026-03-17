@@ -54,6 +54,7 @@ dependencies = [
     "tqdm>=4.62",
     "pyyaml>=6.0",
     "typing-extensions>=4.0",
+    "jsonschema>=4.0",
 ]
 
 [project.optional-dependencies]

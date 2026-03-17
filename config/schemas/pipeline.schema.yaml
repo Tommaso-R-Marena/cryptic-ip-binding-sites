@@ -1,0 +1,60 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+type: object
+required: [pipeline, provenance, data_sources, archival]
+properties:
+  pipeline:
+    type: object
+    required: [score_threshold, seed, sort_columns, float_tolerance, output_precision_decimals]
+    properties:
+      score_threshold:
+        type: number
+        minimum: 0
+        maximum: 1
+      max_structures:
+        type: [integer, 'null']
+        minimum: 1
+      seed:
+        type: integer
+        minimum: 0
+      use_ml_model:
+        type: boolean
+      model_path:
+        type: string
+      sort_columns:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      float_tolerance:
+        type: number
+        exclusiveMinimum: 0
+      output_precision_decimals:
+        type: integer
+        minimum: 1
+  provenance:
+    type: object
+    required: [log_inputs, log_outputs, include_software_versions, manifest_path]
+    properties:
+      log_inputs: {type: boolean}
+      log_outputs: {type: boolean}
+      include_software_versions: {type: boolean}
+      manifest_path: {type: string}
+  data_sources:
+    type: object
+    required: [alphafold_release_date, pdb_fetch_date]
+    properties:
+      alphafold_release_date:
+        type: string
+      pdb_fetch_date:
+        type: string
+  archival:
+    type: object
+    required: [bundle_dir, include_paths]
+    properties:
+      bundle_dir:
+        type: string
+      include_paths:
+        type: array
+        items:
+          type: string
+additionalProperties: false
