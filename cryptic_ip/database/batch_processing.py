@@ -10,6 +10,8 @@ import os
 import sqlite3
 import tempfile
 import time
+import logging
+import threading
 from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +24,20 @@ from tqdm import tqdm
 
 from ..utils.profiling import timed
 from ..utils.resources import set_memory_limit
+from ..utils.input_validation import (
+    BatchDownloadConfig,
+    ExportConfig,
+    ParallelProcessorConfig,
+    parse_or_raise,
+)
+from ..utils.logging_utils import configure_logging, log_with_context
+from ..errors import (
+    BatchItemProcessingError,
+    CacheOperationError,
+    NetworkRetryError,
+    OperationTimeoutError,
+    RecoveryStateError,
+)
 from .alphafold_client import AlphaFoldClient
 
 
@@ -38,19 +54,38 @@ class AlphaFoldBatchDownloader:
         max_retries: int = 5,
         backoff_seconds: float = 1.5,
         session: Optional[requests.Session] = None,
+        timeout_seconds: float = 30.0,
+        log_dir: Path | str = "logs",
     ) -> None:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.state_path = Path(state_path) if state_path else self.output_dir / "download_state.json"
-        self.requests_per_second = max(requests_per_second, 0.1)
-        self.max_retries = max_retries
-        self.backoff_seconds = backoff_seconds
+        config = parse_or_raise(
+            BatchDownloadConfig,
+            {
+                "requests_per_second": requests_per_second,
+                "max_retries": max_retries,
+                "backoff_seconds": backoff_seconds,
+                "timeout_seconds": timeout_seconds,
+            },
+            "Invalid batch downloader configuration",
+        )
+        self.requests_per_second = config.requests_per_second
+        self.max_retries = config.max_retries
+        self.backoff_seconds = config.backoff_seconds
+        self.timeout_seconds = config.timeout_seconds
         self.session = session or requests.Session()
         self.af_client = AlphaFoldClient(cache_dir=self.output_dir)
+        self.logger = configure_logging(log_dir, "batch_downloader")
 
     def _load_state(self) -> Dict[str, Any]:
         if self.state_path.exists():
-            return json.loads(self.state_path.read_text())
+            try:
+                return json.loads(self.state_path.read_text())
+            except json.JSONDecodeError as exc:
+                raise RecoveryStateError(
+                    f"Checkpoint file '{self.state_path}' is corrupted and cannot be resumed."
+                ) from exc
         return {"completed": {}, "failed": {}}
 
     def _save_state(self, state: Dict[str, Any]) -> None:
@@ -65,12 +100,20 @@ class AlphaFoldBatchDownloader:
     def _request_with_retry(self, method: str, url: str, **kwargs: Any) -> requests.Response:
         for attempt in range(1, self.max_retries + 1):
             try:
-                response = self.session.request(method, url, timeout=30, **kwargs)
+                response = self.session.request(method, url, timeout=self.timeout_seconds, **kwargs)
                 response.raise_for_status()
                 return response
-            except requests.RequestException:
+            except requests.Timeout as exc:
                 if attempt == self.max_retries:
-                    raise
+                    raise OperationTimeoutError(
+                        f"Request to {url} timed out after {self.max_retries} attempts."
+                    ) from exc
+                time.sleep(self.backoff_seconds * (2 ** (attempt - 1)))
+            except requests.RequestException as exc:
+                if attempt == self.max_retries:
+                    raise NetworkRetryError(
+                        f"Request to {url} failed after {self.max_retries} attempts."
+                    ) from exc
                 time.sleep(self.backoff_seconds * (2 ** (attempt - 1)))
         raise RuntimeError("Unreachable retry branch")
 
@@ -125,7 +168,15 @@ class AlphaFoldBatchDownloader:
                     completed.add(uniprot_id)
                     failed.discard(uniprot_id)
                     summary["downloaded"] += 1
-                except Exception:
+                except Exception as exc:
+                    log_with_context(
+                        self.logger,
+                        logging.WARNING,
+                        "Skipping failed structure download",
+                        proteome_id=proteome_id,
+                        uniprot_id=uniprot_id,
+                        error=str(exc),
+                    )
                     failed.add(uniprot_id)
                     summary["failed"] += 1
                 finally:
@@ -147,16 +198,33 @@ class AnalysisCache:
         pipeline_version: str,
         pipeline_params: Optional[Dict[str, Any]] = None,
         query_cache_size: int = 2048,
+        max_db_retries: int = 5,
+        log_dir: Path | str = "logs",
     ):
         self.db_path = Path(db_path)
         self.pipeline_version = pipeline_version
         self.pipeline_params = pipeline_params or {}
         self.params_hash = self._hash_pipeline_params(self.pipeline_params)
-        self.connection = sqlite3.connect(self.db_path)
+        self.connection = sqlite3.connect(self.db_path, check_same_thread=False)
         self.connection.row_factory = sqlite3.Row
         self.query_cache_size = query_cache_size
+        self.max_db_retries = max_db_retries
+        self.logger = configure_logging(log_dir, "analysis_cache")
+        self._db_lock = threading.Lock()
         self._query_cache: OrderedDict[Tuple[str, str, str], Dict[str, Any]] = OrderedDict()
         self._initialize_schema()
+
+    def _with_db_retry(self, operation: Callable[[], Any]) -> Any:
+        for attempt in range(1, self.max_db_retries + 1):
+            try:
+                with self._db_lock:
+                    return operation()
+            except sqlite3.OperationalError as exc:
+                if "locked" not in str(exc).lower() or attempt == self.max_db_retries:
+                    raise CacheOperationError(
+                        f"Database operation failed after {attempt} attempts: {exc}"
+                    ) from exc
+                time.sleep(0.1 * (2 ** (attempt - 1)))
 
     @staticmethod
     def _hash_pipeline_params(pipeline_params: Dict[str, Any]) -> str:
@@ -197,17 +265,19 @@ class AnalysisCache:
         if key in self._query_cache:
             return self._query_cache[key]
 
-        row = self.connection.execute(
-            """
-            SELECT analysis_results
-            FROM analysis_cache
-            WHERE uniprot_id = ?
-              AND organism = ?
-              AND pipeline_version = ?
-              AND params_hash = ?
-            """,
-            (uniprot_id, organism, self.pipeline_version, self.params_hash),
-        ).fetchone()
+        row = self._with_db_retry(
+            lambda: self.connection.execute(
+                """
+                SELECT analysis_results
+                FROM analysis_cache
+                WHERE uniprot_id = ?
+                  AND organism = ?
+                  AND pipeline_version = ?
+                  AND params_hash = ?
+                """,
+                (uniprot_id, organism, self.pipeline_version, self.params_hash),
+            ).fetchone()
+        )
 
         if row is None:
             return None
@@ -219,27 +289,29 @@ class AnalysisCache:
     @timed()
     def set_cached_result(self, uniprot_id: str, organism: str, analysis_results: Dict[str, Any]) -> None:
         timestamp = datetime.now(timezone.utc).isoformat()
-        self.connection.execute(
-            """
-            INSERT INTO analysis_cache (
-                uniprot_id, organism, analysis_results, timestamp, pipeline_version, params_hash
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(uniprot_id, pipeline_version, params_hash)
-            DO UPDATE SET
-                organism = excluded.organism,
-                analysis_results = excluded.analysis_results,
-                timestamp = excluded.timestamp
-            """,
-            (
-                uniprot_id,
-                organism,
-                json.dumps(analysis_results),
-                timestamp,
-                self.pipeline_version,
-                self.params_hash,
-            ),
+        self._with_db_retry(
+            lambda: self.connection.execute(
+                """
+                INSERT INTO analysis_cache (
+                    uniprot_id, organism, analysis_results, timestamp, pipeline_version, params_hash
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(uniprot_id, pipeline_version, params_hash)
+                DO UPDATE SET
+                    organism = excluded.organism,
+                    analysis_results = excluded.analysis_results,
+                    timestamp = excluded.timestamp
+                """,
+                (
+                    uniprot_id,
+                    organism,
+                    json.dumps(analysis_results),
+                    timestamp,
+                    self.pipeline_version,
+                    self.params_hash,
+                ),
+            )
         )
-        self.connection.commit()
+        self._with_db_retry(self.connection.commit)
         self._update_query_cache(self._cache_key(uniprot_id, organism), analysis_results)
 
 
@@ -258,20 +330,23 @@ class AnalysisCache:
             )
             for uniprot_id, organism, analysis_results in rows
         ]
-        with self.connection:
-            self.connection.executemany(
-                """
-                INSERT INTO analysis_cache (
-                    uniprot_id, organism, analysis_results, timestamp, pipeline_version, params_hash
-                ) VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(uniprot_id, pipeline_version, params_hash)
-                DO UPDATE SET
-                    organism = excluded.organism,
-                    analysis_results = excluded.analysis_results,
-                    timestamp = excluded.timestamp
-                """,
-                payload,
-            )
+        def _batch_upsert() -> None:
+            with self.connection:
+                self.connection.executemany(
+                    """
+                    INSERT INTO analysis_cache (
+                        uniprot_id, organism, analysis_results, timestamp, pipeline_version, params_hash
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(uniprot_id, pipeline_version, params_hash)
+                    DO UPDATE SET
+                        organism = excluded.organism,
+                        analysis_results = excluded.analysis_results,
+                        timestamp = excluded.timestamp
+                    """,
+                    payload,
+                )
+
+        self._with_db_retry(_batch_upsert)
         for uniprot_id, organism, analysis_results in rows:
             self._update_query_cache(self._cache_key(uniprot_id, organism), analysis_results)
         return len(rows)
@@ -290,17 +365,20 @@ class AnalysisCache:
 
     @timed()
     def export_results(self, output_path: Path | str, export_format: str) -> Path:
+        export = parse_or_raise(
+            ExportConfig,
+            {"export_format": export_format},
+            "Invalid export configuration",
+        )
         export_path = Path(output_path)
         data = pd.read_sql_query("SELECT * FROM analysis_cache", self.connection)
 
-        if export_format == "csv":
+        if export.export_format == "csv":
             data.to_csv(export_path, index=False)
-        elif export_format == "json":
+        elif export.export_format == "json":
             data.to_json(export_path, orient="records", indent=2)
-        elif export_format == "hdf5":
+        elif export.export_format == "hdf5":
             data.to_hdf(export_path, key="analysis_cache", mode="w")
-        else:
-            raise ValueError(f"Unsupported export format: {export_format}")
 
         return export_path
 
@@ -337,17 +415,38 @@ class ParallelProcessor:
         checkpoint_path: Path | str = "processing_checkpoint.json",
         memory_limit_gb: Optional[float] = None,
         use_memmap: bool = False,
+        timeout_per_item_seconds: Optional[float] = None,
+        checkpoint_every: int = 1,
+        log_dir: Path | str = "logs",
     ) -> None:
+        config = parse_or_raise(
+            ParallelProcessorConfig,
+            {
+                "workers": workers or max(1, mp.cpu_count() - 1),
+                "chunk_size": chunk_size,
+                "checkpoint_every": checkpoint_every,
+            },
+            "Invalid parallel processor configuration",
+        )
         self.analyze_function = analyze_function
-        self.workers = workers or max(1, mp.cpu_count() - 1)
-        self.chunk_size = chunk_size
+        self.workers = config.workers
+        self.chunk_size = config.chunk_size
+        self.checkpoint_every = config.checkpoint_every
         self.checkpoint_path = Path(checkpoint_path)
         self.memory_limit_gb = memory_limit_gb
         self.use_memmap = use_memmap
+        self.timeout_per_item_seconds = timeout_per_item_seconds
+        self.logger = configure_logging(log_dir, "parallel_processor")
+        self._memmap_paths: List[Path] = []
 
     def _load_checkpoint(self) -> Dict[str, Any]:
         if self.checkpoint_path.exists():
-            return json.loads(self.checkpoint_path.read_text())
+            try:
+                return json.loads(self.checkpoint_path.read_text())
+            except json.JSONDecodeError as exc:
+                raise RecoveryStateError(
+                    f"Checkpoint file '{self.checkpoint_path}' is invalid JSON."
+                ) from exc
         return {"processed": [], "started_at": time.time()}
 
     def _save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
@@ -376,11 +475,33 @@ class ParallelProcessor:
 
         with mp.Pool(processes=self.workers, initializer=_init_worker, initargs=(self.analyze_function,)) as pool:
             for chunk in self._chunked(remaining):
-                for result in pool.imap_unordered(_run_worker, chunk):
+                iterator = pool.imap_unordered(_run_worker, chunk)
+                while True:
+                    try:
+                        result = iterator.next(timeout=self.timeout_per_item_seconds)
+                    except mp.TimeoutError as exc:
+                        raise OperationTimeoutError(
+                            f"Parallel item processing exceeded timeout ({self.timeout_per_item_seconds}s)."
+                        ) from exc
+                    except StopIteration:
+                        break
+                    except Exception as exc:
+                        log_with_context(
+                            self.logger,
+                            logging.WARNING,
+                            "Skipping failed item during parallel processing",
+                            error=str(exc),
+                        )
+                        continue
+
+                    if "uniprot_id" not in result:
+                        raise BatchItemProcessingError("unknown", "result missing uniprot_id")
+
                     results.append(result)
                     processed.add(result["uniprot_id"])
-                    checkpoint["processed"] = sorted(processed)
-                    self._save_checkpoint(checkpoint)
+                    if len(processed) % self.checkpoint_every == 0:
+                        checkpoint["processed"] = sorted(processed)
+                        self._save_checkpoint(checkpoint)
 
                     progress.update(1)
                     elapsed = time.time() - start
@@ -388,6 +509,8 @@ class ParallelProcessor:
                     eta = (total - progress.n) / rate if rate else 0
                     progress.set_postfix(eta_seconds=f"{eta:.1f}")
 
+        checkpoint["processed"] = sorted(processed)
+        self._save_checkpoint(checkpoint)
         progress.close()
         return results
 
@@ -415,7 +538,45 @@ class ParallelProcessor:
     def create_result_memmap(self, size: int, columns: int = 8) -> np.memmap:
         """Create a temporary memory-mapped array for large numeric outputs."""
         memmap_path = Path(tempfile.gettempdir()) / f"cryptic_ip_{os.getpid()}_{int(time.time())}.mmap"
+        self._memmap_paths.append(memmap_path)
         return np.memmap(memmap_path, dtype="float32", mode="w+", shape=(size, columns))
+
+    def cleanup_temp_files(self) -> None:
+        for path in self._memmap_paths:
+            if path.exists():
+                path.unlink()
+        self._memmap_paths.clear()
+
+
+class ResourceMonitor:
+    """Background monitor that captures process resource usage for long jobs."""
+
+    def __init__(self, logger_name: str = "resource_monitor", interval_seconds: float = 5.0):
+        self.interval_seconds = interval_seconds
+        self._stop = threading.Event()
+        self.logger = configure_logging("logs", logger_name)
+        self._thread: Optional[threading.Thread] = None
+
+    def start(self) -> None:
+        def _loop() -> None:
+            while not self._stop.is_set():
+                rss_bytes = 0
+                try:
+                    import resource
+
+                    rss_bytes = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                except Exception:
+                    rss_bytes = 0
+                log_with_context(self.logger, logging.INFO, "resource_snapshot", rss_kb=rss_bytes)
+                self._stop.wait(self.interval_seconds)
+
+        self._thread = threading.Thread(target=_loop, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=2)
 
 
 @timed()

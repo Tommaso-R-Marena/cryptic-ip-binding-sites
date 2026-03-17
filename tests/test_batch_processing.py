@@ -1,6 +1,9 @@
 """Tests for batch processing infrastructure."""
 
-from pathlib import Path
+import json
+import threading
+
+import pytest
 
 from cryptic_ip.database.batch_processing import (
     AlphaFoldBatchDownloader,
@@ -8,6 +11,7 @@ from cryptic_ip.database.batch_processing import (
     ParallelProcessor,
     append_results_to_file,
 )
+from cryptic_ip.errors import OperationTimeoutError, RecoveryStateError, ValidationError
 
 
 def _double_value(item):
@@ -43,7 +47,7 @@ def test_batch_downloader_resume(tmp_path):
     downloader = AlphaFoldBatchDownloader(
         output_dir=tmp_path / "af",
         state_path=tmp_path / "state.json",
-        requests_per_second=100,
+        requests_per_second=10,
         session=FakeSession(),
     )
 
@@ -62,6 +66,24 @@ def test_batch_downloader_resume(tmp_path):
     summary_second = downloader.download_proteomes(["UP000002311"], resume=True)
     assert summary_second["skipped"] == 2
     assert len(calls) == 2
+
+
+def test_batch_downloader_corrupt_state(tmp_path):
+    state = tmp_path / "state.json"
+    state.write_text("{not-json")
+    downloader = AlphaFoldBatchDownloader(
+        output_dir=tmp_path / "af",
+        state_path=state,
+        requests_per_second=10,
+        session=FakeSession(),
+    )
+    with pytest.raises(RecoveryStateError):
+        downloader.download_proteomes(["UP000002311"], resume=True)
+
+
+def test_batch_downloader_config_validation(tmp_path):
+    with pytest.raises(ValidationError):
+        AlphaFoldBatchDownloader(output_dir=tmp_path / "af", requests_per_second=0)
 
 
 def test_analysis_cache_roundtrip_and_invalidate(tmp_path):
@@ -90,6 +112,22 @@ def test_analysis_cache_roundtrip_and_invalidate(tmp_path):
     other.close()
 
 
+def test_analysis_cache_concurrent_access(tmp_path):
+    cache = AnalysisCache(tmp_path / "cache.sqlite", pipeline_version="v1")
+
+    def writer(index: int):
+        cache.set_cached_result(f"P{index}", "org", {"score": index})
+
+    threads = [threading.Thread(target=writer, args=(i,)) for i in range(10)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert cache.get_cached_result("P3", "org") == {"score": 3}
+    cache.close()
+
+
 def test_parallel_processor_and_csv_append(tmp_path):
     items = [{"uniprot_id": f"P{i}", "value": i} for i in range(8)]
     processor = ParallelProcessor(
@@ -113,3 +151,35 @@ def test_parallel_processor_and_csv_append(tmp_path):
     )
     resumed = processor_resume.run(items, resume=True)
     assert resumed == []
+
+
+def test_parallel_processor_timeout(tmp_path):
+    def slow(item):
+        import time
+
+        time.sleep(0.2)
+        return {"uniprot_id": item["uniprot_id"]}
+
+    processor = ParallelProcessor(
+        analyze_function=slow,
+        workers=1,
+        chunk_size=1,
+        checkpoint_path=tmp_path / "checkpoint.json",
+        timeout_per_item_seconds=0.01,
+    )
+
+    with pytest.raises(OperationTimeoutError):
+        processor.run([{"uniprot_id": "P1"}], resume=False)
+
+
+def test_parallel_processor_corrupt_checkpoint(tmp_path):
+    checkpoint = tmp_path / "checkpoint.json"
+    checkpoint.write_text("{broken")
+    processor = ParallelProcessor(
+        analyze_function=_double_value,
+        workers=1,
+        chunk_size=1,
+        checkpoint_path=checkpoint,
+    )
+    with pytest.raises(RecoveryStateError):
+        processor.run([{"uniprot_id": "P1", "value": 1}], resume=True)

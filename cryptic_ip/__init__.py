@@ -1,27 +1,9 @@
-"""
-Cryptic IP Binding Sites
-========================
+"""Top-level package for cryptic IP binding site pipeline."""
 
-Computational pipeline for identifying buried inositol phosphate binding sites in protein structures.
-
-Modules:
-    analysis: Pocket detection, scoring, and filtering
-    database: Proteome data management and downloads
-    validation: Known site validation and benchmarking
-    visualization: Structure visualization and plotting
-"""
+from __future__ import annotations
 
 __version__ = "0.1.0"
 __author__ = "Tommaso R. Marena"
-
-from .analysis import (
-    ProteinAnalyzer,
-    PocketScorer,
-    CrypticSiteMLClassifier,
-    MLPocketScorer,
-    FEATURE_COLUMNS,
-)
-from .validation import validate_adar2, ValidationSuite
 
 __all__ = [
     "ProteinAnalyzer",
@@ -32,3 +14,27 @@ __all__ = [
     "validate_adar2",
     "ValidationSuite",
 ]
+
+
+def __getattr__(name: str):
+    if name in {"ProteinAnalyzer", "PocketScorer", "CrypticSiteMLClassifier", "MLPocketScorer", "FEATURE_COLUMNS"}:
+        from .analysis import (
+            ProteinAnalyzer,
+            PocketScorer,
+            CrypticSiteMLClassifier,
+            MLPocketScorer,
+            FEATURE_COLUMNS,
+        )
+
+        return {
+            "ProteinAnalyzer": ProteinAnalyzer,
+            "PocketScorer": PocketScorer,
+            "CrypticSiteMLClassifier": CrypticSiteMLClassifier,
+            "MLPocketScorer": MLPocketScorer,
+            "FEATURE_COLUMNS": FEATURE_COLUMNS,
+        }[name]
+    if name in {"validate_adar2", "ValidationSuite"}:
+        from .validation import ValidationSuite, validate_adar2
+
+        return {"validate_adar2": validate_adar2, "ValidationSuite": ValidationSuite}[name]
+    raise AttributeError(name)
