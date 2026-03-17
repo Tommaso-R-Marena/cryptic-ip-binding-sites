@@ -1,0 +1,29 @@
+pipeline:
+  score_threshold: 0.60
+  max_structures: null
+  seed: 42
+  use_ml_model: true
+  model_path: models/cryptic_ip_classifier_v1.pkl
+  sort_columns:
+    - composite_score
+    - uniprot_id
+    - pocket_id
+  float_tolerance: 1.0e-6
+  output_precision_decimals: 6
+
+provenance:
+  log_inputs: true
+  log_outputs: true
+  include_software_versions: true
+  manifest_path: results/provenance_manifest.jsonld
+
+data_sources:
+  alphafold_release_date: "2024-01-15"
+  pdb_fetch_date: "2024-01-15"
+
+archival:
+  bundle_dir: results/repro_bundle
+  include_paths:
+    - config/defaults/pipeline.yaml
+    - requirements.txt
+    - environment.lock.yml

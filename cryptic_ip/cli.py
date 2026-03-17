@@ -10,6 +10,7 @@ from .analysis import ProteinAnalyzer
 from .validation import validate_adar2, ValidationSuite, StructureValidator, ResultsValidator
 from .validation.md_validation import OpenMMMDValidationPipeline
 from .database import ProteomeDownloader, ProteomeManager, DatabaseIntegrityChecker
+from .reproducibility import deterministic_sort_dataframe, set_global_seed
 
 
 @click.group()
@@ -28,17 +29,20 @@ def main():
 @click.option("--output", "-o", type=click.Path(), help="Output file for results")
 @click.option("--score-threshold", "-t", default=0.60, help="Minimum score threshold")
 @click.option("--use-ml-model", is_flag=True, help="Use trained ML classifier if available")
+@click.option("--seed", type=int, default=42, show_default=True, help="Random seed")
 @click.option(
     "--model-path",
     type=click.Path(exists=False),
     default="models/cryptic_ip_classifier_v1.pkl",
     help="Path to serialized ML model",
 )
-def analyze(pdb_file, output, score_threshold, use_ml_model, model_path):
+def analyze(pdb_file, output, score_threshold, use_ml_model, seed, model_path):
     """
     Analyze a single protein structure for cryptic IP binding sites.
     """
     click.echo(f"Analyzing {pdb_file}...\n")
+
+    set_global_seed(seed)
 
     # Create analyzer
     analyzer = ProteinAnalyzer(pdb_file, use_ml_model=use_ml_model, model_path=model_path)
@@ -215,17 +219,19 @@ def download(organism, data_dir):
 @click.option("--score-threshold", "-t", default=0.60, help="Minimum score threshold")
 @click.option("--max-structures", "-n", type=int, help="Maximum structures to process")
 @click.option("--use-ml-model", is_flag=True, help="Use trained ML classifier if available")
+@click.option("--seed", type=int, default=42, show_default=True, help="Random seed")
 @click.option(
     "--model-path",
     type=click.Path(exists=False),
     default="models/cryptic_ip_classifier_v1.pkl",
     help="Path to serialized ML model",
 )
-def screen(proteome_dir, output, score_threshold, max_structures, use_ml_model, model_path):
+def screen(proteome_dir, output, score_threshold, max_structures, use_ml_model, seed, model_path):
     """
     Screen entire proteome for cryptic IP binding sites.
     """
     click.echo(f"Screening proteome: {proteome_dir}\n")
+    set_global_seed(seed)
 
     # Initialize manager
     manager = ProteomeManager(proteome_dir)
@@ -265,7 +271,11 @@ def screen(proteome_dir, output, score_threshold, max_structures, use_ml_model, 
         import pandas as pd
 
         final_results = pd.concat(all_results, ignore_index=True)
-        final_results = final_results.sort_values("composite_score", ascending=False)
+        final_results = deterministic_sort_dataframe(
+            final_results,
+            ["composite_score", "uniprot_id", "pocket_id"],
+            ascending=[False, True, True],
+        )
         final_results.to_csv(output, index=False)
 
         click.secho(f"\n✓ Found {len(final_results)} candidate sites", fg="green")
