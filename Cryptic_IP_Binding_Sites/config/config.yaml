@@ -1,0 +1,45 @@
+pipeline:
+  fpocket:
+    min_volume_A3: 300
+    max_volume_A3: 800
+    min_depth_A: 15.0
+  freesasa:
+    probe_radius: 1.4
+    algorithm: "LeeRichards"
+    max_mean_sasa_A2: 20.0
+  apbs:
+    pH: 7.0
+    forcefield: "AMBER"
+    salt_concentration_mM: 150
+    temperature_K: 298
+    min_electrostatic_kTe: 5.0
+  scoring:
+    weights:
+      depth: 0.25
+      sasa: 0.30
+      electrostatic: 0.25
+      basic_residues: 0.20
+    min_basic_residues: 4
+    min_composite_score_for_flag: 0.7
+  plddt:
+    min_plddt_for_pocket_residues: 70
+  validation:
+    adar2_max_pocket_rank: 3
+    negative_control_max_score: 0.4
+
+organisms:
+  yeast:
+    uniprot_id: "UP000002311"
+    taxon: 559292
+    download_url: "https://ftp.ebi.ac.uk/pub/databases/alphafold/latest/UP000002311_559292_YEAST_v4.tar"
+    expected_file_count: 6049
+  human:
+    uniprot_id: "UP000005640"
+    taxon: 9606
+    download_url: "https://ftp.ebi.ac.uk/pub/databases/alphafold/latest/UP000005640_9606_HUMAN_v4.tar"
+    expected_file_count: 23391
+  dictyostelium:
+    uniprot_id: "UP000002195"
+    taxon: 44689
+    download_url: "https://ftp.ebi.ac.uk/pub/databases/alphafold/latest/UP000002195_44689_DICDI_v4.tar"
+    expected_file_count: 12622

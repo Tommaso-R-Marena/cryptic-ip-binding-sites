@@ -1,0 +1,18 @@
+controls:
+  adar2:
+    alphafold_id: "AF-P78563-F1-model_v4"
+    pdb_id: "1ZY7"
+    ligand: "IP6"
+    expected_sasa_A2: 5.0
+  pds5b:
+    pdb_id: "5HDT"
+    ligand: "IP6"
+    expected_sasa_A2: 10.0
+  hdac1:
+    pdb_id: "5ICN"
+    ligand: "IP4"
+    expected_sasa_A2: 15.0
+  hdac3:
+    pdb_id: "4A69"
+    ligand: "IP4"
+    expected_sasa_A2: 15.0

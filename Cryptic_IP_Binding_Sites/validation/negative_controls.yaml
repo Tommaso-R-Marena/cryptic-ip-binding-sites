@@ -1,0 +1,19 @@
+controls:
+  plcdelta1_ph:
+    pdb_id: "1MAI"
+    ligand: "IP3"
+    expected_sasa_min_A2: 50.0
+    expected_max_score: 0.4
+  btk_ph:
+    pdb_id: "1BTK"
+    ligand: "IP4"
+    expected_sasa_min_A2: 50.0
+    expected_max_score: 0.4
+  dapp1_ph:
+    pdb_id: "1FAO"
+    ligand: "IP4"
+    expected_max_score: 0.4
+  grp1_ph:
+    pdb_id: "1FGY"
+    ligand: "IP4"
+    expected_max_score: 0.4
