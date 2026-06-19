@@ -142,23 +142,36 @@ class CrypticSiteMLClassifier:
             raise ValueError("Binary labels are required (0/1).")
 
         counts = np.bincount(y)
-        if np.min(counts) < self.n_splits:
+        min_class = int(np.min(counts))
+        if min_class < 2:
             raise ValueError(
-                f"5-fold stratified CV requires at least {self.n_splits} examples in each class; "
-                f"class counts are {counts.tolist()}."
+                f"At least 2 examples per class are required; class counts are {counts.tolist()}."
             )
 
         return features.loc[:, FEATURE_COLUMNS].copy(), y
 
-    def fit(self, features: pd.DataFrame, labels: Iterable[int]) -> TrainingResults:
+    def fit(
+        self,
+        features: pd.DataFrame,
+        labels: Iterable[int],
+        *,
+        class_weight: Optional[str] = None,
+    ) -> TrainingResults:
         """Fit the classifier with hyperparameter tuning and CV diagnostics."""
         X, y = self._validate_inputs(features, labels)
+        n_splits = min(self.n_splits, int(np.min(np.bincount(y))))
+        if n_splits < 2:
+            raise ValueError("Need at least two folds and two classes for training.")
         splitter = StratifiedKFold(
-            n_splits=self.n_splits, shuffle=True, random_state=self.random_state
+            n_splits=n_splits, shuffle=True, random_state=self.random_state
         )
 
+        pipeline = self.pipeline
+        if class_weight is not None:
+            pipeline.set_params(**{f"classifier__class_weight": class_weight})
+
         grid = GridSearchCV(
-            estimator=self.pipeline,
+            estimator=pipeline,
             param_grid=self._param_grid(),
             scoring="average_precision",
             cv=splitter,

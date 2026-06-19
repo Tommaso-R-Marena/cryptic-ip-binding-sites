@@ -68,9 +68,13 @@ class ProteomeManager:
                 'file_size': pdb_file.stat().st_size
             }
             
-            # Try to extract pLDDT from file if available
-            # (This would require parsing PDB file - placeholder)
-            record['mean_plddt'] = None
+            # Try to extract pLDDT from AlphaFold B-factors
+            try:
+                from ..validation.plddt import mean_plddt
+
+                record["mean_plddt"] = mean_plddt(pdb_file)
+            except Exception:
+                record["mean_plddt"] = None
             
             records.append(record)
         
@@ -113,9 +117,10 @@ class ProteomeManager:
         """
         if self.catalog is None:
             self.build_catalog()
-        
-        # Placeholder - requires parsing pLDDT from files
-        print("Warning: pLDDT filtering not yet implemented")
+
+        if self.catalog["mean_plddt"].notna().any():
+            return self.catalog[self.catalog["mean_plddt"].fillna(0) >= min_plddt].copy()
+        print("Warning: pLDDT not available in catalog; returning all structures")
         return self.catalog
     
     def get_statistics(self) -> Dict:

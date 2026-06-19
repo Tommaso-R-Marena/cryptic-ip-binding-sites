@@ -1,0 +1,70 @@
+name: Tier-1 Validation Gate
+
+on:
+  push:
+    branches: [main, cursor/**]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  tier1-controls:
+    name: Phase 1 tier-1 control gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda,defaults
+
+      - name: Install structural biology tools
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge fpocket freesasa apbs pdb2pqr
+          pip install -r requirements.txt
+          pip install -e .
+          pip install pytest
+
+      - name: Cache validation structures
+        uses: actions/cache@v4
+        with:
+          path: data/validation
+          key: validation-pdbs-${{ hashFiles('cryptic_ip/validation/validation_suite.py') }}
+
+      - name: Download tier-1 control structures
+        run: |
+          mkdir -p data/validation
+          for pdb in 1ZY7 1MAI; do
+            if [ ! -f "data/validation/${pdb}.pdb" ]; then
+              wget -q -O "data/validation/${pdb}.pdb" "https://files.rcsb.org/download/${pdb}.pdb"
+            fi
+          done
+
+      - name: Run tier-1 validation gate
+        shell: bash -l {0}
+        run: |
+          python - <<'PY'
+          from cryptic_ip.validation.validation_suite import ValidationSuite
+          suite = ValidationSuite(use_electrostatics=False)
+          pos = suite.run_positive_controls()
+          neg = suite.run_negative_controls()
+          tier1_pos = pos[pos["tier"] == 1]
+          tier1_neg = neg[neg["tier"] == 1]
+          sep = float(tier1_pos["score"].iloc[0] - tier1_neg["score"].iloc[0])
+          passed = bool(tier1_pos["passed"].all() and tier1_neg["passed"].all() and sep > 0.50)
+          print(f"Tier-1 separation: {sep:.3f}")
+          print(f"Phase 1 gate passed: {passed}")
+          if not passed:
+              raise SystemExit(1)
+          PY
+
+      - name: Run unit tests for scoring modules
+        run: |
+          pytest tests/test_control_scoring.py tests/test_structure_context.py tests/test_burial_metrics.py -q

@@ -160,7 +160,7 @@ jobs:
     - name: Run ADAR2 end-to-end test
       shell: bash -l {0}
       run: |
-        python scripts/validate_adar2.py --output test_results/
+        python scripts/phase1_validate_adar2.py --output test_results/
 
     - name: Upload integration test results
       uses: actions/upload-artifact@v4

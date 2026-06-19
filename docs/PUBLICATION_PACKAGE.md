@@ -25,9 +25,30 @@ python scripts/run_publication_package.py --output-dir results/publication
 # Skip dataset rebuild if CSV already exists
 python scripts/run_publication_package.py --skip-dataset-build
 
+# Enable APBS electrostatics in controls and ML feature extraction
+python scripts/run_publication_package.py --with-electrostatics
+
 # Figures only (after CSV assets exist)
 python scripts/generate_publication_figures.py \
   --config results/publication/figure_config.yaml --figures all
+```
+
+## Yeast pilot screen (500 proteins)
+
+```bash
+python scripts/run_yeast_pilot_screen.py --n-proteins 500 --workers 4
+```
+
+## MD pilot validation
+
+```bash
+python scripts/run_md_pilot_validation.py --top-n 5 --production-ns 1.0
+```
+
+## ML training (pocket-level labels, grouped splits)
+
+```bash
+python scripts/train_ml_classifier.py --skip-build-dataset --include-electrostatics
 ```
 
 ## External dependencies
