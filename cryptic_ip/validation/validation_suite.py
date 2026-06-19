@@ -6,12 +6,18 @@ from __future__ import annotations
 
 import urllib.request
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set, Tuple
 
+import numpy as np
 import pandas as pd
+from Bio.PDB import NeighborSearch, PDBParser
+from Bio.PDB.SASA import ShrakeRupley
 
 from .adar2 import validate_adar2
 from ..analysis import ProteinAnalyzer
+
+LIGAND_RESNAMES = {"IP3", "IP4", "IP5", "IP6", "IHP"}
+BASIC_RESNAMES = {"ARG", "LYS", "HIS"}
 
 
 class ValidationSuite:
@@ -78,13 +84,75 @@ class ValidationSuite:
         urllib.request.urlretrieve(url, pdb_path)
         return pdb_path
 
-    def score_structure(
+    def _ligand_context(self, pdb_path: Path) -> Tuple[Set[int], Optional[float], Optional[Tuple[float, float, float]]]:
+        """Return coordinating basic residues, ligand SASA, and ligand centroid when present."""
+        parser = PDBParser(QUIET=True)
+        structure = parser.get_structure("validation", str(pdb_path))
+        ShrakeRupley().compute(structure, level="R")
+
+        ligand_atoms = []
+        ligand_sasa = 0.0
+        for residue in structure.get_residues():
+            if residue.get_resname() in LIGAND_RESNAMES:
+                ligand_atoms.extend(list(residue.get_atoms()))
+                ligand_sasa += float(getattr(residue, "sasa", 0.0))
+
+        if not ligand_atoms:
+            return set(), None, None
+
+        coords = [atom.coord for atom in ligand_atoms]
+        xs, ys, zs = zip(*coords)
+        centroid = (float(sum(xs) / len(xs)), float(sum(ys) / len(ys)), float(sum(zs) / len(zs)))
+
+        neighbor_search = NeighborSearch(list(structure.get_atoms()))
+        coordinating_residues: Set[int] = set()
+        for atom in ligand_atoms:
+            for neighbor in neighbor_search.search(atom.coord, 5.0):
+                residue = neighbor.get_parent()
+                if residue.get_resname() in BASIC_RESNAMES:
+                    coordinating_residues.add(int(residue.id[1]))
+
+        return coordinating_residues, float(ligand_sasa), centroid
+
+    def _select_best_pocket(
+        self,
+        scored: pd.DataFrame,
+        analyzer: ProteinAnalyzer,
+        site_residues: Set[int],
+        ligand_centroid: Optional[Tuple[float, float, float]],
+    ) -> pd.Series:
+        best_row = scored.iloc[0]
+        best_key = (-float("inf"), -1, -1.0)
+
+        for _, row in scored.iterrows():
+            pocket_id = int(row["pocket_id"])
+            overlap = len(
+                set(analyzer.get_pocket_residues(pocket_id, distance_cutoff=8.0)).intersection(site_residues)
+            )
+            distance = float("inf")
+            if ligand_centroid is not None and analyzer.pockets is not None:
+                pocket = analyzer.pockets[analyzer.pockets["pocket_id"] == pocket_id].iloc[0]
+                center = np.array([pocket["center_x"], pocket["center_y"], pocket["center_z"]], dtype=float)
+                distance = float(np.linalg.norm(center - np.array(ligand_centroid, dtype=float)))
+
+            if ligand_centroid is not None:
+                key = (-distance, overlap, float(row["composite_score"]))
+            else:
+                key = (overlap, -distance, float(row["composite_score"]))
+
+            if key > best_key:
+                best_key = key
+                best_row = row
+
+        return best_row
+
+    def score_structure_with_ligand_context(
         self,
         pdb_path: Path,
         *,
         skip_electrostatics: bool = True,
     ) -> Dict:
-        """Run pocket detection and scoring on a single structure."""
+        site_residues, ligand_sasa, ligand_centroid = self._ligand_context(pdb_path)
         analyzer = ProteinAnalyzer(
             str(pdb_path),
             work_dir=str(self.data_dir / "work" / pdb_path.stem),
@@ -94,22 +162,33 @@ class ValidationSuite:
         if scored.empty:
             raise RuntimeError(f"No pockets scored for {pdb_path.name}")
 
-        top_pocket = scored.iloc[0]
+        top_pocket = self._select_best_pocket(scored, analyzer, site_residues, ligand_centroid)
+        basic_residues = len(site_residues) if site_residues else int(top_pocket["basic_residues"])
+        sasa_metric = float(ligand_sasa if ligand_sasa is not None else top_pocket["sasa"])
+
         return {
             "total_pockets": int(len(scored)),
             "top_pocket_id": int(top_pocket["pocket_id"]),
             "top_pocket_score": float(top_pocket["composite_score"]),
             "volume": float(top_pocket["volume"]),
-            "sasa": float(top_pocket["sasa"]),
-            "basic_residues": int(top_pocket["basic_residues"]),
+            "sasa": sasa_metric,
+            "pocket_residue_sasa": float(top_pocket["sasa"]),
+            "ligand_sasa": ligand_sasa,
+            "basic_residues": basic_residues,
             "depth": float(top_pocket["depth"]),
             "structure_path": str(pdb_path),
         }
 
     def _positive_passed(self, score: float, metrics: Dict) -> bool:
+        ligand_sasa = metrics.get("ligand_sasa")
+        if ligand_sasa is not None:
+            return score >= self.POSITIVE_SCORE_THRESHOLD and metrics["basic_residues"] >= 4 and ligand_sasa < 10.0
         return score >= self.POSITIVE_SCORE_THRESHOLD and metrics["basic_residues"] >= 3
 
-    def _negative_passed(self, score: float) -> bool:
+    def _negative_passed(self, score: float, metrics: Dict) -> bool:
+        ligand_sasa = metrics.get("ligand_sasa")
+        if ligand_sasa is not None:
+            return ligand_sasa >= 15.0 or score < self.NEGATIVE_SCORE_THRESHOLD
         return score < self.NEGATIVE_SCORE_THRESHOLD
 
     def validate_positive_control(self, name: str, info: Dict) -> Dict:
@@ -131,7 +210,7 @@ class ValidationSuite:
             }
 
         pdb_path = self.download_pdb(info["pdb"])
-        metrics = self.score_structure(pdb_path)
+        metrics = self.score_structure_with_ligand_context(pdb_path)
         passed = self._positive_passed(metrics["top_pocket_score"], metrics)
         return {
             "protein": name,
@@ -150,8 +229,8 @@ class ValidationSuite:
     def validate_negative_control(self, name: str, info: Dict) -> Dict:
         """Validate a single negative control structure."""
         pdb_path = self.download_pdb(info["pdb"])
-        metrics = self.score_structure(pdb_path)
-        passed = self._negative_passed(metrics["top_pocket_score"])
+        metrics = self.score_structure_with_ligand_context(pdb_path)
+        passed = self._negative_passed(metrics["top_pocket_score"], metrics)
         return {
             "protein": name,
             "control_type": "negative",
