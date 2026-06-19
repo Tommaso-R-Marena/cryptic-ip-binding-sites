@@ -27,7 +27,7 @@ LOGGER = logging.getLogger("build_ip_validation_dataset")
 RCSB_SEARCH_URL = "https://search.rcsb.org/rcsbsearch/v2/query"
 RCSB_CORE_URL = "https://data.rcsb.org/rest/v1/core"
 RCSB_FILES_URL = "https://files.rcsb.org/download"
-TARGET_LIGANDS = ("IP3", "IP4", "IP5", "IP6", "IHP")
+TARGET_LIGANDS = ("IP3", "IP4", "IP5", "IP6", "IHP", "I3P")
 
 
 @dataclass
@@ -193,6 +193,16 @@ def classify_sasa(value: float) -> str:
     return "Surface"
 
 
+def extract_organism(polymer_entities: Iterable[Dict]) -> str:
+    for entity in polymer_entities:
+        source = entity.get("rcsb_entity_source_organism", [])
+        if source:
+            names = [item.get("ncbi_scientific_name", "") for item in source if item.get("ncbi_scientific_name")]
+            if names:
+                return names[0]
+    return "NA"
+
+
 def extract_uniprot_ids(entry_data: Dict, polymer_entities: Iterable[Dict]) -> str:
     ids: Set[str] = set()
     for entity in polymer_entities:
@@ -267,12 +277,7 @@ def build_dataset(output_csv: Path, download_dir: Path, min_proteins: int) -> No
             res_list = entry_data.get("rcsb_entry_info", {}).get("resolution_combined", [])
             if res_list:
                 resolution = float(res_list[0])
-            organism = ""
-            src_org = entry_data.get("rcsb_entry_container_identifiers", {}).get(
-                "source_organism_scientific_name", []
-            )
-            if src_org:
-                organism = src_org[0]
+            organism = extract_organism(polymer_entities)
 
             for ligand_id in sorted(target_ligands):
                 fetch_ligand_metadata(client, ligand_id, metadata_dir)

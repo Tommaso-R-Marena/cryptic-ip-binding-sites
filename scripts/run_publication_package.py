@@ -121,6 +121,13 @@ def build_comparative_tables(dataset_csv: Path, out_dir: Path) -> None:
         .rename(columns={"organism": "organism"})
     )
     organism_stats = organism_stats[organism_stats["organism"].notna() & (organism_stats["organism"] != "NA")]
+    if organism_stats.empty:
+        organism_stats = (
+            dataset.groupby("ligand_type")
+            .agg(hit_rate=("is_cryptic", "mean"), n_structures=("pdb_id", "nunique"))
+            .reset_index()
+            .rename(columns={"ligand_type": "organism"})
+        )
     organism_stats = organism_stats.sort_values("hit_rate", ascending=False)
 
     ip6_map = {
@@ -146,7 +153,7 @@ def build_comparative_tables(dataset_csv: Path, out_dir: Path) -> None:
 
     top_cryptic = dataset[dataset["classification"] == "Cryptic"].sort_values("sasa").head(10)
     phylo = top_cryptic[["pdb_id", "organism", "sasa"]].copy()
-    phylo["species"] = phylo["organism"]
+    phylo["species"] = phylo["organism"].replace("NA", pd.NA).fillna(phylo["pdb_id"])
     phylo["candidate"] = phylo["pdb_id"]
     phylo["conservation_score"] = 1.0 - (phylo["sasa"] / max(phylo["sasa"].max(), 1.0))
 
@@ -244,6 +251,15 @@ def _render_pocket_panel(pdb_path: Path, out_png: Path, panel_type: str) -> None
     plt.close(fig)
 
 
+def _dataframe_to_markdown(df: pd.DataFrame) -> str:
+    if df.empty:
+        return "_No results_"
+    header = "| " + " | ".join(df.columns.astype(str)) + " |"
+    sep = "| " + " | ".join(["---"] * len(df.columns)) + " |"
+    rows = ["| " + " | ".join(str(value) for value in row) + " |" for row in df.astype(object).values]
+    return "\n".join([header, sep, *rows])
+
+
 def write_results_summary(
     output_dir: Path,
     controls_summary: dict,
@@ -270,15 +286,15 @@ def write_results_summary(
         "",
         "### Positive controls",
         "",
-        positive.to_markdown(index=False) if not positive.empty else "_No results_",
+        _dataframe_to_markdown(positive) if not positive.empty else "_No results_",
         "",
         "### Negative controls",
         "",
-        negative.to_markdown(index=False) if not negative.empty else "_No results_",
+        _dataframe_to_markdown(negative) if not negative.empty else "_No results_",
         "",
         "## ML classifier benchmark (held-out test set)",
         "",
-        ml_comparison.to_markdown(index=False),
+        _dataframe_to_markdown(ml_comparison),
         "",
         "## Validation dataset",
         "",

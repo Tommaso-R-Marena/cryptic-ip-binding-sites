@@ -1,0 +1,4 @@
+| method | test_roc_auc | test_pr_auc |
+|---|---|---|
+| ML (random_forest) | 0.5814401814401815 | 0.026766709689335984 |
+| Threshold scoring | 0.4470925470925471 | 0.013889916435016008 |

@@ -15,7 +15,7 @@ from Bio.PDB.SASA import ShrakeRupley
 from ..analysis import ProteinAnalyzer
 from ..database.alphafold_client import AlphaFoldClient
 
-LIGAND_RESNAMES = {"IP6", "IHP", "IP5", "IP4", "IP3"}
+LIGAND_RESNAMES = {"IP6", "IHP", "IP5", "IP4", "IP3", "I3P"}
 BASIC_RESNAMES = {"ARG", "LYS", "HIS"}
 
 

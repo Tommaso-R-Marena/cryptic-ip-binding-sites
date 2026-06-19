@@ -1,0 +1,15 @@
+Figure 1 | Overview of cryptic IP-binding site discovery workflow.
+(A) ADAR2 structure with buried IP6 shown in stick representation and pocket surface shading.
+(B) End-to-end computational pipeline: AlphaFold structural input, fpocket cavity detection,
+FreeSASA solvent accessibility filtering, APBS electrostatic feature extraction, and final scoring.
+(C) Receiver operating characteristic (ROC) curves benchmarking candidate scoring performance.
+
+Figure 2 | Comparative proteomics of predicted IP-binding sites.
+(A) Hit-rate comparison across organisms with statistical significance annotations.
+(B) Correlation between IP6 concentration and predicted hit rate.
+(C) GO term enrichment heatmap for high-confidence candidates.
+(D) Phylogenetic conservation profile across top predicted hits.
+
+Figure 3 | Structural gallery of top predicted cryptic IP-binding candidates.
+Top 10 candidates shown with matched structural and electrostatic views,
+unified color scales, and consistent annotation/scale bars.

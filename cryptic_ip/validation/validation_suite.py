@@ -16,7 +16,7 @@ from Bio.PDB.SASA import ShrakeRupley
 from .adar2 import validate_adar2
 from ..analysis import ProteinAnalyzer
 
-LIGAND_RESNAMES = {"IP3", "IP4", "IP5", "IP6", "IHP"}
+LIGAND_RESNAMES = {"IP3", "IP4", "IP5", "IP6", "IHP", "I3P"}
 BASIC_RESNAMES = {"ARG", "LYS", "HIS"}
 
 

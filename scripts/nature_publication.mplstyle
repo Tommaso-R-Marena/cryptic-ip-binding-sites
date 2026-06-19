@@ -2,7 +2,7 @@ figure.dpi: 150
 savefig.dpi: 600
 figure.facecolor: white
 axes.facecolor: white
-axes.edgecolor: #222222
+axes.edgecolor: 0.133
 axes.linewidth: 0.8
 axes.grid: False
 font.family: DejaVu Sans

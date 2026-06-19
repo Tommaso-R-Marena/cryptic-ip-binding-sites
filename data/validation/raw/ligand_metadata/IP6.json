@@ -1,0 +1,191 @@
+{
+  "chem_comp": {
+    "formula": "C20 H18 N4",
+    "formula_weight": 314.384,
+    "id": "IP6",
+    "name": "N~3~-[3-(1H-INDOL-6-YL)BENZYL]PYRIDINE-2,3-DIAMINE",
+    "pdbx_formal_charge": 0,
+    "pdbx_initial_date": "2007-01-12T00:00:00.000+00:00",
+    "pdbx_modified_date": "2011-06-04T00:00:00.000+00:00",
+    "pdbx_processing_site": "EBI",
+    "pdbx_release_status": "REL",
+    "three_letter_code": "IP6",
+    "type": "non-polymer"
+  },
+  "pdbx_chem_comp_audit": [
+    {
+      "action_type": "Create component",
+      "comp_id": "IP6",
+      "date": "2007-01-12T00:00:00.000+00:00",
+      "ordinal": 1
+    },
+    {
+      "action_type": "Modify aromatic_flag",
+      "comp_id": "IP6",
+      "date": "2011-06-04T00:00:00.000+00:00",
+      "ordinal": 2
+    },
+    {
+      "action_type": "Modify descriptor",
+      "comp_id": "IP6",
+      "date": "2011-06-04T00:00:00.000+00:00",
+      "ordinal": 3
+    }
+  ],
+  "pdbx_chem_comp_descriptor": [
+    {
+      "comp_id": "IP6",
+      "descriptor": "n1cccc(c1N)NCc4cccc(c2ccc3c(c2)ncc3)c4",
+      "program": "ACDLabs",
+      "program_version": "10.04",
+      "type": "SMILES"
+    },
+    {
+      "comp_id": "IP6",
+      "descriptor": "Nc1ncccc1NCc2cccc(c2)c3ccc4cc[nH]c4c3",
+      "program": "CACTVS",
+      "program_version": "3.341",
+      "type": "SMILES_CANONICAL"
+    },
+    {
+      "comp_id": "IP6",
+      "descriptor": "Nc1ncccc1NCc2cccc(c2)c3ccc4cc[nH]c4c3",
+      "program": "CACTVS",
+      "program_version": "3.341",
+      "type": "SMILES"
+    },
+    {
+      "comp_id": "IP6",
+      "descriptor": "c1cc(cc(c1)c2ccc3cc[nH]c3c2)CNc4cccnc4N",
+      "program": "OpenEye OEToolkits",
+      "program_version": "1.5.0",
+      "type": "SMILES_CANONICAL"
+    },
+    {
+      "comp_id": "IP6",
+      "descriptor": "c1cc(cc(c1)c2ccc3cc[nH]c3c2)CNc4cccnc4N",
+      "program": "OpenEye OEToolkits",
+      "program_version": "1.5.0",
+      "type": "SMILES"
+    },
+    {
+      "comp_id": "IP6",
+      "descriptor": "InChI=1S/C20H18N4/c21-20-18(5-2-9-23-20)24-13-14-3-1-4-16(11-14)17-7-6-15-8-10-22-19(15)12-17/h1-12,22,24H,13H2,(H2,21,23)",
+      "program": "InChI",
+      "program_version": "1.03",
+      "type": "InChI"
+    },
+    {
+      "comp_id": "IP6",
+      "descriptor": "LPQUIIHPUGDHJK-UHFFFAOYSA-N",
+      "program": "InChI",
+      "program_version": "1.03",
+      "type": "InChIKey"
+    }
+  ],
+  "pdbx_chem_comp_identifier": [
+    {
+      "comp_id": "IP6",
+      "identifier": "N~3~-[3-(1H-indol-6-yl)benzyl]pyridine-2,3-diamine",
+      "program": "ACDLabs",
+      "program_version": "10.04",
+      "type": "SYSTEMATIC NAME"
+    },
+    {
+      "comp_id": "IP6",
+      "identifier": "N'-[[3-(1H-indol-6-yl)phenyl]methyl]pyridine-2,3-diamine",
+      "program": "OpenEye OEToolkits",
+      "program_version": "1.5.0",
+      "type": "SYSTEMATIC NAME"
+    }
+  ],
+  "rcsb_chem_comp_container_identifiers": {
+    "comp_id": "IP6",
+    "drugbank_id": "DB07993",
+    "rcsb_id": "IP6"
+  },
+  "rcsb_chem_comp_descriptor": {
+    "InChI": "InChI=1S/C20H18N4/c21-20-18(5-2-9-23-20)24-13-14-3-1-4-16(11-14)17-7-6-15-8-10-22-19(15)12-17/h1-12,22,24H,13H2,(H2,21,23)",
+    "InChIKey": "LPQUIIHPUGDHJK-UHFFFAOYSA-N",
+    "SMILES": "c1cc(cc(c1)c2ccc3cc[nH]c3c2)CNc4cccnc4N",
+    "SMILES_stereo": "c1cc(cc(c1)c2ccc3cc[nH]c3c2)CNc4cccnc4N",
+    "comp_id": "IP6"
+  },
+  "rcsb_chem_comp_info": {
+    "atom_count": 42,
+    "atom_count_chiral": 0,
+    "atom_count_heavy": 24,
+    "bond_count": 45,
+    "bond_count_aromatic": 23,
+    "comp_id": "IP6",
+    "initial_deposition_date": "2007-01-12T00:00:00.000+00:00",
+    "initial_release_date": "2007-03-13T00:00:00.000+00:00",
+    "release_status": "REL",
+    "revision_date": "2011-06-04T00:00:00.000+00:00"
+  },
+  "rcsb_chem_comp_related": [
+    {
+      "comp_id": "IP6",
+      "ordinal": 1,
+      "related_mapping_method": "matching InChIKey in DrugBank",
+      "resource_accession_code": "DB07993",
+      "resource_name": "DrugBank"
+    },
+    {
+      "comp_id": "IP6",
+      "ordinal": 2,
+      "related_mapping_method": "matching InChIKey in PubChem",
+      "resource_accession_code": "11507920",
+      "resource_name": "PubChem"
+    },
+    {
+      "comp_id": "IP6",
+      "ordinal": 3,
+      "related_mapping_method": "assigned by PubChem resource",
+      "resource_accession_code": "CHEMBL220896",
+      "resource_name": "ChEMBL"
+    }
+  ],
+  "rcsb_chem_comp_synonyms": [
+    {
+      "comp_id": "IP6",
+      "name": "N~3~-[3-(1H-INDOL-6-YL)BENZYL]PYRIDINE-2,3-DIAMINE",
+      "ordinal": 1,
+      "provenance_source": "PDB Reference Data",
+      "type": "Preferred Name"
+    },
+    {
+      "comp_id": "IP6",
+      "name": "N~3~-[3-(1H-indol-6-yl)benzyl]pyridine-2,3-diamine",
+      "ordinal": 2,
+      "provenance_source": "ACDLabs",
+      "type": "Systematic Name"
+    },
+    {
+      "comp_id": "IP6",
+      "name": "N'-[[3-(1H-indol-6-yl)phenyl]methyl]pyridine-2,3-diamine",
+      "ordinal": 3,
+      "provenance_source": "OpenEye OEToolkits",
+      "type": "Systematic Name"
+    },
+    {
+      "comp_id": "IP6",
+      "name": "N~3~-[3-(1H-INDOL-6-YL)BENZYL]PYRIDINE-2,3-DIAMINE",
+      "ordinal": 4,
+      "provenance_source": "DrugBank",
+      "type": "Synonym"
+    }
+  ],
+  "rcsb_chem_comp_target": [
+    {
+      "comp_id": "IP6",
+      "interaction_type": "target",
+      "name": "Beta-secretase 1",
+      "ordinal": 1,
+      "provenance_source": "DrugBank",
+      "reference_database_accession_code": "P56817",
+      "reference_database_name": "UniProt"
+    }
+  ],
+  "rcsb_id": "IP6"
+}

@@ -1,0 +1,14 @@
+output_dir: results/publication/figures
+style_file: scripts/nature_publication.mplstyle
+figure1:
+  adar2_structure: data/validation/1ZY7.pdb
+  ip6_resn: IP6
+  validation_roc_csv: results/publication/validation/roc_curves.csv
+figure2:
+  hit_rates_csv: results/publication/comparative/hit_rates.csv
+  correlation_csv: results/publication/comparative/ip6_vs_hit_rate.csv
+  go_heatmap_csv: results/publication/comparative/go_enrichment_heatmap.csv
+  phylo_conservation_csv: results/publication/comparative/phylogenetic_conservation.csv
+figure3:
+  top_candidates_csv: results/publication/gallery/gallery_inputs.csv
+  top_n: 10
