@@ -56,8 +56,35 @@ class FpocketParser:
         # Add last pocket
         if current_pocket:
             pockets.append(current_pocket)
-        
-        return pd.DataFrame(pockets)
+
+        frame = pd.DataFrame(pockets)
+        if frame.empty:
+            return frame
+
+        pockets_dir = info_file.parent / "pockets"
+        centers = []
+        for pocket_id in frame["pocket_id"]:
+            pocket_file = pockets_dir / f"pocket{int(pocket_id)}_atm.pdb"
+            centers.append(self._pocket_centroid(pocket_file))
+        frame["center_x"] = [center[0] for center in centers]
+        frame["center_y"] = [center[1] for center in centers]
+        frame["center_z"] = [center[2] for center in centers]
+
+        return frame
+
+    def _pocket_centroid(self, pocket_file: Path) -> tuple[float, float, float]:
+        """Compute alpha-sphere centroid for a pocket coordinates file."""
+        if not pocket_file.exists():
+            return (0.0, 0.0, 0.0)
+
+        atoms = self.parse_pocket_atoms(pocket_file)
+        if not atoms:
+            return (0.0, 0.0, 0.0)
+
+        xs = [atom["x"] for atom in atoms]
+        ys = [atom["y"] for atom in atoms]
+        zs = [atom["z"] for atom in atoms]
+        return (float(sum(xs) / len(xs)), float(sum(ys) / len(ys)), float(sum(zs) / len(zs)))
     
     def parse_pocket_atoms(self, pocket_file: Path) -> List[Dict]:
         """

@@ -154,8 +154,7 @@ def ligand_sasa(pdb_path: Path, ligand_id: str) -> float:
 
     structure = freesasa.Structure(str(pdb_path))
     result = freesasa.calc(structure)
-    selection = ("lig", f"resn {ligand_id}")
-    selected = freesasa.selectArea((selection,), structure, result)
+    selected = freesasa.selectArea([f"lig, resn {ligand_id}"], structure, result)
     return float(selected.get("lig", 0.0))
 
 

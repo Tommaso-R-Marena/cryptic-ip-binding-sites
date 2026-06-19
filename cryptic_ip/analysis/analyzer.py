@@ -53,7 +53,7 @@ class ProteinAnalyzer:
             use_ml_model: When True, attempt to load a pre-trained ML scorer.
             model_path: Optional path to serialized ML model.
         """
-        self.pdb_path = Path(pdb_path)
+        self.pdb_path = Path(pdb_path).resolve()
         self.work_dir = Path(work_dir) if work_dir else Path(tempfile.mkdtemp())
         self.work_dir.mkdir(parents=True, exist_ok=True)
 
@@ -129,11 +129,11 @@ class ProteinAnalyzer:
                 "fpocket not found. Please install from https://github.com/Discngine/fpocket"
             )
 
-        # Run fpocket
-        output_dir = self.work_dir / f"{self.pdb_path.stem}_out"
+        # fpocket writes output adjacent to the input structure file
+        output_dir = self.pdb_path.parent / f"{self.pdb_path.stem}_out"
         cmd = ["fpocket", "-f", str(self.pdb_path), "-m", str(min_alpha_sphere)]
 
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(self.work_dir))
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
         if result.returncode != 0:
             raise RuntimeError(f"fpocket failed: {result.stderr}")
@@ -157,16 +157,16 @@ class ProteinAnalyzer:
             Dictionary mapping residue number to SASA value
         """
         try:
-            # Use ProDy for SASA calculation
-            structure = parsePDB(str(self.pdb_path))
-            sasa = calcSASA(structure)
+            from Bio.PDB.SASA import ShrakeRupley
 
-            # Get per-residue SASA
-            residue_sasa = {}
-            for residue in structure.iterResidues():
-                resnum = residue.getResnum()
-                atom_indices = residue.getIndices()
-                residue_sasa[resnum] = np.sum(sasa[atom_indices])
+            ShrakeRupley().compute(self.structure, level="R")
+            residue_sasa: Dict[int, float] = {}
+            for model in self.structure:
+                for chain in model:
+                    for residue in chain:
+                        if residue.id[0] != " ":
+                            continue
+                        residue_sasa[residue.id[1]] = float(getattr(residue, "sasa", 0.0))
 
             self.sasa_data = residue_sasa
             return residue_sasa
@@ -273,9 +273,8 @@ class ProteinAnalyzer:
         pocket = self.pockets[self.pockets["pocket_id"] == pocket_id].iloc[0]
         pocket_residues = self.get_pocket_residues(pocket_id)
 
-        # Calculate average SASA for pocket residues
-        residue_array = np.asarray(pocket_residues, dtype=int)
-        pocket_sasa = float(np.mean(np.vectorize(lambda r: self.sasa_data.get(int(r), 0.0))(residue_array)))
+        pocket_sasa_values = [self.sasa_data.get(int(resnum), 0.0) for resnum in pocket_residues]
+        pocket_sasa = float(np.mean(pocket_sasa_values)) if pocket_sasa_values else 0.0
 
         # Count basic residues
         basic_count = self.count_basic_residues(pocket_id)
@@ -301,6 +300,9 @@ class ProteinAnalyzer:
         """
         if self.pockets is None:
             self.detect_pockets()
+
+        if self.sasa_data is None:
+            self.calculate_sasa()
 
         results = []
         for pocket_id in self.pockets["pocket_id"]:
@@ -345,5 +347,5 @@ class ProteinAnalyzer:
     @timed()
     def cleanup(self) -> None:
         """Clear analyzer intermediates from disk and reset in-memory caches."""
-        cleanup_files([self.work_dir / f"{self.pdb_path.stem}_out", self.work_dir / "electrostatics"])
+        cleanup_files([self.pdb_path.parent / f"{self.pdb_path.stem}_out", self.work_dir / "electrostatics"])
         self.get_pocket_residues.cache_clear()
