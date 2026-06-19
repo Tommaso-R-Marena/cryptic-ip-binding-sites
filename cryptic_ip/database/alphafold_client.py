@@ -34,55 +34,61 @@ class AlphaFoldClient:
             'User-Agent': 'CrypticIP/1.0 (https://github.com/Tommaso-R-Marena/cryptic-ip-binding-sites)'
         })
     
-    def fetch_structure(self, uniprot_id: str, version: int = 4) -> Path:
+    def fetch_structure(self, uniprot_id: str, version: Optional[int] = None) -> Path:
         """Download AlphaFold structure for a UniProt ID.
-        
-        Downloads from FTP as gzipped files and decompresses.
-        
+
+        Resolves the latest model version from the AlphaFold API when ``version``
+        is omitted, then downloads from the public file endpoint (falling back to
+        the legacy FTP mirror for older releases).
+
         Args:
             uniprot_id: UniProt accession (e.g., 'P78563' for ADAR2)
-            version: AlphaFold model version (default: 4)
-            
+            version: Optional AlphaFold model version override
+
         Returns:
             Path to downloaded PDB file
-            
+
         Raises:
             ValueError: If UniProt ID not found in AlphaFold
             requests.HTTPError: If download fails
         """
-        # Check cache first
-        filename = f"AF-{uniprot_id}-F1-model_v{version}.pdb"
+        metadata = self.get_metadata(uniprot_id)
+        resolved_version = int(version or metadata.get("model_version", 4))
+        filename = f"AF-{uniprot_id}-F1-model_v{resolved_version}.pdb"
         cached_file = self.cache_dir / filename
-        
+
         if cached_file.exists():
             logger.info(f"Using cached structure: {cached_file}")
             return cached_file
-        
-        # Download from FTP (files are gzipped)
-        ftp_url = f"{self.FTP_BASE}/AF-{uniprot_id}-F1-model_v{version}.pdb.gz"
-        logger.info(f"Downloading {uniprot_id} from AlphaFold FTP: {ftp_url}")
-        
+
+        file_url = f"https://alphafold.ebi.ac.uk/files/{filename}"
+        logger.info(f"Downloading {uniprot_id} from AlphaFold: {file_url}")
+
         try:
-            response = self.session.get(ftp_url, timeout=30)
+            response = self.session.get(file_url, timeout=60)
             response.raise_for_status()
-            
-            # Decompress gzipped content
-            decompressed = gzip.decompress(response.content)
-            
-            # Save decompressed PDB
-            with open(cached_file, 'wb') as f:
-                f.write(decompressed)
-            
+            cached_file.write_bytes(response.content)
             logger.info(f"Downloaded structure to {cached_file}")
             return cached_file
-            
+        except requests.HTTPError as file_error:
+            if file_error.response is not None and file_error.response.status_code != 404:
+                raise
+
+        ftp_url = f"{self.FTP_BASE}/{filename}.gz"
+        logger.info(f"Falling back to AlphaFold FTP mirror: {ftp_url}")
+        try:
+            response = self.session.get(ftp_url, timeout=60)
+            response.raise_for_status()
+            cached_file.write_bytes(gzip.decompress(response.content))
+            logger.info(f"Downloaded structure to {cached_file}")
+            return cached_file
         except requests.HTTPError as e:
             if e.response.status_code == 404:
                 raise ValueError(
                     f"UniProt ID {uniprot_id} not found in AlphaFold Database.\n"
                     f"Check if the protein exists at: https://alphafold.ebi.ac.uk/entry/{uniprot_id}\n"
-                    f"FTP URL attempted: {ftp_url}"
-                )
+                    f"URLs attempted: {file_url}, {ftp_url}"
+                ) from e
             raise
     
     def get_metadata(self, uniprot_id: str) -> Dict:

@@ -2,45 +2,42 @@
 ADAR2 validation - the gold standard for cryptic IP6 binding.
 """
 
-import os
 from pathlib import Path
 from typing import Dict, Optional
 import urllib.request
 
 from ..analysis import ProteinAnalyzer
+from ..database.alphafold_client import AlphaFoldClient
 
 
 def download_adar2_structures(data_dir: str = "data/validation") -> Dict[str, Path]:
     """
     Download ADAR2 structures from AlphaFold and PDB.
-    
+
     Args:
         data_dir: Directory to save structures
-        
+
     Returns:
         Dictionary with paths to downloaded files
     """
     data_path = Path(data_dir)
     data_path.mkdir(parents=True, exist_ok=True)
-    
-    structures = {}
-    
-    # AlphaFold structure
-    alphafold_url = "https://alphafold.ebi.ac.uk/files/AF-P78563-F1-model_v4.pdb"
-    alphafold_path = data_path / "AF-P78563-F1-model_v4.pdb"
-    if not alphafold_path.exists():
-        print(f"Downloading AlphaFold ADAR2 structure...")
-        urllib.request.urlretrieve(alphafold_url, alphafold_path)
-    structures['alphafold'] = alphafold_path
-    
-    # Crystal structure with IP6
-    pdb_url = "https://files.rcsb.org/download/1ZY7.pdb"
+
+    structures: Dict[str, Path] = {}
+
+    client = AlphaFoldClient(cache_dir=data_path)
+    alphafold_path = client.fetch_structure("P78563")
+    local_alphafold = data_path / alphafold_path.name
+    if alphafold_path.resolve() != local_alphafold.resolve():
+        local_alphafold.write_bytes(alphafold_path.read_bytes())
+    structures["alphafold"] = local_alphafold
+
     pdb_path = data_path / "1ZY7.pdb"
     if not pdb_path.exists():
-        print(f"Downloading PDB 1ZY7 (ADAR2 crystal structure)...")
-        urllib.request.urlretrieve(pdb_url, pdb_path)
-    structures['crystal'] = pdb_path
-    
+        print("Downloading PDB 1ZY7 (ADAR2 crystal structure)...")
+        urllib.request.urlretrieve("https://files.rcsb.org/download/1ZY7.pdb", pdb_path)
+    structures["crystal"] = pdb_path
+
     return structures
 
 
