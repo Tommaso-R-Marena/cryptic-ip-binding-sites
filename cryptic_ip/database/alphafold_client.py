@@ -41,17 +41,18 @@ class AlphaFoldClient:
         is omitted, then downloads from the public file endpoint (falling back to
         the legacy FTP mirror for older releases).
 
-        Args:
-            uniprot_id: UniProt accession (e.g., 'P78563' for ADAR2)
-            version: Optional AlphaFold model version override
-
-        Returns:
-            Path to downloaded PDB file
-
-        Raises:
-            ValueError: If UniProt ID not found in AlphaFold
-            requests.HTTPError: If download fails
+        Cached files are returned without contacting the API when possible.
         """
+        if version is not None:
+            cached_candidates = [self.cache_dir / f"AF-{uniprot_id}-F1-model_v{version}.pdb"]
+        else:
+            cached_candidates = sorted(self.cache_dir.glob(f"AF-{uniprot_id}-F1-model_v*.pdb"))
+
+        for cached_file in cached_candidates:
+            if cached_file.exists():
+                logger.info(f"Using cached structure: {cached_file}")
+                return cached_file
+
         metadata = self.get_metadata(uniprot_id)
         resolved_version = int(version or metadata.get("model_version", 4))
         filename = f"AF-{uniprot_id}-F1-model_v{resolved_version}.pdb"

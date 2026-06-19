@@ -27,7 +27,7 @@ LOGGER = logging.getLogger("build_ip_validation_dataset")
 RCSB_SEARCH_URL = "https://search.rcsb.org/rcsbsearch/v2/query"
 RCSB_CORE_URL = "https://data.rcsb.org/rest/v1/core"
 RCSB_FILES_URL = "https://files.rcsb.org/download"
-TARGET_LIGANDS = ("IP3", "IP4", "IP5", "IP6", "IHP", "I3P")
+TARGET_LIGANDS = ("IP3", "IP4", "IP5", "IP6", "IHP", "I3P", "4IP", "6A0")
 
 
 @dataclass
@@ -152,37 +152,15 @@ def query_candidate_pdb_ids(client: RcsbClient, ligands: Sequence[str]) -> List[
 
 
 def parse_target_ligands_from_pdb(pdb_path: Path, target_ligands: Set[str]) -> Set[str]:
-    found: Set[str] = set()
-    with pdb_path.open("r", encoding="utf-8", errors="ignore") as handle:
-        for line in handle:
-            if not line.startswith(("HETATM", "ATOM  ")):
-                continue
-            resname = line[17:20].strip().upper()
-            if resname in target_ligands:
-                found.add(resname)
-    return found
+    from cryptic_ip.validation.structure_context import parse_ligand_resnames
+
+    return parse_ligand_resnames(pdb_path, target_ligands)
 
 
 def ligand_sasa(pdb_path: Path, ligand_id: str) -> float:
-    """Compute total SASA for all residues matching ``ligand_id`` in the structure file."""
-    from Bio.PDB import PDBParser
-    from Bio.PDB.SASA import ShrakeRupley
+    from cryptic_ip.validation.structure_context import ligand_total_sasa
 
-    parser = PDBParser(QUIET=True)
-    structure = parser.get_structure("ligand", str(pdb_path))
-    ShrakeRupley().compute(structure, level="R")
-
-    total = 0.0
-    found = False
-    for residue in structure.get_residues():
-        if residue.get_resname() == ligand_id:
-            found = True
-            total += float(getattr(residue, "sasa", 0.0))
-
-    if not found:
-        raise ValueError(f"Ligand {ligand_id} not found in {pdb_path.name}")
-
-    return total
+    return ligand_total_sasa(pdb_path, ligand_id)
 
 
 def classify_sasa(value: float) -> str:

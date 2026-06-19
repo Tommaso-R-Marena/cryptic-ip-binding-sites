@@ -283,6 +283,8 @@ def write_results_summary(
         f"- Mean positive score: {sep.get('positive_mean', float('nan')):.3f}",
         f"- Mean negative score: {sep.get('negative_mean', float('nan')):.3f}",
         f"- Score separation: {sep.get('separation', float('nan')):.3f}",
+        f"- Tier-1 separation (ADAR2 vs PLCδ1): {sep.get('tier1_separation', float('nan')):.3f}",
+        f"- Phase 1 gate passed: {sep.get('phase1_ready', False)}",
         "",
         "### Positive controls",
         "",
@@ -308,11 +310,63 @@ def write_results_summary(
         "",
         "## Interpretation",
         "",
-        "The pipeline recovers known buried IP-binding positives with scores clearly "
-        "separated from canonical surface PH-domain negatives. Machine-learning scoring "
-        "improves discrimination over fixed thresholds on the RCSB-derived validation set.",
-        "",
     ]
+
+    phase1_ready = bool(sep.get("phase1_ready", False))
+    tier1_sep = float(sep.get("tier1_separation", float("nan")))
+    separation = float(sep.get("separation", float("nan")))
+    clear_sep = bool(sep.get("clear_separation", False))
+
+    if phase1_ready:
+        lines.extend(
+            [
+                "Phase 1 gate **passed**: ADAR2 and PLCδ1 PH controls both passed, with "
+                f"tier-1 score separation ({tier1_sep:.3f}) above the 0.50 threshold. "
+                "Burial-aware validation scores separate known cryptic positives from "
+                "canonical surface PH-domain negatives.",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "Phase 1 gate **not yet passed**. Tier-1 separation "
+                f"({tier1_sep:.3f}) must exceed 0.50 and both ADAR2 and PLCδ1 PH "
+                "controls must pass individually before proteome screening.",
+            ]
+        )
+
+    if clear_sep:
+        lines.append(
+            f"Full control benchmark separation ({separation:.3f}) exceeds the 0.30 "
+            "minimum for positive vs negative discrimination."
+        )
+    else:
+        lines.append(
+            f"Full control benchmark separation ({separation:.3f}) is below the 0.30 "
+            "target; extended tier-2 controls should be reviewed before publication claims."
+        )
+
+    if not ml_comparison.empty:
+        auc_col = "test_roc_auc" if "test_roc_auc" in ml_comparison.columns else "roc_auc"
+        if auc_col in ml_comparison.columns:
+            ml_row = ml_comparison.iloc[0]
+            ml_auc = float(ml_row[auc_col])
+            thresh_rows = ml_comparison[
+                ml_comparison["method"].astype(str).str.contains("threshold", case=False, na=False)
+            ]
+            thresh_auc = float(thresh_rows[auc_col].iloc[0]) if not thresh_rows.empty else float("nan")
+            if ml_auc == ml_auc and thresh_auc == thresh_auc and ml_auc > thresh_auc:
+                lines.append(
+                    f"On the RCSB-derived validation set, ML scoring (ROC AUC {ml_auc:.2f}) "
+                    f"outperforms fixed thresholds (ROC AUC {thresh_auc:.2f})."
+                )
+            else:
+                lines.append(
+                    "ML vs threshold discrimination on the RCSB validation set remains modest; "
+                    "treat classifier benchmarks as exploratory until Phase 1 controls stabilize."
+                )
+
+    lines.append("")
     (output_dir / "RESULTS_SUMMARY.md").write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -409,14 +463,18 @@ def main() -> int:
         )
 
     config = load_yaml(ROOT / "config/defaults/pipeline.yaml")
+    output_files = [
+        args.output_dir / "RESULTS_SUMMARY.md",
+        args.output_dir / "validation" / "roc_curves.csv",
+    ]
+    figures_dir = args.output_dir / "figures"
+    if figures_dir.exists():
+        output_files.extend(path for path in figures_dir.rglob("*") if path.is_file())
+
     manifest = generate_provenance_manifest(
         config=config,
         inputs=[args.dataset_csv, ROOT / "config/defaults/pipeline.yaml"],
-        outputs=[
-            args.output_dir / "RESULTS_SUMMARY.md",
-            args.output_dir / "validation" / "roc_curves.csv",
-            args.output_dir / "figures",
-        ],
+        outputs=output_files,
         parameters=config["pipeline"],
         data_sources=config["data_sources"],
     )

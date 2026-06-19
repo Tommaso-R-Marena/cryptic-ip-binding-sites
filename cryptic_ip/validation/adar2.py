@@ -15,8 +15,7 @@ from Bio.PDB.SASA import ShrakeRupley
 from ..analysis import ProteinAnalyzer
 from ..database.alphafold_client import AlphaFoldClient
 
-LIGAND_RESNAMES = {"IP6", "IHP", "IP5", "IP4", "IP3", "I3P"}
-BASIC_RESNAMES = {"ARG", "LYS", "HIS"}
+from .structure_context import BASIC_RESNAMES, LIGAND_RESNAMES, ligand_context
 
 
 def download_adar2_structures(data_dir: str = "data/validation") -> Dict[str, Path]:
@@ -132,7 +131,7 @@ def validate_adar2(structure_path: Optional[str] = None, use_alphafold: bool = T
     print(f"Structure: {structure_path_obj}")
 
     site_residues, ligand_sasa = _ligand_site_residues(structure_path_obj)
-    ligand_centroid = _ligand_centroid(structure_path_obj)
+    _, _, ligand_centroid = ligand_context(structure_path_obj)
     if not site_residues:
         site_residues = {376, 519, 522, 651, 672}
 

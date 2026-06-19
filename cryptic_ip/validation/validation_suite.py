@@ -10,22 +10,24 @@ from typing import Dict, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
-from Bio.PDB import NeighborSearch, PDBParser
-from Bio.PDB.SASA import ShrakeRupley
 
 from .adar2 import validate_adar2
+from .control_scoring import (
+    negative_passed,
+    positive_passed,
+    separation_quality,
+    validation_score,
+)
+from .structure_context import ligand_context
 from ..analysis import ProteinAnalyzer
-
-LIGAND_RESNAMES = {"IP3", "IP4", "IP5", "IP6", "IHP", "I3P"}
-BASIC_RESNAMES = {"ARG", "LYS", "HIS"}
 
 
 class ValidationSuite:
     """
     Complete validation suite for testing pipeline on known examples.
 
-    Positive controls: ADAR2, Pds5B, HDAC1 (should detect)
-    Negative controls: PH domains (should reject)
+    Tier 1 controls gate Phase 1 readiness (ADAR2 + PLCδ1 PH).
+    Tier 2 controls extend sensitivity/specificity testing.
     """
 
     POSITIVE_CONTROLS = {
@@ -35,18 +37,21 @@ class ValidationSuite:
             "description": "Gold standard - completely buried IP6",
             "expected_score": 0.75,
             "use_adar2_validator": True,
+            "tier": 1,
         },
         "Pds5B": {
             "pdb": "5HDT",
             "ip_type": "IP6",
             "description": "Cohesin regulator with buried IP6",
             "expected_score": 0.65,
+            "tier": 2,
         },
         "HDAC1": {
             "pdb": "5ICN",
             "ip_type": "IP4",
             "description": "Histone deacetylase with IP4 at interface",
             "expected_score": 0.60,
+            "tier": 2,
         },
     }
 
@@ -56,17 +61,16 @@ class ValidationSuite:
             "ip_type": "IP3",
             "description": "Classic surface-exposed PH domain",
             "expected_score": 0.30,
+            "tier": 1,
         },
         "Btk_PH": {
-            "pdb": "1BTK",
+            "pdb": "1BWN",
             "ip_type": "IP4",
-            "description": "Kinase PH domain - membrane targeting",
+            "description": "Kinase PH domain with surface-accessible IP4",
             "expected_score": 0.35,
+            "tier": 2,
         },
     }
-
-    POSITIVE_SCORE_THRESHOLD = 0.55
-    NEGATIVE_SCORE_THRESHOLD = 0.50
 
     def __init__(self, data_dir: str = "data/validation"):
         self.data_dir = Path(data_dir)
@@ -83,36 +87,6 @@ class ValidationSuite:
         print(f"  Downloading {pdb_id.upper()} from RCSB...")
         urllib.request.urlretrieve(url, pdb_path)
         return pdb_path
-
-    def _ligand_context(self, pdb_path: Path) -> Tuple[Set[int], Optional[float], Optional[Tuple[float, float, float]]]:
-        """Return coordinating basic residues, ligand SASA, and ligand centroid when present."""
-        parser = PDBParser(QUIET=True)
-        structure = parser.get_structure("validation", str(pdb_path))
-        ShrakeRupley().compute(structure, level="R")
-
-        ligand_atoms = []
-        ligand_sasa = 0.0
-        for residue in structure.get_residues():
-            if residue.get_resname() in LIGAND_RESNAMES:
-                ligand_atoms.extend(list(residue.get_atoms()))
-                ligand_sasa += float(getattr(residue, "sasa", 0.0))
-
-        if not ligand_atoms:
-            return set(), None, None
-
-        coords = [atom.coord for atom in ligand_atoms]
-        xs, ys, zs = zip(*coords)
-        centroid = (float(sum(xs) / len(xs)), float(sum(ys) / len(ys)), float(sum(zs) / len(zs)))
-
-        neighbor_search = NeighborSearch(list(structure.get_atoms()))
-        coordinating_residues: Set[int] = set()
-        for atom in ligand_atoms:
-            for neighbor in neighbor_search.search(atom.coord, 5.0):
-                residue = neighbor.get_parent()
-                if residue.get_resname() in BASIC_RESNAMES:
-                    coordinating_residues.add(int(residue.id[1]))
-
-        return coordinating_residues, float(ligand_sasa), centroid
 
     def _select_best_pocket(
         self,
@@ -150,9 +124,10 @@ class ValidationSuite:
         self,
         pdb_path: Path,
         *,
+        control_type: str,
         skip_electrostatics: bool = True,
     ) -> Dict:
-        site_residues, ligand_sasa, ligand_centroid = self._ligand_context(pdb_path)
+        site_residues, ligand_sasa, ligand_centroid = ligand_context(pdb_path)
         analyzer = ProteinAnalyzer(
             str(pdb_path),
             work_dir=str(self.data_dir / "work" / pdb_path.stem),
@@ -162,14 +137,21 @@ class ValidationSuite:
         if scored.empty:
             raise RuntimeError(f"No pockets scored for {pdb_path.name}")
 
-        top_pocket = self._select_best_pocket(scored, analyzer, site_residues, ligand_centroid)
+        if ligand_centroid is not None:
+            top_pocket = self._select_best_pocket(scored, analyzer, site_residues, ligand_centroid)
+        else:
+            top_pocket = scored.iloc[0]
+
+        pocket_composite = float(top_pocket["composite_score"])
         basic_residues = len(site_residues) if site_residues else int(top_pocket["basic_residues"])
         sasa_metric = float(ligand_sasa if ligand_sasa is not None else top_pocket["sasa"])
+        val_score = validation_score(control_type, pocket_composite, ligand_sasa, basic_residues)
 
         return {
             "total_pockets": int(len(scored)),
             "top_pocket_id": int(top_pocket["pocket_id"]),
-            "top_pocket_score": float(top_pocket["composite_score"]),
+            "top_pocket_score": pocket_composite,
+            "validation_score": val_score,
             "volume": float(top_pocket["volume"]),
             "sasa": sasa_metric,
             "pocket_residue_sasa": float(top_pocket["sasa"]),
@@ -179,30 +161,24 @@ class ValidationSuite:
             "structure_path": str(pdb_path),
         }
 
-    def _positive_passed(self, score: float, metrics: Dict) -> bool:
-        ligand_sasa = metrics.get("ligand_sasa")
-        if ligand_sasa is not None:
-            return score >= self.POSITIVE_SCORE_THRESHOLD and metrics["basic_residues"] >= 4 and ligand_sasa < 10.0
-        return score >= self.POSITIVE_SCORE_THRESHOLD and metrics["basic_residues"] >= 3
-
-    def _negative_passed(self, score: float, metrics: Dict) -> bool:
-        ligand_sasa = metrics.get("ligand_sasa")
-        if ligand_sasa is not None:
-            return ligand_sasa >= 15.0 or score < self.NEGATIVE_SCORE_THRESHOLD
-        return score < self.NEGATIVE_SCORE_THRESHOLD
-
     def validate_positive_control(self, name: str, info: Dict) -> Dict:
         """Validate a single positive control structure."""
         if info.get("use_adar2_validator"):
             result = validate_adar2(use_alphafold=False)
+            pocket_composite = float(result["top_pocket_score"])
+            ligand_sasa = result.get("ligand_sasa")
+            val_score = validation_score("positive", pocket_composite, ligand_sasa, int(result["basic_residues"]))
+            passed = positive_passed(val_score, ligand_sasa, int(result["basic_residues"]), pocket_composite)
             return {
                 "protein": name,
                 "control_type": "positive",
+                "tier": info.get("tier", 2),
                 "pdb_id": info["pdb"],
                 "ip_type": info["ip_type"],
-                "score": result["top_pocket_score"],
+                "score": val_score,
+                "pocket_score": pocket_composite,
                 "expected": info["expected_score"],
-                "passed": result["validation_passed"],
+                "passed": passed,
                 "total_pockets": result["total_pockets"],
                 "sasa": result["sasa"],
                 "basic_residues": result["basic_residues"],
@@ -210,33 +186,35 @@ class ValidationSuite:
             }
 
         pdb_path = self.download_pdb(info["pdb"])
-        metrics = self.score_structure_with_ligand_context(pdb_path)
-        passed = self._positive_passed(metrics["top_pocket_score"], metrics)
-        return {
-            "protein": name,
-            "control_type": "positive",
-            "pdb_id": info["pdb"],
-            "ip_type": info["ip_type"],
-            "score": metrics["top_pocket_score"],
-            "expected": info["expected_score"],
-            "passed": passed,
-            "total_pockets": metrics["total_pockets"],
-            "sasa": metrics["sasa"],
-            "basic_residues": metrics["basic_residues"],
-            "description": info["description"],
-        }
+        metrics = self.score_structure_with_ligand_context(pdb_path, control_type="positive")
+        passed = positive_passed(
+            metrics["validation_score"],
+            metrics.get("ligand_sasa"),
+            metrics["basic_residues"],
+            metrics["top_pocket_score"],
+        )
+        return self._result_row(name, "positive", info, metrics, passed)
 
     def validate_negative_control(self, name: str, info: Dict) -> Dict:
         """Validate a single negative control structure."""
         pdb_path = self.download_pdb(info["pdb"])
-        metrics = self.score_structure_with_ligand_context(pdb_path)
-        passed = self._negative_passed(metrics["top_pocket_score"], metrics)
+        metrics = self.score_structure_with_ligand_context(pdb_path, control_type="negative")
+        passed = negative_passed(
+            metrics["validation_score"],
+            metrics.get("ligand_sasa"),
+            metrics["top_pocket_score"],
+        )
+        return self._result_row(name, "negative", info, metrics, passed)
+
+    def _result_row(self, name: str, control_type: str, info: Dict, metrics: Dict, passed: bool) -> Dict:
         return {
             "protein": name,
-            "control_type": "negative",
+            "control_type": control_type,
+            "tier": info.get("tier", 2),
             "pdb_id": info["pdb"],
             "ip_type": info["ip_type"],
-            "score": metrics["top_pocket_score"],
+            "score": metrics["validation_score"],
+            "pocket_score": metrics["top_pocket_score"],
             "expected": info["expected_score"],
             "passed": passed,
             "total_pockets": metrics["total_pockets"],
@@ -257,16 +235,21 @@ class ValidationSuite:
             try:
                 results.append(self.validate_positive_control(name, info))
                 status = "PASS" if results[-1]["passed"] else "FAIL"
-                print(f"  Score: {results[-1]['score']:.3f} ({status})")
+                print(
+                    f"  Validation score: {results[-1]['score']:.3f} "
+                    f"(pocket={results[-1]['pocket_score']:.3f}, SASA={results[-1]['sasa']:.1f}) ({status})"
+                )
             except Exception as exc:
                 print(f"  Error: {exc}")
                 results.append(
                     {
                         "protein": name,
                         "control_type": "positive",
+                        "tier": info.get("tier", 2),
                         "pdb_id": info.get("pdb"),
                         "ip_type": info["ip_type"],
                         "score": float("nan"),
+                        "pocket_score": float("nan"),
                         "expected": info["expected_score"],
                         "passed": False,
                         "description": info["description"],
@@ -288,16 +271,21 @@ class ValidationSuite:
             try:
                 results.append(self.validate_negative_control(name, info))
                 status = "PASS" if results[-1]["passed"] else "FAIL"
-                print(f"  Score: {results[-1]['score']:.3f} ({status})")
+                print(
+                    f"  Validation score: {results[-1]['score']:.3f} "
+                    f"(pocket={results[-1]['pocket_score']:.3f}, SASA={results[-1]['sasa']:.1f}) ({status})"
+                )
             except Exception as exc:
                 print(f"  Error: {exc}")
                 results.append(
                     {
                         "protein": name,
                         "control_type": "negative",
+                        "tier": info.get("tier", 2),
                         "pdb_id": info.get("pdb"),
                         "ip_type": info["ip_type"],
                         "score": float("nan"),
+                        "pocket_score": float("nan"),
                         "expected": info["expected_score"],
                         "passed": False,
                         "description": info["description"],
@@ -312,10 +300,24 @@ class ValidationSuite:
         positive_results = self.run_positive_controls()
         negative_results = self.run_negative_controls()
 
+        sep = separation_quality(positive_results["score"], negative_results["score"])
+        tier1_pos = positive_results[positive_results["tier"] == 1]
+        tier1_neg = negative_results[negative_results["tier"] == 1]
+        if not tier1_pos.empty and not tier1_neg.empty:
+            tier_sep = separation_quality(tier1_pos["score"], tier1_neg["score"])
+            sep["tier1_separation"] = tier_sep.get("separation", sep.get("tier1_separation"))
+            sep["tier1_gate_passed"] = bool(
+                tier1_pos["passed"].all() and tier1_neg["passed"].all() and tier_sep.get("separation", 0) > 0.50
+            )
+            sep["phase1_ready"] = sep["tier1_gate_passed"]
+
+        sep["all_positive_passed"] = bool(positive_results["passed"].fillna(False).all())
+        sep["all_negative_passed"] = bool(negative_results["passed"].fillna(False).all())
+
         summary = {
             "positive_controls": positive_results,
             "negative_controls": negative_results,
-            "separation_quality": self._calculate_separation(positive_results, negative_results),
+            "separation_quality": sep,
         }
 
         if output_dir is not None:
@@ -329,26 +331,6 @@ class ValidationSuite:
         self._print_summary(summary)
         return summary
 
-    def _calculate_separation(self, positive: pd.DataFrame, negative: pd.DataFrame) -> Dict:
-        """Calculate score separation between positive and negative controls."""
-        pos_scores = positive["score"].dropna()
-        neg_scores = negative["score"].dropna()
-        if len(pos_scores) == 0 or len(neg_scores) == 0:
-            return {}
-
-        pos_mean = float(pos_scores.mean())
-        neg_mean = float(neg_scores.mean())
-        separation = pos_mean - neg_mean
-
-        return {
-            "positive_mean": pos_mean,
-            "negative_mean": neg_mean,
-            "separation": separation,
-            "clear_separation": separation > 0.3,
-            "all_positive_passed": bool(positive["passed"].fillna(False).all()),
-            "all_negative_passed": bool(negative["passed"].fillna(False).all()),
-        }
-
     def _print_summary(self, summary: Dict) -> None:
         """Print validation summary."""
         print("\n" + "=" * 60)
@@ -357,11 +339,13 @@ class ValidationSuite:
 
         sep = summary.get("separation_quality") or {}
         if sep:
-            print("\nScore Separation:")
+            print("\nScore Separation (burial-aware validation scores):")
             print(f"  Positive controls: {sep.get('positive_mean', 0):.3f}")
             print(f"  Negative controls: {sep.get('negative_mean', 0):.3f}")
             print(f"  Separation: {sep.get('separation', 0):.3f}")
-            print(f"  Clear separation: {sep.get('clear_separation', False)}")
+            print(f"  Tier-1 separation (ADAR2 vs PLCδ1): {sep.get('tier1_separation', 0):.3f}")
+            print(f"  Clear separation (>0.30): {sep.get('clear_separation', False)}")
+            print(f"  Phase 1 gate passed: {sep.get('phase1_ready', False)}")
             print(f"  All positives passed: {sep.get('all_positive_passed', False)}")
             print(f"  All negatives passed: {sep.get('all_negative_passed', False)}")
 

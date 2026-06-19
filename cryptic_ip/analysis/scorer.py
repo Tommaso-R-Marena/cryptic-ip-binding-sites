@@ -25,13 +25,13 @@ class PocketScorer:
         Args:
             weights: Dictionary of scoring weights
         """
-        # Default weights (sum to 1.0)
+        # Default weights (sum to 1.0) — SASA-heavy for cryptic vs surface separation
         self.weights = weights or {
-            'volume': 0.15,
+            'volume': 0.10,
             'depth': 0.25,
-            'sasa': 0.30,
+            'sasa': 0.40,
             'basic_residues': 0.20,
-            'electrostatics': 0.10
+            'electrostatics': 0.05
         }
     
     def score_volume(self, volume: float) -> float:

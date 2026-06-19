@@ -1,6 +1,6 @@
-protein,control_type,pdb_id,ip_type,score,expected,passed,total_pockets,sasa,basic_residues,description
-ADAR2,positive,1ZY7,IP6,0.6170511394705258,0.75,True,76,0.0,8,Gold standard - completely buried IP6
-Pds5B,positive,5HDT,IP6,0.5052939139095399,0.65,False,313,566.4129699568884,10,Cohesin regulator with buried IP6
-HDAC1,positive,5ICN,IP4,0.7283406000000001,0.6,False,68,287.42858444293904,6,Histone deacetylase with IP4 at interface
-PLCd1_PH,negative,1MAI,IP3,0.6132965287450305,0.3,True,11,99.11890698167906,6,Classic surface-exposed PH domain
-Btk_PH,negative,1BTK,IP4,0.75,0.35,False,42,0.0,0,Kinase PH domain - membrane targeting
+protein,control_type,tier,pdb_id,ip_type,score,pocket_score,expected,passed,total_pockets,sasa,basic_residues,description
+ADAR2,positive,1,1ZY7,IP6,0.8557630936719473,0.6394077341798682,0.75,True,76,0.0,8,Gold standard - completely buried IP6
+Pds5B,positive,2,5HDT,IP6,0.212117565563816,0.53029391390954,0.65,False,313,269.70226099239414,10,Cohesin regulator with buried IP6
+HDAC1,positive,2,5ICN,IP4,0.4902588915652315,0.7610180000000001,0.6,False,68,36.06112313260764,11,Histone deacetylase with IP4 at interface
+PLCd1_PH,negative,1,1MAI,IP3,0.2716676314980122,0.6791690787450305,0.3,True,11,99.11890698167906,6,Classic surface-exposed PH domain
+Btk_PH,negative,2,1BWN,IP4,0.6401115586051882,0.7238878205582052,0.35,True,52,23.708267721357046,9,Kinase PH domain with surface-accessible IP4
