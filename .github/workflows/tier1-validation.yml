@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, cursor/**]
   pull_request:
-    branches: [main]
+    branches: [main, cursor/**]
   schedule:
     - cron: '0 6 * * 1'
 
@@ -24,19 +24,20 @@ jobs:
           python-version: '3.11'
           channels: conda-forge,bioconda,defaults
 
-      - name: Install structural biology tools
+      - name: Install structural biology tools and Python deps
         shell: bash -l {0}
         run: |
           conda install -y -c conda-forge fpocket freesasa apbs pdb2pqr
-          pip install -r requirements.txt
-          pip install -e .
-          pip install pytest
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+          python -m pip install pytest
 
       - name: Cache validation structures
         uses: actions/cache@v4
         with:
           path: data/validation
-          key: validation-pdbs-${{ hashFiles('cryptic_ip/validation/validation_suite.py') }}
+          key: ci-validation-pdbs-v1
 
       - name: Download tier-1 control structures
         run: |
@@ -52,13 +53,13 @@ jobs:
         run: |
           python - <<'PY'
           from cryptic_ip.validation.validation_suite import ValidationSuite
-          suite = ValidationSuite(use_electrostatics=False)
-          pos = suite.run_positive_controls()
-          neg = suite.run_negative_controls()
-          tier1_pos = pos[pos["tier"] == 1]
-          tier1_neg = neg[neg["tier"] == 1]
-          sep = float(tier1_pos["score"].iloc[0] - tier1_neg["score"].iloc[0])
-          passed = bool(tier1_pos["passed"].all() and tier1_neg["passed"].all() and sep > 0.50)
+          suite = ValidationSuite(data_dir="data/validation", use_electrostatics=False)
+          pos = suite.validate_positive_control("ADAR2", suite.POSITIVE_CONTROLS["ADAR2"])
+          neg = suite.validate_negative_control("PLCd1_PH", suite.NEGATIVE_CONTROLS["PLCd1_PH"])
+          sep = float(pos["score"] - neg["score"])
+          passed = bool(pos["passed"] and neg["passed"] and sep > 0.50)
+          print(f"ADAR2 score: {pos['score']:.3f} passed={pos['passed']}")
+          print(f"PLC score: {neg['score']:.3f} passed={neg['passed']}")
           print(f"Tier-1 separation: {sep:.3f}")
           print(f"Phase 1 gate passed: {passed}")
           if not passed:
@@ -66,5 +67,6 @@ jobs:
           PY
 
       - name: Run unit tests for scoring modules
+        shell: bash -l {0}
         run: |
           pytest tests/test_control_scoring.py tests/test_structure_context.py tests/test_burial_metrics.py -q
