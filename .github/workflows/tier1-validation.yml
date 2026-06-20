@@ -27,7 +27,7 @@ jobs:
       - name: Install structural biology tools and Python deps
         shell: bash -l {0}
         run: |
-          conda install -y -c conda-forge fpocket freesasa apbs pdb2pqr
+          conda install -y -c conda-forge fpocket freesasa apbs pdb2pqr pip
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install -r requirements.txt
           python -m pip install -e .
