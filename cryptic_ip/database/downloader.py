@@ -103,7 +103,12 @@ class ProteomeDownloader:
             # Extract
             print(f"\nExtracting to {proteome_dir}...")
             with tarfile.open(tar_path, 'r') as tar:
-                tar.extractall(proteome_dir)
+                dest = proteome_dir.resolve()
+                for member in tar.getmembers():
+                    target = (dest / member.name).resolve()
+                    if not str(target).startswith(str(dest)):
+                        raise tarfile.TarError(f"Unsafe path in archive: {member.name}")
+                tar.extractall(dest)
             
             # Clean up tar file
             tar_path.unlink()
