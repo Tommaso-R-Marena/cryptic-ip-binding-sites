@@ -124,6 +124,10 @@ If buried IP-binding co-evolved with cellular IP metabolism:
 
 ### Comparative Statistics & Figure Pipeline (Phase 5)
 
+See **[Publication Package](docs/PUBLICATION_PACKAGE.md)** for the one-command workflow that builds
+the RCSB validation dataset, benchmarks controls, trains the ML classifier, and generates
+manuscript figures.
+
 After completing proteome screening for each organism, run the comparative analysis script to generate manuscript-ready statistics and figures:
 
 ```bash

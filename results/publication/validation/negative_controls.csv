@@ -1,0 +1,3 @@
+protein,control_type,tier,pdb_id,ip_type,score,pocket_score,expected,passed,total_pockets,sasa,basic_residues,description
+PLCd1_PH,negative,1,1MAI,IP3,0.2716676314980122,0.6791690787450305,0.3,True,11,99.11890698167906,6,Classic surface-exposed PH domain
+Btk_PH,negative,2,1BWN,IP4,0.6401115586051882,0.7238878205582052,0.35,True,52,23.708267721357046,9,Kinase PH domain with surface-accessible IP4

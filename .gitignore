@@ -67,8 +67,12 @@ io.mc
 
 # PyMOL
 *.pse
-*.png
 *.jpg
+
+# Allow manuscript artifacts
+!results/publication/**
+!results/publication/figures/*.pdf
+!results/publication/figures/*.png
 
 # Logs
 *.log

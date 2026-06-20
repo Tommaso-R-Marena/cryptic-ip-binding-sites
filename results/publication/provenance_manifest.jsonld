@@ -1,0 +1,116 @@
+{
+  "@context": "https://w3id.org/ro/crate/1.1/context",
+  "@type": "Dataset",
+  "config": {
+    "archival": {
+      "bundle_dir": "results/repro_bundle",
+      "include_paths": [
+        "config/defaults/pipeline.yaml",
+        "requirements.txt",
+        "environment.lock.yml"
+      ]
+    },
+    "data_sources": {
+      "alphafold_release_date": "2024-01-15",
+      "pdb_fetch_date": "2024-01-15"
+    },
+    "pipeline": {
+      "float_tolerance": 1e-06,
+      "max_structures": null,
+      "model_path": "models/cryptic_ip_classifier_v1.pkl",
+      "output_precision_decimals": 6,
+      "score_threshold": 0.6,
+      "seed": 42,
+      "sort_columns": [
+        "composite_score",
+        "uniprot_id",
+        "pocket_id"
+      ],
+      "use_ml_model": true
+    },
+    "provenance": {
+      "include_software_versions": true,
+      "log_inputs": true,
+      "log_outputs": true,
+      "manifest_path": "results/provenance_manifest.jsonld"
+    }
+  },
+  "dataSources": {
+    "alphafold_release_date": "2024-01-15",
+    "pdb_fetch_date": "2024-01-15"
+  },
+  "generatedAt": "2026-06-19T18:23:47.375992+00:00",
+  "inputs": [
+    {
+      "path": "/workspace/config/defaults/pipeline.yaml",
+      "sha256": "789e47cdf6d5d519ab9e88a40fb7e48bb76f931d1aa2a5e6cf94c2d3fb5141f5"
+    },
+    {
+      "path": "data/validation/ip_binding_validation_dataset.csv",
+      "sha256": "a241b3d5aae73af70bbdfb159d649895bf92e2edc016919ab4f5511967bade58"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "results/publication/RESULTS_SUMMARY.md",
+      "sha256": "78620ee16e550db8c716b9519d839455cd574925a231e11a62a265909ca63720"
+    },
+    {
+      "path": "results/publication/figures/Figure1_Overview.pdf",
+      "sha256": "cdd84e3eabe2bdee1cb78daf07d5812ab2062cf7d8788e6e9ad35a42f3c0db18"
+    },
+    {
+      "path": "results/publication/figures/Figure1_Overview.png",
+      "sha256": "e1734f74c573bc55507decea267b7db73bb975dbd4e86ecb67a9aa199d6dc740"
+    },
+    {
+      "path": "results/publication/figures/Figure2_Comparative_Proteomics.pdf",
+      "sha256": "de9eb98b595d160d8d81d476a0276f574fcbf0cc5686c977670a126aead66984"
+    },
+    {
+      "path": "results/publication/figures/Figure2_Comparative_Proteomics.png",
+      "sha256": "71fc6418c615de2997f7a1017d22eb5bde1dc7c40c4c464fc9d392607ffe5ca4"
+    },
+    {
+      "path": "results/publication/figures/Figure3_Top_Candidates.pdf",
+      "sha256": "74e0b25621ce05dd42c9825e2548d03c6fb5303c88851708c013b657e1d267d8"
+    },
+    {
+      "path": "results/publication/figures/Figure3_Top_Candidates.png",
+      "sha256": "3454d7c92acb52584a031c94bf998161e183115f767228185428e8c1546765b6"
+    },
+    {
+      "path": "results/publication/figures/figure_legends.txt",
+      "sha256": "16f55b6dbf9d9064b51bb18924a2cc31f437e87d52df9c872b461fac721cdc59"
+    },
+    {
+      "path": "results/publication/validation/roc_curves.csv",
+      "sha256": "c5995f9d7615f0d6d006669e89d10a97d3ef83385acce51893520fd810627fc5"
+    }
+  ],
+  "parameters": {
+    "float_tolerance": 1e-06,
+    "max_structures": null,
+    "model_path": "models/cryptic_ip_classifier_v1.pkl",
+    "output_precision_decimals": 6,
+    "score_threshold": 0.6,
+    "seed": 42,
+    "sort_columns": [
+      "composite_score",
+      "uniprot_id",
+      "pocket_id"
+    ],
+    "use_ml_model": true
+  },
+  "pipelineVersion": "dafbeabcdbcfbf93eddc2a44b9edcfe4711ade77",
+  "softwareVersions": {
+    "biopython": "1.87",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "platform": "Linux-6.12.58+-x86_64-with-glibc2.39",
+    "python": "3.13.13",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.17.1",
+    "xgboost": "3.3.0"
+  }
+}

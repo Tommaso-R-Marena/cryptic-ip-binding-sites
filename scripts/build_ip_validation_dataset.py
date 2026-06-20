@@ -27,7 +27,7 @@ LOGGER = logging.getLogger("build_ip_validation_dataset")
 RCSB_SEARCH_URL = "https://search.rcsb.org/rcsbsearch/v2/query"
 RCSB_CORE_URL = "https://data.rcsb.org/rest/v1/core"
 RCSB_FILES_URL = "https://files.rcsb.org/download"
-TARGET_LIGANDS = ("IP3", "IP4", "IP5", "IP6")
+TARGET_LIGANDS = ("IP3", "IP4", "IP5", "IP6", "IHP", "I3P", "4IP", "6A0")
 
 
 @dataclass
@@ -83,13 +83,36 @@ class RcsbClient:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         if out_path.exists():
             return out_path
-        response = self._request("GET", url)
-        out_path.write_bytes(response.content)
-        return out_path
+        try:
+            response = self._request("GET", url)
+            out_path.write_bytes(response.content)
+            return out_path
+        except RuntimeError:
+            if out_path.suffix.lower() == ".pdb":
+                cif_path = out_path.with_suffix(".cif")
+                if not cif_path.exists():
+                    cif_url = url.replace(".pdb", ".cif")
+                    response = self._request("GET", cif_url)
+                    cif_path.write_bytes(response.content)
+                return cif_path
+            raise
 
 
 def build_search_query(ligands: Sequence[str]) -> Dict:
     """Build RCSB search query for X-ray entries with requested ligands."""
+    ligand_nodes = [
+        {
+            "type": "terminal",
+            "service": "text",
+            "parameters": {
+                "attribute": "rcsb_nonpolymer_entity_container_identifiers.nonpolymer_comp_id",
+                "operator": "exact_match",
+                "value": ligand_id,
+            },
+        }
+        for ligand_id in ligands
+    ]
+
     return {
         "query": {
             "type": "group",
@@ -105,19 +128,14 @@ def build_search_query(ligands: Sequence[str]) -> Dict:
                     },
                 },
                 {
-                    "type": "terminal",
-                    "service": "text",
-                    "parameters": {
-                        "attribute": "rcsb_entry_container_identifiers.nonpolymer_comp_ids",
-                        "operator": "in",
-                        "value": list(ligands),
-                    },
+                    "type": "group",
+                    "logical_operator": "or",
+                    "nodes": ligand_nodes,
                 },
             ],
         },
         "request_options": {
-            "results_content_type": ["experimental"],
-            "return_all_hits": True,
+            "paginate": {"start": 0, "rows": 10000},
             "sort": [{"sort_by": "score", "direction": "desc"}],
         },
         "return_type": "entry",
@@ -134,29 +152,15 @@ def query_candidate_pdb_ids(client: RcsbClient, ligands: Sequence[str]) -> List[
 
 
 def parse_target_ligands_from_pdb(pdb_path: Path, target_ligands: Set[str]) -> Set[str]:
-    found: Set[str] = set()
-    with pdb_path.open("r", encoding="utf-8", errors="ignore") as handle:
-        for line in handle:
-            if not line.startswith(("HETATM", "ATOM  ")):
-                continue
-            resname = line[17:20].strip().upper()
-            if resname in target_ligands:
-                found.add(resname)
-    return found
+    from cryptic_ip.validation.structure_context import parse_ligand_resnames
+
+    return parse_ligand_resnames(pdb_path, target_ligands)
 
 
 def ligand_sasa(pdb_path: Path, ligand_id: str) -> float:
-    """Compute total SASA for all residues matching ligand_id."""
-    try:
-        import freesasa
-    except ImportError as exc:  # pragma: no cover - import guard
-        raise RuntimeError("freesasa is required. Install via conda/pip before running this script.") from exc
+    from cryptic_ip.validation.structure_context import ligand_total_sasa
 
-    structure = freesasa.Structure(str(pdb_path))
-    result = freesasa.calc(structure)
-    selection = ("lig", f"resn {ligand_id}")
-    selected = freesasa.selectArea((selection,), structure, result)
-    return float(selected.get("lig", 0.0))
+    return ligand_total_sasa(pdb_path, ligand_id)
 
 
 def classify_sasa(value: float) -> str:
@@ -165,6 +169,16 @@ def classify_sasa(value: float) -> str:
     if value <= 20.0:
         return "Semi-cryptic"
     return "Surface"
+
+
+def extract_organism(polymer_entities: Iterable[Dict]) -> str:
+    for entity in polymer_entities:
+        source = entity.get("rcsb_entity_source_organism", [])
+        if source:
+            names = [item.get("ncbi_scientific_name", "") for item in source if item.get("ncbi_scientific_name")]
+            if names:
+                return names[0]
+    return "NA"
 
 
 def extract_uniprot_ids(entry_data: Dict, polymer_entities: Iterable[Dict]) -> str:
@@ -241,16 +255,15 @@ def build_dataset(output_csv: Path, download_dir: Path, min_proteins: int) -> No
             res_list = entry_data.get("rcsb_entry_info", {}).get("resolution_combined", [])
             if res_list:
                 resolution = float(res_list[0])
-            organism = ""
-            src_org = entry_data.get("rcsb_entry_container_identifiers", {}).get(
-                "source_organism_scientific_name", []
-            )
-            if src_org:
-                organism = src_org[0]
+            organism = extract_organism(polymer_entities)
 
             for ligand_id in sorted(target_ligands):
                 fetch_ligand_metadata(client, ligand_id, metadata_dir)
-                sasa = ligand_sasa(structure_path, ligand_id)
+                try:
+                    sasa = ligand_sasa(structure_path, ligand_id)
+                except Exception as err:  # noqa: BLE001
+                    LOGGER.warning("Skipping %s ligand %s: %s", pdb_id, ligand_id, err)
+                    continue
                 rows.append(
                     DatasetRow(
                         pdb_id=pdb_id,

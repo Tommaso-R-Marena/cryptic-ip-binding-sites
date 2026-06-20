@@ -74,8 +74,11 @@ def export_figure(fig: plt.Figure, basename: Path, dpi: int = 600) -> None:
     if Image is not None:
         png_path = basename.with_suffix(".png")
         cmyk_path = basename.with_name(f"{basename.stem}_CMYK.png")
-        with Image.open(png_path) as img:
-            img.convert("CMYK").save(cmyk_path)
+        try:
+            with Image.open(png_path) as img:
+                img.convert("CMYK").save(cmyk_path)
+        except OSError:
+            pass
 
 
 def run_pymol_render(structure_path: Path, output_png: Path, ip6_resn: str = "IP6") -> bool:
@@ -208,8 +211,12 @@ def make_figure2(config: Dict, output_dir: Path) -> None:
     sns.heatmap(go_mat, cmap="mako", linewidths=0.2, linecolor="white", ax=axes[1, 0])
     axes[1, 0].set_title("C. GO term enrichment")
 
-    if {"species", "conservation_score"}.issubset(phylo_df.columns):
-        sns.pointplot(data=phylo_df, x="species", y="conservation_score", hue="candidate", ax=axes[1, 1])
+    if {"species", "conservation_score"}.issubset(phylo_df.columns) and phylo_df["conservation_score"].notna().any():
+        plot_df = phylo_df.dropna(subset=["species", "conservation_score"])
+        if len(plot_df) > 1:
+            sns.pointplot(data=plot_df, x="species", y="conservation_score", hue="candidate", ax=axes[1, 1])
+        else:
+            sns.barplot(data=plot_df, x="species", y="conservation_score", ax=axes[1, 1])
     else:
         sns.heatmap(phylo_df.set_index(phylo_df.columns[0]), cmap="viridis", ax=axes[1, 1])
     axes[1, 1].set_title("D. Phylogenetic conservation")

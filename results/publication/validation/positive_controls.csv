@@ -1,0 +1,4 @@
+protein,control_type,tier,pdb_id,ip_type,score,pocket_score,expected,passed,total_pockets,sasa,basic_residues,description
+ADAR2,positive,1,1ZY7,IP6,0.8557630936719473,0.6394077341798682,0.75,True,76,0.0,8,Gold standard - completely buried IP6
+Pds5B,positive,2,5HDT,IP6,0.212117565563816,0.53029391390954,0.65,False,313,269.70226099239414,10,Cohesin regulator with buried IP6
+HDAC1,positive,2,5ICN,IP4,0.4902588915652315,0.7610180000000001,0.6,False,68,36.06112313260764,11,Histone deacetylase with IP4 at interface
