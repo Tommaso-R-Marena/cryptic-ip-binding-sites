@@ -39,8 +39,9 @@ env/
 # VSCode
 .vscode/
 
-# Data directories (structures can be large)
-data/structures/
+# Large screening caches
+results/yeast_pilot/screen_cache.sqlite
+results/yeast_pilot/run.log
 data/results/
 data/temp/
 *.pdb

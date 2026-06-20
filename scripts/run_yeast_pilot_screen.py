@@ -32,6 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--skip-download", action="store_true")
     parser.add_argument("--skip-electrostatics", action="store_true", default=True)
+    parser.add_argument("--with-electrostatics", action="store_true", help="Run APBS per structure (slow)")
     return parser.parse_args()
 
 
@@ -60,6 +61,7 @@ def _analyze_structure(item: Dict[str, Any]) -> Dict[str, Any]:
 
 def main() -> int:
     args = parse_args()
+    skip_electrostatics = args.skip_electrostatics and not args.with_electrostatics
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.structures_dir.mkdir(parents=True, exist_ok=True)
 
@@ -85,7 +87,7 @@ def main() -> int:
             "work_dir": str(work_root),
             "score_threshold": args.score_threshold,
             "min_plddt": args.min_plddt,
-            "skip_electrostatics": args.skip_electrostatics,
+            "skip_electrostatics": skip_electrostatics,
         }
         for path in pdb_files
     ]
