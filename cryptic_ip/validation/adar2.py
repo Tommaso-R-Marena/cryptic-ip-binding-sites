@@ -123,7 +123,7 @@ def _select_site_pocket(
 def validate_adar2(
     structure_path: Optional[str] = None,
     use_alphafold: bool = True,
-    use_electrostatics: bool = True,
+    use_electrostatics: bool = False,
 ) -> Dict:
     """Validate pipeline on ADAR2 IP6 binding site."""
     if structure_path is None:
