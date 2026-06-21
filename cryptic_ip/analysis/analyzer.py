@@ -219,35 +219,39 @@ class ProteinAnalyzer:
 
     @timed()
     @lru_cache(maxsize=512)
-    def get_pocket_residues(self, pocket_id: int, distance_cutoff: float = 5.0) -> List[int]:
+    def get_pocket_residues(self, pocket_id: int, distance_cutoff: float = 8.0) -> List[int]:
         """
-        Get residue numbers within distance of pocket center.
+        Get residue numbers lining a pocket.
 
-        Args:
-            pocket_id: Pocket identifier
-            distance_cutoff: Distance threshold in Angstroms
-
-        Returns:
-            List of residue numbers
+        Uses fpocket pocket atom residue IDs when available, otherwise falls back
+        to CA atoms within ``distance_cutoff`` of the pocket alpha-sphere centroid.
         """
         if self.pockets is None:
             raise ValueError("Run detect_pockets() first")
 
         pocket = self.pockets[self.pockets["pocket_id"] == pocket_id].iloc[0]
-        center = np.array([pocket["center_x"], pocket["center_y"], pocket["center_z"]])
+        if "fpocket_residue_ids" in pocket and pd.notna(pocket["fpocket_residue_ids"]):
+            fpocket_ids = [
+                int(token)
+                for token in str(pocket["fpocket_residue_ids"]).split(",")
+                if token.strip()
+            ]
+            if fpocket_ids:
+                return fpocket_ids
 
-        # Get all CA atoms
+        center = np.array([pocket["center_x"], pocket["center_y"], pocket["center_z"]])
         residue_numbers = []
         for model in self.structure:
             for chain in model:
                 for residue in chain:
-                    if "CA" in residue:
-                        ca_coord = residue["CA"].get_coord()
-                        distance = np.linalg.norm(ca_coord - center)
-                        if distance <= distance_cutoff:
-                            residue_numbers.append(residue.id[1])
+                    if "CA" not in residue:
+                        continue
+                    ca_coord = residue["CA"].get_coord()
+                    distance = np.linalg.norm(ca_coord - center)
+                    if distance <= distance_cutoff:
+                        residue_numbers.append(residue.id[1])
 
-        return residue_numbers
+        return sorted(set(residue_numbers))
 
     def count_basic_residues(self, pocket_id: int, distance_cutoff: float = 5.0) -> int:
         """

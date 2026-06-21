@@ -109,7 +109,29 @@ class CandidateFilter:
         )
         return results[mask].copy()
 
-    def rank_candidates(self, results: pd.DataFrame) -> pd.DataFrame:
+    def filter_cryptic_candidates(
+        self,
+        results: pd.DataFrame,
+        structure_path: Optional[str] = None,
+        *,
+        min_basic: int = 4,
+        max_sasa: float = 10.0,
+        min_volume: float = 300,
+        max_volume: float = 800,
+    ) -> pd.DataFrame:
+        """Apply score, burial, volume, and pLDDT gates for proteome screening."""
+        filtered = self.filter_by_score(results)
+        filtered = self.filter_by_criteria(
+            filtered,
+            min_basic=min_basic,
+            max_sasa=max_sasa,
+            min_volume=min_volume,
+            max_volume=max_volume,
+        )
+        if structure_path:
+            filtered = self.filter_by_confidence(filtered, structure_path=structure_path)
+        return self.rank_candidates(filtered)
+
         """
         Rank candidates by composite score and add classification.
 

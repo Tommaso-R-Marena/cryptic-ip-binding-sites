@@ -27,6 +27,55 @@ def main():
 
 
 @main.command()
+def check_dependencies():
+    """
+    Verify external tools and Python packages required by the pipeline.
+    """
+    import importlib
+    import shutil
+
+    tools = ["fpocket", "freesasa", "apbs", "pdb2pqr"]
+    missing_tools = [tool for tool in tools if shutil.which(tool) is None]
+
+    packages = [
+        "numpy",
+        "pandas",
+        "Bio",
+        "prody",
+        "sklearn",
+        "matplotlib",
+        "requests",
+    ]
+    missing_packages = []
+    for package in packages:
+        try:
+            importlib.import_module(package)
+        except ImportError:
+            missing_packages.append(package)
+
+    if missing_tools:
+        click.secho("Missing external tools:", fg="red", bold=True)
+        for tool in missing_tools:
+            click.echo(f"  - {tool}")
+        click.echo("Install via conda: conda install -c conda-forge fpocket freesasa apbs pdb2pqr")
+    else:
+        click.secho("All external tools found.", fg="green")
+
+    if missing_packages:
+        click.secho("Missing Python packages:", fg="red", bold=True)
+        for package in missing_packages:
+            click.echo(f"  - {package}")
+        click.echo("Install via pip: pip install -r requirements.txt && pip install -e .")
+    else:
+        click.secho("All required Python packages found.", fg="green")
+
+    if missing_tools or missing_packages:
+        raise click.exceptions.Exit(1)
+
+    click.secho("\n✓ Environment ready for cryptic IP site analysis", fg="green", bold=True)
+
+
+@main.command()
 @click.argument("pdb_file", type=click.Path(exists=True))
 @click.option("--output", "-o", type=click.Path(), help="Output file for results")
 @click.option("--score-threshold", "-t", default=0.60, help="Minimum score threshold")

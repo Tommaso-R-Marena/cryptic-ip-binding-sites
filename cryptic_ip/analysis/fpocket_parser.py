@@ -63,14 +63,33 @@ class FpocketParser:
 
         pockets_dir = info_file.parent / "pockets"
         centers = []
+        residue_sets = []
         for pocket_id in frame["pocket_id"]:
             pocket_file = pockets_dir / f"pocket{int(pocket_id)}_atm.pdb"
             centers.append(self._pocket_centroid(pocket_file))
+            residue_sets.append(self._pocket_residue_ids_from_atoms(pocket_file))
         frame["center_x"] = [center[0] for center in centers]
         frame["center_y"] = [center[1] for center in centers]
         frame["center_z"] = [center[2] for center in centers]
+        frame["fpocket_residue_ids"] = [",".join(str(r) for r in residues) for residues in residue_sets]
 
         return frame
+
+    def _pocket_residue_ids_from_atoms(self, pocket_file: Path) -> List[int]:
+        """Extract fpocket-reported residue numbers from pocket atom records."""
+        if not pocket_file.exists():
+            return []
+
+        residue_ids: set[int] = set()
+        with pocket_file.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not (line.startswith("ATOM") or line.startswith("HETATM")):
+                    continue
+                try:
+                    residue_ids.add(int(line[22:26].strip()))
+                except ValueError:
+                    continue
+        return sorted(residue_ids)
 
     def _pocket_centroid(self, pocket_file: Path) -> tuple[float, float, float]:
         """Compute alpha-sphere centroid for a pocket coordinates file."""

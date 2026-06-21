@@ -238,7 +238,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-      - name: Run Bandit security scan
+    - name: Run Bandit security scan
       run: |
         pip install bandit
         bandit -r cryptic_ip/ -c .bandit -lll
