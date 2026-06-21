@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 
@@ -181,6 +182,107 @@ class ElectrostaticsCalculator:
             raise RuntimeError("APBS output did not include 'Global net ELEC energy'.")
 
         return float(energy_match.group(1))
+
+    def run_apbs_with_map(
+        self, pqr_path: Union[str, Path], output_dir: Union[str, Path]
+    ) -> Tuple[float, Path]:
+        """Run APBS and return scalar energy plus the potential DX map path."""
+        pqr_path = Path(pqr_path)
+        output_dir = Path(output_dir)
+        energy = self.run_apbs(pqr_path, output_dir)
+        map_path = output_dir / f"{pqr_path.stem}.dx"
+        if not map_path.exists():
+            raise RuntimeError(f"APBS potential map not found: {map_path}")
+        return energy, map_path
+
+    @staticmethod
+    def parse_dx_grid(dx_path: Union[str, Path]) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Parse an APBS OpenDX potential map into grid axes and values."""
+        import numpy as np
+
+        dx_path = Path(dx_path)
+        counts = None
+        origin = None
+        deltas = []
+        values: List[float] = []
+
+        with dx_path.open("r", encoding="utf-8") as handle:
+            in_data = False
+            for line in handle:
+                stripped = line.strip()
+                if stripped.startswith("counts"):
+                    counts = [int(x) for x in stripped.split()[1:4]]
+                elif stripped.startswith("origin"):
+                    origin = np.asarray([float(x) for x in stripped.split()[1:4]], dtype=float)
+                elif stripped.startswith("delta"):
+                    deltas.append(np.asarray([float(x) for x in stripped.split()[1:4]], dtype=float))
+                elif stripped == "object 3 class array":
+                    in_data = True
+                    continue
+                elif in_data:
+                    if stripped.startswith("attribute") or stripped.startswith("object"):
+                        break
+                    values.extend(float(x) for x in stripped.split())
+
+        if counts is None or origin is None or len(deltas) < 3:
+            raise RuntimeError(f"Unable to parse DX grid metadata from {dx_path}")
+
+        grid = np.asarray(values, dtype=float).reshape(counts[2], counts[1], counts[0])
+        xs = origin[0] + np.arange(counts[0]) * deltas[0][0]
+        ys = origin[1] + np.arange(counts[1]) * deltas[1][1]
+        zs = origin[2] + np.arange(counts[2]) * deltas[2][2]
+        return xs, ys, zs, grid
+
+    def sample_potential_at_point(
+        self, dx_path: Union[str, Path], point: Sequence[float]
+    ) -> float:
+        """Trilinearly interpolate electrostatic potential (kT/e) at a 3D coordinate."""
+        import numpy as np
+
+        xs, ys, zs, grid = self.parse_dx_grid(dx_path)
+        x, y, z = (float(point[0]), float(point[1]), float(point[2]))
+
+        ix = int(np.clip(np.searchsorted(xs, x) - 1, 0, len(xs) - 2))
+        iy = int(np.clip(np.searchsorted(ys, y) - 1, 0, len(ys) - 2))
+        iz = int(np.clip(np.searchsorted(zs, z) - 1, 0, len(zs) - 2))
+
+        x0, x1 = xs[ix], xs[ix + 1]
+        y0, y1 = ys[iy], ys[iy + 1]
+        z0, z1 = zs[iz], zs[iz + 1]
+        tx = 0.0 if x1 == x0 else (x - x0) / (x1 - x0)
+        ty = 0.0 if y1 == y0 else (y - y0) / (y1 - y0)
+        tz = 0.0 if z1 == z0 else (z - z0) / (z1 - z0)
+
+        c000 = grid[iz, iy, ix]
+        c100 = grid[iz, iy, ix + 1]
+        c010 = grid[iz, iy + 1, ix]
+        c110 = grid[iz, iy + 1, ix + 1]
+        c001 = grid[iz + 1, iy, ix]
+        c101 = grid[iz + 1, iy, ix + 1]
+        c011 = grid[iz + 1, iy + 1, ix]
+        c111 = grid[iz + 1, iy + 1, ix + 1]
+
+        c00 = c000 * (1 - tx) + c100 * tx
+        c01 = c001 * (1 - tx) + c101 * tx
+        c10 = c010 * (1 - tx) + c110 * tx
+        c11 = c011 * (1 - tx) + c111 * tx
+        c0 = c00 * (1 - ty) + c10 * ty
+        c1 = c01 * (1 - ty) + c11 * ty
+        return float(c0 * (1 - tz) + c1 * tz)
+
+    def pocket_electrostatic_potential(
+        self,
+        pdb_path: Union[str, Path],
+        pocket_center: Sequence[float],
+        output_dir: Union[str, Path],
+        ph: float = 7.4,
+    ) -> float:
+        """Compute pocket-local electrostatic potential at the given center."""
+        pdb_path = Path(pdb_path)
+        output_dir = Path(output_dir)
+        pqr_path = self.generate_pqr(pdb_path, ph=ph, output_dir=output_dir)
+        _, dx_path = self.run_apbs_with_map(pqr_path, output_dir)
+        return self.sample_potential_at_point(dx_path, pocket_center)
 
     def identify_ph_sensitive_residues(
         self,

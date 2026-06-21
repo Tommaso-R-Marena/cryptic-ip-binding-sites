@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 
+BURIAL_CLASSES = ("cryptic", "semi_cryptic", "surface", "crystal_artifact", "unknown")
+
 
 def burial_component(ligand_sasa: float) -> float:
     """Return 1.0 for cryptic ligands and 0.0 for surface ligands."""
@@ -14,11 +16,29 @@ def burial_component(ligand_sasa: float) -> float:
     return float((50.0 - ligand_sasa) / 45.0)
 
 
-def cryptic_likeness(pocket_composite: float, ligand_sasa: Optional[float]) -> float:
+def electrostatic_component(pocket_potential: Optional[float]) -> float:
+    """Normalize pocket electrostatic potential to 0-1 (higher = more positive)."""
+    if pocket_potential is None or pocket_potential != pocket_potential:
+        return 0.5
+    # Typical APBS sampled values for basic pockets are positive single digits.
+    return float(max(0.0, min(1.0, (pocket_potential + 2.0) / 12.0)))
+
+
+def cryptic_likeness(
+    pocket_composite: float,
+    ligand_sasa: Optional[float],
+    *,
+    pocket_potential: Optional[float] = None,
+    use_electrostatics: bool = False,
+) -> float:
     """Unified score: higher values indicate more cryptic/buried binding."""
     if ligand_sasa is not None:
         burial = burial_component(ligand_sasa)
-        return float(0.60 * burial + 0.40 * pocket_composite)
+        base = float(0.55 * burial + 0.35 * pocket_composite)
+        if use_electrostatics:
+            elec = electrostatic_component(pocket_potential)
+            return float(0.75 * base + 0.25 * elec)
+        return base
     return float(pocket_composite)
 
 
@@ -27,10 +47,18 @@ def validation_score(
     pocket_composite: float,
     ligand_sasa: Optional[float],
     basic_residues: int,
+    *,
+    pocket_potential: Optional[float] = None,
+    use_electrostatics: bool = False,
 ) -> float:
     """Return cryptic-likeness on a single scale for separation analysis."""
     _ = control_type, basic_residues
-    return cryptic_likeness(pocket_composite, ligand_sasa)
+    return cryptic_likeness(
+        pocket_composite,
+        ligand_sasa,
+        pocket_potential=pocket_potential,
+        use_electrostatics=use_electrostatics,
+    )
 
 
 def positive_passed(
@@ -39,9 +67,20 @@ def positive_passed(
     basic_residues: int,
     pocket_composite: float,
     *,
+    burial_class: str = "cryptic",
     score_threshold: float = 0.55,
 ) -> bool:
     """Phase 1 positive-control pass criteria."""
+    if burial_class == "crystal_artifact":
+        return False
+    if burial_class == "semi_cryptic":
+        return (
+            ligand_sasa is not None
+            and 10.0 <= ligand_sasa < 50.0
+            and basic_residues >= 4
+            and pocket_composite >= 0.45
+            and validation_value >= 0.40
+        )
     if ligand_sasa is not None:
         return (
             ligand_sasa < 10.0
@@ -58,21 +97,39 @@ def negative_passed(
     pocket_composite: float,
     *,
     score_threshold: float = 0.45,
+    decoy_mode: bool = False,
 ) -> bool:
     """Phase 1 negative-control pass criteria (low cryptic-likeness)."""
+    threshold = 0.55 if decoy_mode else score_threshold
     if ligand_sasa is not None:
         if ligand_sasa >= 50.0:
-            return validation_value <= score_threshold
+            return validation_value <= threshold
         if ligand_sasa >= 20.0:
             return validation_value <= 0.65
-        return validation_value <= score_threshold and pocket_composite < 0.55
-    return validation_value <= score_threshold
+        return validation_value <= threshold and pocket_composite < 0.55
+    return validation_value <= threshold
 
 
-def separation_quality(positive_scores, negative_scores) -> Dict[str, object]:
+def separation_quality(
+    positive_scores,
+    negative_scores,
+    *,
+    exclude_artifact_positives: bool = True,
+    positive_classes: Optional[list] = None,
+) -> Dict[str, object]:
     """Summarize whether positive and negative controls separate cleanly."""
     pos_scores = [float(score) for score in positive_scores if score == score]
     neg_scores = [float(score) for score in negative_scores if score == score]
+
+    if positive_classes and exclude_artifact_positives:
+        filtered = [
+            score
+            for score, cls in zip(positive_scores, positive_classes)
+            if score == score and cls not in {"crystal_artifact"}
+        ]
+        if filtered:
+            pos_scores = [float(s) for s in filtered]
+
     if not pos_scores or not neg_scores:
         return {}
 

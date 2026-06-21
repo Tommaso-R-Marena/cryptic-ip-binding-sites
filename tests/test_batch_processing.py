@@ -83,7 +83,7 @@ def test_batch_downloader_corrupt_state(tmp_path):
 
 def test_batch_downloader_config_validation(tmp_path):
     with pytest.raises(ValidationError):
-        AlphaFoldBatchDownloader(output_dir=tmp_path / "af", requests_per_second=0)
+        AlphaFoldBatchDownloader(output_dir=tmp_path / "af", requests_per_second=0.05)
 
 
 def test_analysis_cache_roundtrip_and_invalidate(tmp_path):

@@ -26,9 +26,15 @@ def _roc_curve(y_true: np.ndarray, y_score: np.ndarray) -> Tuple[np.ndarray, np.
     return fpr, tpr
 
 
+def _trapz(y: np.ndarray, x: np.ndarray) -> float:
+    if hasattr(np, "trapezoid"):
+        return float(np.trapezoid(y, x))
+    return float(np.trapz(y, x))
+
+
 def _roc_auc_score(y_true: np.ndarray, y_score: np.ndarray) -> float:
     fpr, tpr = _roc_curve(y_true, y_score)
-    return float(np.trapz(tpr, fpr))
+    return _trapz(tpr, fpr)
 
 
 def _precision_recall_curve(y_true: np.ndarray, y_score: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -49,7 +55,7 @@ def _precision_recall_curve(y_true: np.ndarray, y_score: np.ndarray) -> Tuple[np
 def _average_precision_score(y_true: np.ndarray, y_score: np.ndarray) -> float:
     precision, recall = _precision_recall_curve(y_true, y_score)
     sort_idx = np.argsort(recall)
-    return float(np.trapz(precision[sort_idx], recall[sort_idx]))
+    return float(_trapz(precision[sort_idx], recall[sort_idx]))
 
 
 @dataclass

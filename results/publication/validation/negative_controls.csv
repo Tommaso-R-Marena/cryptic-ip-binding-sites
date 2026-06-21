@@ -1,3 +1,3 @@
-protein,control_type,tier,pdb_id,ip_type,score,pocket_score,expected,passed,total_pockets,sasa,basic_residues,description
-PLCd1_PH,negative,1,1MAI,IP3,0.2716676314980122,0.6791690787450305,0.3,True,11,99.11890698167906,6,Classic surface-exposed PH domain
-Btk_PH,negative,2,1BWN,IP4,0.6401115586051882,0.7238878205582052,0.35,True,52,23.708267721357046,9,Kinase PH domain with surface-accessible IP4
+protein,control_type,tier,pdb_id,ip_type,score,pocket_score,expected,passed,burial_class,total_pockets,sasa,phosphate_sasa,burial_depth,basic_residues,electrostatic_potential,plddt_confidence,decoy_mode,description
+PLCd1_PH,negative,1,1MAI,IP3,0.23751118256076062,0.6786033787450304,0.3,True,surface,11,99.11890698167906,94.2883941175194,5.97563012602723,6,,,False,Classic surface-exposed PH domain
+Btk_PH,negative,2,1BWN,IP4,0.27125,0.775,0.35,True,surface,52,589.9155513240296,394.73805072912756,10.141927973631454,9,,27.72,True,Kinase PH domain with surface-accessible IP4

@@ -59,6 +59,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-ml-training", action="store_true")
     parser.add_argument("--skip-controls", action="store_true")
     parser.add_argument("--skip-figures", action="store_true")
+    parser.add_argument("--with-electrostatics", action="store_true")
+    parser.add_argument("--skip-electrostatics", action="store_true", help="Force-disable APBS in controls")
     return parser.parse_args()
 
 
@@ -415,8 +417,9 @@ def main() -> int:
         )
 
     controls_summary = {}
+    use_electrostatics = args.with_electrostatics and not args.skip_electrostatics
     if not args.skip_controls:
-        suite = ValidationSuite(data_dir=str(ROOT / "data" / "validation"))
+        suite = ValidationSuite(data_dir=str(ROOT / "data" / "validation"), use_electrostatics=use_electrostatics)
         controls_summary = suite.run_full_validation(output_dir=args.output_dir / "validation")
 
     ml_work = args.output_dir / "ml_training"
@@ -433,6 +436,7 @@ def main() -> int:
                 str(ml_work),
                 "--skip-build-dataset",
             ]
+            + (["--include-electrostatics"] if use_electrostatics else []),
         )
 
     ml_comparison = export_roc_csv(ml_work, args.output_dir / "validation" / "roc_curves.csv")

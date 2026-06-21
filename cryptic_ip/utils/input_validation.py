@@ -43,6 +43,13 @@ class BatchDownloadConfig(BaseModel):
     backoff_seconds: float = Field(default=1.5)
     timeout_seconds: float = Field(default=30.0)
 
+    @field_validator("requests_per_second")
+    @classmethod
+    def _valid_rate(cls, value: float) -> float:
+        if not (0.1 <= value <= 50.0):
+            raise ValueError("requests_per_second must be between 0.1 and 50.0")
+        return value
+
 
 class ParallelProcessorConfig(BaseModel):
     if PYDANTIC_AVAILABLE:

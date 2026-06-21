@@ -120,7 +120,11 @@ def _select_site_pocket(
     return best_row
 
 
-def validate_adar2(structure_path: Optional[str] = None, use_alphafold: bool = True) -> Dict:
+def validate_adar2(
+    structure_path: Optional[str] = None,
+    use_alphafold: bool = True,
+    use_electrostatics: bool = False,
+) -> Dict:
     """Validate pipeline on ADAR2 IP6 binding site."""
     if structure_path is None:
         structures = download_adar2_structures()
@@ -135,15 +139,23 @@ def validate_adar2(structure_path: Optional[str] = None, use_alphafold: bool = T
     if not site_residues:
         site_residues = {376, 519, 522, 651, 672}
 
-    analyzer = ProteinAnalyzer(str(structure_path_obj), skip_electrostatics=True)
+    analyzer = ProteinAnalyzer(str(structure_path_obj), skip_electrostatics=not use_electrostatics)
 
     print("Detecting pockets...")
     pockets = analyzer.detect_pockets()
     print(f"Found {len(pockets)} pockets")
 
     print("Scoring pockets...")
+    if use_electrostatics:
+        analyzer.calculate_electrostatics()
     scored = analyzer.score_all_pockets()
     top_pocket = _select_site_pocket(scored, analyzer, site_residues, ligand_centroid)
+    if "center" in top_pocket and top_pocket["center"] is not None:
+        pocket_center = tuple(float(v) for v in top_pocket["center"])
+    else:
+        pocket_row = analyzer.pockets[analyzer.pockets["pocket_id"] == int(top_pocket["pocket_id"])].iloc[0]
+        pocket_center = (float(pocket_row["center_x"]), float(pocket_row["center_y"]), float(pocket_row["center_z"]))
+    electrostatic_potential = analyzer.pocket_electrostatic_potential(pocket_center)
 
     sasa_metric = float(ligand_sasa if ligand_sasa is not None else top_pocket["sasa"])
     overlap = len(
@@ -164,6 +176,7 @@ def validate_adar2(structure_path: Optional[str] = None, use_alphafold: bool = T
         "ligand_sasa": ligand_sasa,
         "basic_residues": basic_residues,
         "depth": float(top_pocket["depth"]),
+        "electrostatic_potential": electrostatic_potential,
         "structure_used": "AlphaFold" if use_alphafold else "Crystal",
         "site_residue_overlap": int(overlap),
         "site_residues": sorted(site_residues),

@@ -1,0 +1,9 @@
+{
+  "proteome_id": "UP000002311",
+  "structures_screened": 499,
+  "proteins_with_hits": 495,
+  "total_hits": 1484,
+  "hit_rate": 0.9919839679358717,
+  "score_threshold": 0.6,
+  "min_plddt": 70.0
+}
