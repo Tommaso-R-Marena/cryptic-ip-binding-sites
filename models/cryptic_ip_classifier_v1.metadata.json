@@ -1,9 +1,12 @@
 {
-  "model_version": "v1",
-  "trained_at_utc": "2026-06-19T17:51:25.171931+00:00",
+  "model_version": "v2",
+  "labeling": "pocket-level ligand proximity <= 8A",
+  "split": "grouped by pdb_id",
+  "trained_at_utc": "2026-06-20T02:53:00.329625+00:00",
   "dataset_csv": "data/validation/ip_binding_validation_dataset.csv",
   "num_structures": 136,
   "num_pockets": 12190,
+  "num_positive_pockets": 5,
   "feature_columns": [
     "pocket_depth",
     "sasa",
@@ -18,51 +21,46 @@
         "classifier__class_weight": null,
         "classifier__max_depth": null,
         "classifier__min_samples_leaf": 1,
-        "classifier__min_samples_split": 4,
+        "classifier__min_samples_split": 2,
         "classifier__n_estimators": 200
       },
-      "roc_auc": 0.5646272347941169,
-      "pr_auc": 0.022904345308088842,
+      "roc_auc": 0.49640737269603247,
+      "pr_auc": 0.00020822488287350338,
       "roc_auc_ci": [
-        0.5112306935993958,
-        0.616968625509856
+        0.49552269887546857,
+        0.49724044569405396
       ],
       "pr_auc_ci": [
-        0.01610708643721959,
-        0.0406028515574363
+        0.00010411244143675169,
+        0.0005205622071837585
       ],
-      "cv_roc_auc": 0.5646272347941169,
-      "cv_pr_auc": 0.022904345308088842
+      "cv_roc_auc": 0.4966677080079142,
+      "cv_pr_auc": 0.00020822488287350338,
+      "cv_mcc": 0.0
     },
     "xgboost": {
       "best_params": {
         "classifier__colsample_bytree": 0.8,
-        "classifier__learning_rate": 0.1,
+        "classifier__learning_rate": 0.03,
         "classifier__max_depth": 3,
         "classifier__n_estimators": 200,
-        "classifier__subsample": 1.0
+        "classifier__subsample": 0.8
       },
-      "roc_auc": 0.629587313375401,
-      "pr_auc": 0.020922311523031707,
+      "roc_auc": 0.49997396646881176,
+      "pr_auc": 0.00020821404460144043,
       "roc_auc_ci": [
-        0.5851025453570218,
-        0.6762612859825472
+        0.24652434193187087,
+        0.7530587799835042
       ],
       "pr_auc_ci": [
-        0.016472290244184926,
-        0.02999179513533029
+        0.00010411244143675169,
+        0.0006276808914736521
       ],
-      "cv_roc_auc": 0.629587313375401,
-      "cv_pr_auc": 0.020922311523031707
+      "cv_roc_auc": 0.19944288243257313,
+      "cv_pr_auc": 0.00016911504154075587,
+      "cv_mcc": 0.0
     }
   },
   "selected_model_type": "random_forest",
-  "selected_hyperparameters": {
-    "classifier__class_weight": null,
-    "classifier__max_depth": null,
-    "classifier__min_samples_leaf": 1,
-    "classifier__min_samples_split": 4,
-    "classifier__n_estimators": 200
-  },
   "dataset_sha256": "a241b3d5aae73af70bbdfb159d649895bf92e2edc016919ab4f5511967bade58"
 }

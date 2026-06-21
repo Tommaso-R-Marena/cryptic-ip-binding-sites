@@ -10,6 +10,6 @@ Data sources:
 - AlphaFold DB release date: 2024-01-15
 - PDB retrieval date: 2024-01-15
 
-Pipeline commit: dafbeabcdbcfbf93eddc2a44b9edcfe4711ade77
+Pipeline commit: cd04d7eaaf540c2e3ca8b7c495b8c3130e58d286
 Floating point note: tiny score differences may occur across BLAS implementations;
 store outputs with >=6 decimal places and compare with tolerance (1e-6).

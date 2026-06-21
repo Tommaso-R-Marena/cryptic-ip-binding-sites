@@ -1,0 +1,7 @@
+# Bandit configuration for structural-biology tooling (fpocket/APBS subprocess calls).
+skips:
+  - B404  # subprocess import required for external tools
+  - B603  # subprocess calls to conda-installed binaries
+  - B607  # partial executable paths for fpocket/apbs/pdb2pqr
+  - B310  # urllib downloads from RCSB/AlphaFold EBI
+  - B202  # tar paths validated before extractall (AlphaFold EBI archives)

@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from .adar2 import validate_adar2
+from .burial_metrics import compute_burial_metrics
 from .control_scoring import (
     negative_passed,
     positive_passed,
@@ -38,20 +39,23 @@ class ValidationSuite:
             "expected_score": 0.75,
             "use_adar2_validator": True,
             "tier": 1,
+            "burial_class": "cryptic",
         },
         "Pds5B": {
             "pdb": "5HDT",
             "ip_type": "IP6",
-            "description": "Cohesin regulator with buried IP6",
+            "description": "Cohesin regulator - crystal shows surface-exposed IP6 (artifact)",
             "expected_score": 0.65,
             "tier": 2,
+            "burial_class": "crystal_artifact",
         },
         "HDAC1": {
             "pdb": "5ICN",
             "ip_type": "IP4",
-            "description": "Histone deacetylase with IP4 at interface",
+            "description": "Histone deacetylase with semi-cryptic IP at interface",
             "expected_score": 0.60,
             "tier": 2,
+            "burial_class": "semi_cryptic",
         },
     }
 
@@ -69,12 +73,14 @@ class ValidationSuite:
             "description": "Kinase PH domain with surface-accessible IP4",
             "expected_score": 0.35,
             "tier": 2,
+            "decoy_mode": True,
         },
     }
 
-    def __init__(self, data_dir: str = "data/validation"):
+    def __init__(self, data_dir: str = "data/validation", use_electrostatics: bool = True):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.use_electrostatics = use_electrostatics
         self.results: List[Dict] = []
 
     def download_pdb(self, pdb_id: str) -> Path:
@@ -94,7 +100,12 @@ class ValidationSuite:
         analyzer: ProteinAnalyzer,
         site_residues: Set[int],
         ligand_centroid: Optional[Tuple[float, float, float]],
+        *,
+        decoy_mode: bool = False,
     ) -> pd.Series:
+        if decoy_mode or ligand_centroid is None:
+            return scored.iloc[0]
+
         best_row = scored.iloc[0]
         best_key = (-float("inf"), -1, -1.0)
 
@@ -104,16 +115,12 @@ class ValidationSuite:
                 set(analyzer.get_pocket_residues(pocket_id, distance_cutoff=8.0)).intersection(site_residues)
             )
             distance = float("inf")
-            if ligand_centroid is not None and analyzer.pockets is not None:
+            if analyzer.pockets is not None:
                 pocket = analyzer.pockets[analyzer.pockets["pocket_id"] == pocket_id].iloc[0]
                 center = np.array([pocket["center_x"], pocket["center_y"], pocket["center_z"]], dtype=float)
                 distance = float(np.linalg.norm(center - np.array(ligand_centroid, dtype=float)))
 
-            if ligand_centroid is not None:
-                key = (-distance, overlap, float(row["composite_score"]))
-            else:
-                key = (overlap, -distance, float(row["composite_score"]))
-
+            key = (-distance, overlap, float(row["composite_score"]))
             if key > best_key:
                 best_key = key
                 best_row = row
@@ -125,27 +132,39 @@ class ValidationSuite:
         pdb_path: Path,
         *,
         control_type: str,
-        skip_electrostatics: bool = True,
+        decoy_mode: bool = False,
     ) -> Dict:
         site_residues, ligand_sasa, ligand_centroid = ligand_context(pdb_path)
+        burial = compute_burial_metrics(pdb_path)
+
         analyzer = ProteinAnalyzer(
             str(pdb_path),
             work_dir=str(self.data_dir / "work" / pdb_path.stem),
-            skip_electrostatics=skip_electrostatics,
+            skip_electrostatics=not self.use_electrostatics,
         )
-        scored = analyzer.run_pipeline(include_electrostatics=not skip_electrostatics)
+        scored = analyzer.run_pipeline(include_electrostatics=self.use_electrostatics)
         if scored.empty:
             raise RuntimeError(f"No pockets scored for {pdb_path.name}")
 
-        if ligand_centroid is not None:
-            top_pocket = self._select_best_pocket(scored, analyzer, site_residues, ligand_centroid)
-        else:
-            top_pocket = scored.iloc[0]
+        top_pocket = self._select_best_pocket(
+            scored, analyzer, site_residues, ligand_centroid, decoy_mode=decoy_mode
+        )
 
         pocket_composite = float(top_pocket["composite_score"])
+        pocket_potential = top_pocket.get("electrostatic_potential")
         basic_residues = len(site_residues) if site_residues else int(top_pocket["basic_residues"])
-        sasa_metric = float(ligand_sasa if ligand_sasa is not None else top_pocket["sasa"])
-        val_score = validation_score(control_type, pocket_composite, ligand_sasa, basic_residues)
+        sasa_metric = float(burial.ligand_sasa if burial.ligand_sasa is not None else top_pocket["sasa"])
+        val_score = validation_score(
+            control_type,
+            pocket_composite,
+            burial.ligand_sasa if burial.ligand_sasa is not None else ligand_sasa,
+            basic_residues,
+            pocket_potential=pocket_potential,
+            use_electrostatics=self.use_electrostatics,
+        )
+
+        pocket_residues = analyzer.get_pocket_residues(int(top_pocket["pocket_id"]))
+        plddt = top_pocket.get("plddt_confidence", float("nan"))
 
         return {
             "total_pockets": int(len(scored)),
@@ -154,21 +173,41 @@ class ValidationSuite:
             "validation_score": val_score,
             "volume": float(top_pocket["volume"]),
             "sasa": sasa_metric,
+            "phosphate_sasa": burial.phosphate_sasa,
+            "delta_sasa": burial.delta_sasa,
+            "burial_depth": burial.burial_depth,
+            "burial_class": burial.burial_class,
             "pocket_residue_sasa": float(top_pocket["sasa"]),
-            "ligand_sasa": ligand_sasa,
+            "ligand_sasa": burial.ligand_sasa if burial.ligand_sasa is not None else ligand_sasa,
             "basic_residues": basic_residues,
             "depth": float(top_pocket["depth"]),
+            "electrostatic_potential": pocket_potential,
+            "plddt_confidence": plddt,
+            "pocket_residues": ",".join(str(r) for r in pocket_residues),
             "structure_path": str(pdb_path),
+            "decoy_mode": decoy_mode,
         }
 
     def validate_positive_control(self, name: str, info: Dict) -> Dict:
         """Validate a single positive control structure."""
+        burial_class = info.get("burial_class", "cryptic")
+
         if info.get("use_adar2_validator"):
-            result = validate_adar2(use_alphafold=False)
+            result = validate_adar2(use_alphafold=False, use_electrostatics=self.use_electrostatics)
             pocket_composite = float(result["top_pocket_score"])
             ligand_sasa = result.get("ligand_sasa")
-            val_score = validation_score("positive", pocket_composite, ligand_sasa, int(result["basic_residues"]))
-            passed = positive_passed(val_score, ligand_sasa, int(result["basic_residues"]), pocket_composite)
+            pocket_potential = result.get("electrostatic_potential")
+            val_score = validation_score(
+                "positive",
+                pocket_composite,
+                ligand_sasa,
+                int(result["basic_residues"]),
+                pocket_potential=pocket_potential,
+                use_electrostatics=self.use_electrostatics,
+            )
+            passed = positive_passed(
+                val_score, ligand_sasa, int(result["basic_residues"]), pocket_composite, burial_class=burial_class
+            )
             return {
                 "protein": name,
                 "control_type": "positive",
@@ -179,34 +218,53 @@ class ValidationSuite:
                 "pocket_score": pocket_composite,
                 "expected": info["expected_score"],
                 "passed": passed,
+                "burial_class": burial_class,
                 "total_pockets": result["total_pockets"],
                 "sasa": result["sasa"],
                 "basic_residues": result["basic_residues"],
+                "electrostatic_potential": pocket_potential,
                 "description": info["description"],
             }
 
         pdb_path = self.download_pdb(info["pdb"])
         metrics = self.score_structure_with_ligand_context(pdb_path, control_type="positive")
+        if metrics["ligand_sasa"] is not None and metrics["ligand_sasa"] > 100:
+            burial_class = "crystal_artifact"
+            metrics["burial_class"] = burial_class
+
         passed = positive_passed(
             metrics["validation_score"],
             metrics.get("ligand_sasa"),
             metrics["basic_residues"],
             metrics["top_pocket_score"],
+            burial_class=burial_class,
         )
-        return self._result_row(name, "positive", info, metrics, passed)
+        return self._result_row(name, "positive", info, metrics, passed, burial_class=burial_class)
 
     def validate_negative_control(self, name: str, info: Dict) -> Dict:
         """Validate a single negative control structure."""
         pdb_path = self.download_pdb(info["pdb"])
-        metrics = self.score_structure_with_ligand_context(pdb_path, control_type="negative")
+        decoy_mode = bool(info.get("decoy_mode", False))
+        metrics = self.score_structure_with_ligand_context(
+            pdb_path, control_type="negative", decoy_mode=decoy_mode
+        )
         passed = negative_passed(
             metrics["validation_score"],
             metrics.get("ligand_sasa"),
             metrics["top_pocket_score"],
+            decoy_mode=decoy_mode,
         )
         return self._result_row(name, "negative", info, metrics, passed)
 
-    def _result_row(self, name: str, control_type: str, info: Dict, metrics: Dict, passed: bool) -> Dict:
+    def _result_row(
+        self,
+        name: str,
+        control_type: str,
+        info: Dict,
+        metrics: Dict,
+        passed: bool,
+        burial_class: Optional[str] = None,
+    ) -> Dict:
         return {
             "protein": name,
             "control_type": control_type,
@@ -217,9 +275,15 @@ class ValidationSuite:
             "pocket_score": metrics["top_pocket_score"],
             "expected": info["expected_score"],
             "passed": passed,
+            "burial_class": burial_class or metrics.get("burial_class"),
             "total_pockets": metrics["total_pockets"],
             "sasa": metrics["sasa"],
+            "phosphate_sasa": metrics.get("phosphate_sasa"),
+            "burial_depth": metrics.get("burial_depth"),
             "basic_residues": metrics["basic_residues"],
+            "electrostatic_potential": metrics.get("electrostatic_potential"),
+            "plddt_confidence": metrics.get("plddt_confidence"),
+            "decoy_mode": metrics.get("decoy_mode", False),
             "description": info["description"],
         }
 
@@ -237,7 +301,8 @@ class ValidationSuite:
                 status = "PASS" if results[-1]["passed"] else "FAIL"
                 print(
                     f"  Validation score: {results[-1]['score']:.3f} "
-                    f"(pocket={results[-1]['pocket_score']:.3f}, SASA={results[-1]['sasa']:.1f}) ({status})"
+                    f"(pocket={results[-1]['pocket_score']:.3f}, SASA={results[-1]['sasa']:.1f}, "
+                    f"class={results[-1].get('burial_class')}) ({status})"
                 )
             except Exception as exc:
                 print(f"  Error: {exc}")
@@ -252,6 +317,7 @@ class ValidationSuite:
                         "pocket_score": float("nan"),
                         "expected": info["expected_score"],
                         "passed": False,
+                        "burial_class": info.get("burial_class"),
                         "description": info["description"],
                         "error": str(exc),
                     }
@@ -300,7 +366,12 @@ class ValidationSuite:
         positive_results = self.run_positive_controls()
         negative_results = self.run_negative_controls()
 
-        sep = separation_quality(positive_results["score"], negative_results["score"])
+        pos_classes = positive_results.get("burial_class", pd.Series(dtype=str)).tolist()
+        sep = separation_quality(
+            positive_results["score"],
+            negative_results["score"],
+            positive_classes=pos_classes,
+        )
         tier1_pos = positive_results[positive_results["tier"] == 1]
         tier1_neg = negative_results[negative_results["tier"] == 1]
         if not tier1_pos.empty and not tier1_neg.empty:
@@ -311,7 +382,8 @@ class ValidationSuite:
             )
             sep["phase1_ready"] = sep["tier1_gate_passed"]
 
-        sep["all_positive_passed"] = bool(positive_results["passed"].fillna(False).all())
+        scored_pos = positive_results[positive_results.get("burial_class", "") != "crystal_artifact"]
+        sep["all_positive_passed"] = bool(scored_pos["passed"].fillna(False).all())
         sep["all_negative_passed"] = bool(negative_results["passed"].fillna(False).all())
 
         summary = {

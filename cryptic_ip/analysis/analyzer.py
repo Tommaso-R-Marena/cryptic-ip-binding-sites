@@ -73,6 +73,7 @@ class ProteinAnalyzer:
         self.pockets = None
         self.sasa_data = None
         self.electrostatic_data = None
+        self.electrostatic_map_path: Optional[Path] = None
 
     @timed()
     def run_pipeline(self, include_electrostatics: Optional[bool] = None) -> pd.DataFrame:
@@ -190,13 +191,31 @@ class ProteinAnalyzer:
 
         try:
             pqr_path = calculator.generate_pqr(self.pdb_path, ph=ph, output_dir=electro_dir)
-            potential = calculator.run_apbs(pqr_path=pqr_path, output_dir=electro_dir)
+            potential, dx_path = calculator.run_apbs_with_map(pqr_path=pqr_path, output_dir=electro_dir)
+            self.electrostatic_map_path = dx_path
         except RuntimeError as exc:
             print(f"Warning: Electrostatics calculation failed: {exc}")
             return None
 
         self.electrostatic_data = potential
         return potential
+
+    def pocket_electrostatic_potential(self, pocket_center: Tuple[float, float, float]) -> Optional[float]:
+        """Sample APBS potential at a pocket center when a map is available."""
+        if self.electrostatic_map_path is None or not self.electrostatic_map_path.exists():
+            return self.electrostatic_data
+        calculator = ElectrostaticsCalculator()
+        try:
+            return calculator.sample_potential_at_point(self.electrostatic_map_path, pocket_center)
+        except Exception:
+            return self.electrostatic_data
+
+    def pocket_plddt_confidence(self, pocket_residues: List[int]) -> float:
+        """Mean pLDDT (B-factor) for pocket-lining residues in AlphaFold models."""
+        from ..validation.plddt import pocket_plddt_confidence
+
+        summary = pocket_plddt_confidence(self.pdb_path, pocket_residues)
+        return float(summary["plddt_mean"])
 
     @timed()
     @lru_cache(maxsize=512)
@@ -272,12 +291,15 @@ class ProteinAnalyzer:
 
         pocket = self.pockets[self.pockets["pocket_id"] == pocket_id].iloc[0]
         pocket_residues = self.get_pocket_residues(pocket_id)
+        pocket_center = (float(pocket["center_x"]), float(pocket["center_y"]), float(pocket["center_z"]))
 
         pocket_sasa_values = [self.sasa_data.get(int(resnum), 0.0) for resnum in pocket_residues]
         pocket_sasa = float(np.mean(pocket_sasa_values)) if pocket_sasa_values else 0.0
 
         # Count basic residues
         basic_count = self.count_basic_residues(pocket_id)
+        pocket_potential = self.pocket_electrostatic_potential(pocket_center)
+        plddt = self.pocket_plddt_confidence(pocket_residues)
 
         return {
             "pocket_id": pocket_id,
@@ -286,8 +308,9 @@ class ProteinAnalyzer:
             "sasa": pocket_sasa,
             "basic_residues": basic_count,
             "residue_count": len(pocket_residues),
-            "electrostatic_potential": self.electrostatic_data,
-            "center": (pocket["center_x"], pocket["center_y"], pocket["center_z"]),
+            "electrostatic_potential": pocket_potential,
+            "plddt_confidence": plddt,
+            "center": pocket_center,
         }
 
     @timed()
@@ -324,7 +347,7 @@ class ProteinAnalyzer:
                         "electrostatic_potential": row.get("electrostatic_potential"),
                         "n_basic_residues": row["basic_residues"],
                         "pocket_volume": row["volume"],
-                        "plddt_confidence": np.nan,
+                        "plddt_confidence": row.get("plddt_confidence", np.nan),
                     }
                     for row in results
                 ]

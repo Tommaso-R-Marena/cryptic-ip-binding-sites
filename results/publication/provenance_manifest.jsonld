@@ -39,7 +39,7 @@
     "alphafold_release_date": "2024-01-15",
     "pdb_fetch_date": "2024-01-15"
   },
-  "generatedAt": "2026-06-19T18:23:47.375992+00:00",
+  "generatedAt": "2026-06-20T02:57:04.435013+00:00",
   "inputs": [
     {
       "path": "/workspace/config/defaults/pipeline.yaml",
@@ -53,7 +53,7 @@
   "outputs": [
     {
       "path": "results/publication/RESULTS_SUMMARY.md",
-      "sha256": "78620ee16e550db8c716b9519d839455cd574925a231e11a62a265909ca63720"
+      "sha256": "028924df08cba5c26ce55a6e9ca5981010295235fb4ba49836e6cd606a87dee3"
     },
     {
       "path": "results/publication/figures/Figure1_Overview.pdf",
@@ -85,7 +85,7 @@
     },
     {
       "path": "results/publication/validation/roc_curves.csv",
-      "sha256": "c5995f9d7615f0d6d006669e89d10a97d3ef83385acce51893520fd810627fc5"
+      "sha256": "7a87caa6665a8eb136c5023ca8e2306ca14b1e71c7bb7235c2a8bb12de754b65"
     }
   ],
   "parameters": {
@@ -102,7 +102,7 @@
     ],
     "use_ml_model": true
   },
-  "pipelineVersion": "dafbeabcdbcfbf93eddc2a44b9edcfe4711ade77",
+  "pipelineVersion": "cd04d7eaaf540c2e3ca8b7c495b8c3130e58d286",
   "softwareVersions": {
     "biopython": "1.87",
     "numpy": "2.4.6",

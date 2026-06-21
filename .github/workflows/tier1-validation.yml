@@ -1,0 +1,72 @@
+name: Tier-1 Validation Gate
+
+on:
+  push:
+    branches: [main, cursor/**]
+  pull_request:
+    branches: [main, cursor/**]
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  tier1-controls:
+    name: Phase 1 tier-1 control gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda,defaults
+
+      - name: Install structural biology tools and Python deps
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge fpocket freesasa apbs pdb2pqr pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+          python -m pip install pytest
+
+      - name: Cache validation structures
+        uses: actions/cache@v4
+        with:
+          path: data/validation
+          key: ci-validation-pdbs-v1
+
+      - name: Download tier-1 control structures
+        run: |
+          mkdir -p data/validation
+          for pdb in 1ZY7 1MAI; do
+            if [ ! -f "data/validation/${pdb}.pdb" ]; then
+              wget -q -O "data/validation/${pdb}.pdb" "https://files.rcsb.org/download/${pdb}.pdb"
+            fi
+          done
+
+      - name: Run tier-1 validation gate
+        shell: bash -l {0}
+        run: |
+          python - <<'PY'
+          from cryptic_ip.validation.validation_suite import ValidationSuite
+          suite = ValidationSuite(data_dir="data/validation", use_electrostatics=False)
+          pos = suite.validate_positive_control("ADAR2", suite.POSITIVE_CONTROLS["ADAR2"])
+          neg = suite.validate_negative_control("PLCd1_PH", suite.NEGATIVE_CONTROLS["PLCd1_PH"])
+          sep = float(pos["score"] - neg["score"])
+          passed = bool(pos["passed"] and neg["passed"] and sep > 0.50)
+          print(f"ADAR2 score: {pos['score']:.3f} passed={pos['passed']}")
+          print(f"PLC score: {neg['score']:.3f} passed={neg['passed']}")
+          print(f"Tier-1 separation: {sep:.3f}")
+          print(f"Phase 1 gate passed: {passed}")
+          if not passed:
+              raise SystemExit(1)
+          PY
+
+      - name: Run unit tests for scoring modules
+        shell: bash -l {0}
+        run: |
+          pytest tests/test_control_scoring.py tests/test_structure_context.py tests/test_burial_metrics.py -q

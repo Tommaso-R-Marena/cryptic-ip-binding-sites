@@ -14,6 +14,7 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from cryptic_ip.analysis import ProteinAnalyzer
+from cryptic_ip.analysis.filters import CandidateFilter
 from cryptic_ip.database import ProteomeManager
 
 
@@ -46,11 +47,17 @@ def main():
         help='Maximum number of structures to process (for testing)'
     )
     parser.add_argument(
+        '--min-plddt',
+        type=float,
+        default=70.0,
+        help='Minimum pocket pLDDT confidence (AlphaFold models)'
+    )
+    parser.add_argument(
         '--resume',
         action='store_true',
         help='Resume from previous run'
     )
-    
+
     args = parser.parse_args()
     
     print("="*70)
@@ -91,16 +98,14 @@ def main():
             pdb_path = row['filepath']
             
             # Analyze structure
-            analyzer = ProteinAnalyzer(pdb_path)
-            scored = analyzer.score_all_pockets()
-            
-            # Add metadata
-            scored['uniprot_id'] = uniprot_id
-            scored['protein_file'] = row['filename']
-            
-            # Filter by threshold
-            candidates = scored[scored['composite_score'] >= args.threshold]
-            
+            analyzer = ProteinAnalyzer(pdb_path, skip_electrostatics=True)
+            scored = analyzer.run_pipeline(include_electrostatics=False)
+
+            filt = CandidateFilter(min_score=args.threshold, min_plddt=args.min_plddt)
+            ranked = filt.rank_candidates(scored)
+            candidates = filt.filter_by_confidence(ranked, structure_path=pdb_path)
+            candidates["uniprot_id"] = uniprot_id
+            candidates["protein_file"] = row["filename"]
             if len(candidates) > 0:
                 all_results.append(candidates)
                 
