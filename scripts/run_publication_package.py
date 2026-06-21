@@ -438,8 +438,22 @@ def main() -> int:
             ]
             + (["--include-electrostatics"] if use_electrostatics else []),
         )
-
-    ml_comparison = export_roc_csv(ml_work, args.output_dir / "validation" / "roc_curves.csv")
+        ml_comparison = export_roc_csv(ml_work, args.output_dir / "validation" / "roc_curves.csv")
+    else:
+        bundled_ml = ROOT / "results/publication/ml_training/ml_vs_threshold_comparison.csv"
+        bundled_roc = ROOT / "results/publication/validation/roc_curves.csv"
+        if (ml_work / "ml_vs_threshold_comparison.csv").exists():
+            ml_comparison = pd.read_csv(ml_work / "ml_vs_threshold_comparison.csv")
+        elif bundled_ml.exists():
+            ml_comparison = pd.read_csv(bundled_ml)
+        else:
+            ml_comparison = pd.DataFrame(
+                [{"method": "skipped", "roc_auc": float("nan"), "pr_auc": float("nan")}]
+            )
+        roc_out = args.output_dir / "validation" / "roc_curves.csv"
+        roc_out.parent.mkdir(parents=True, exist_ok=True)
+        if bundled_roc.exists() and not roc_out.exists():
+            roc_out.write_text(bundled_roc.read_text(encoding="utf-8"), encoding="utf-8")
     build_comparative_tables(args.dataset_csv, args.output_dir / "comparative")
 
     controls_csv = args.output_dir / "validation" / "control_benchmark.csv"
@@ -467,10 +481,10 @@ def main() -> int:
         )
 
     config = load_yaml(ROOT / "config/defaults/pipeline.yaml")
-    output_files = [
-        args.output_dir / "RESULTS_SUMMARY.md",
-        args.output_dir / "validation" / "roc_curves.csv",
-    ]
+    output_files = [args.output_dir / "RESULTS_SUMMARY.md"]
+    roc_path = args.output_dir / "validation" / "roc_curves.csv"
+    if roc_path.exists():
+        output_files.append(roc_path)
     figures_dir = args.output_dir / "figures"
     if figures_dir.exists():
         output_files.extend(path for path in figures_dir.rglob("*") if path.is_file())
