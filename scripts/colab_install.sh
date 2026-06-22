@@ -30,6 +30,8 @@ apbs --version >/dev/null 2>&1 && echo "  apbs OK" || echo "  apbs: check manual
 echo "==> Verifying Python CLI..."
 python -c "import cryptic_ip; from cryptic_ip.validation import ValidationSuite; print('  cryptic_ip OK')"
 
+python scripts/colab_env.py
+
 if command -v cryptic-ip &>/dev/null; then
   cryptic-ip check-dependencies || echo "  (check-dependencies reported missing optional tools — continue if fpocket works)"
 fi

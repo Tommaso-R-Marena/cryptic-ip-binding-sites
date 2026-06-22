@@ -34,8 +34,10 @@ def check_dependencies():
     import importlib
     import shutil
 
-    tools = ["fpocket", "freesasa", "apbs", "pdb2pqr"]
-    missing_tools = [tool for tool in tools if shutil.which(tool) is None]
+    required_tools = ["fpocket"]
+    optional_tools = ["freesasa", "apbs", "pdb2pqr"]
+    missing_required = [tool for tool in required_tools if shutil.which(tool) is None]
+    missing_optional = [tool for tool in optional_tools if shutil.which(tool) is None]
 
     packages = [
         "numpy",
@@ -53,13 +55,18 @@ def check_dependencies():
         except ImportError:
             missing_packages.append(package)
 
-    if missing_tools:
-        click.secho("Missing external tools:", fg="red", bold=True)
-        for tool in missing_tools:
+    if missing_required:
+        click.secho("Missing required external tools:", fg="red", bold=True)
+        for tool in missing_required:
             click.echo(f"  - {tool}")
         click.echo("Install via conda: conda install -c conda-forge fpocket freesasa apbs pdb2pqr")
     else:
-        click.secho("All external tools found.", fg="green")
+        click.secho("Required external tools found.", fg="green")
+
+    if missing_optional:
+        click.secho("Optional tools not on PATH (pipeline may still run):", fg="yellow")
+        for tool in missing_optional:
+            click.echo(f"  - {tool}")
 
     if missing_packages:
         click.secho("Missing Python packages:", fg="red", bold=True)
@@ -69,7 +76,7 @@ def check_dependencies():
     else:
         click.secho("All required Python packages found.", fg="green")
 
-    if missing_tools or missing_packages:
+    if missing_required or missing_packages:
         raise click.exceptions.Exit(1)
 
     click.secho("\n✓ Environment ready for cryptic IP site analysis", fg="green", bold=True)

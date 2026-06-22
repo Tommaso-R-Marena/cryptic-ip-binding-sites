@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -32,6 +33,8 @@ from typing import Iterable, List, Sequence
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+from scripts.colab_env import bootstrap_colab_runtime, reexec_if_needed
 
 PRESETS = {
     "quick": {
@@ -97,7 +100,9 @@ def log(msg: str, log_path: Path) -> None:
 
 def run_cmd(cmd: Sequence[str], log_path: Path, *, cwd: Path = ROOT) -> None:
     log(f"CMD: {' '.join(cmd)}", log_path)
-    subprocess.run(cmd, check=True, cwd=cwd)
+    env = os.environ.copy()
+    bootstrap_colab_runtime()
+    subprocess.run(cmd, check=True, cwd=cwd, env=env)
 
 
 def stage_install_check(log_path: Path) -> None:
@@ -105,12 +110,13 @@ def stage_install_check(log_path: Path) -> None:
     import importlib
     import shutil
 
-    for tool in ("fpocket", "freesasa", "apbs", "pdb2pqr"):
-        if shutil.which(tool) is None:
-            raise RuntimeError(f"Missing external tool: {tool}. Run: bash scripts/colab_install.sh")
-    for mod in ("numpy", "pandas", "Bio", "prody", "sklearn"):
+    bootstrap_colab_runtime()
+    if shutil.which("fpocket") is None:
+        raise RuntimeError("Missing fpocket. Run: bash scripts/colab_install.sh")
+
+    for mod in ("numpy", "pandas", "Bio", "prody", "sklearn", "cryptic_ip"):
         importlib.import_module(mod)
-    log("install-check OK", log_path)
+    log(f"install-check OK (python={sys.executable})", log_path)
 
 
 def stage_structures(log_path: Path) -> None:
@@ -146,8 +152,9 @@ def stage_tier1(output_dir: Path, with_electrostatics: bool, log_path: Path) -> 
 
 def stage_ml(output_dir: Path, with_electrostatics: bool, log_path: Path) -> None:
     log("STAGE ml", log_path)
+    python = bootstrap_colab_runtime()
     cmd = [
-        sys.executable,
+        python,
         "scripts/train_ml_classifier.py",
         "--skip-build-dataset",
         "--work-dir",
@@ -173,8 +180,9 @@ def stage_yeast(
     log_path: Path,
 ) -> None:
     log(f"STAGE yeast (n={n_proteins})", log_path)
+    python = bootstrap_colab_runtime()
     cmd = [
-        sys.executable,
+        python,
         "scripts/run_yeast_pilot_screen.py",
         "--n-proteins",
         str(n_proteins),
@@ -208,8 +216,9 @@ def stage_publication(
     log_path: Path,
 ) -> None:
     log("STAGE publication", log_path)
+    python = bootstrap_colab_runtime()
     cmd = [
-        sys.executable,
+        python,
         "scripts/run_publication_package.py",
         "--output-dir",
         str(output_dir / "publication"),
@@ -226,16 +235,17 @@ def stage_publication(
 
 def stage_md(output_dir: Path, log_path: Path) -> None:
     log("STAGE md", log_path)
+    python = bootstrap_colab_runtime()
     try:
         import openmm  # noqa: F401
     except ImportError:
-        run_cmd([sys.executable, "-m", "pip", "install", "-q", "openmm", "mdtraj"], log_path)
+        run_cmd([python, "-m", "pip", "install", "-q", "openmm", "mdtraj"], log_path)
     candidates = output_dir / "publication" / "gallery" / "gallery_inputs.csv"
     if not candidates.exists():
         candidates = ROOT / "results" / "publication" / "gallery" / "gallery_inputs.csv"
     run_cmd(
         [
-            sys.executable,
+            python,
             "scripts/run_md_pilot_validation.py",
             "--candidates-csv",
             str(candidates),
@@ -285,6 +295,7 @@ def resolve_config(args: argparse.Namespace) -> dict:
 
 
 def main() -> int:
+    reexec_if_needed()
     args = parse_args()
     cfg = resolve_config(args)
     output_dir = args.output_dir

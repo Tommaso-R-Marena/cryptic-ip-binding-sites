@@ -72,7 +72,8 @@ The yeast pilot uses **strict cryptic filters** (fixes the earlier 99% false-hit
 
 | Issue | Fix |
 |-------|-----|
-| `fpocket not found` | Re-run `!bash scripts/colab_install.sh` |
+| `fpocket not found` | Re-run `!bash scripts/colab_install.sh`; confirm **Pipeline Python** shows `/usr/local/miniforge3/bin/python` |
+| Pipeline uses `/usr/bin/python3` | Re-run install cell; notebook must print `Pipeline Python: .../miniforge3/bin/python` |
 | Tier-1 gate fails | Ensure 1ZY7/1MAI downloaded; set `WITH_ELECTROSTATICS = False` |
 | Colab disconnects | Use Drive mount + `SKIP_DOWNLOAD = True` to resume yeast pilot |
 | MD fails | Expected on some runtimes; use `--skip-md` or `PRESET = pilot` |
