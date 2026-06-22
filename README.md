@@ -60,7 +60,9 @@ All tutorials in `notebooks/tutorials/` include one-click Colab launch links.
 | `Tutorial_04_Comparative_Analysis.ipynb` | Compare 3 organisms with stats + figures | [Open](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/tutorials/Tutorial_04_Comparative_Analysis.ipynb) |
 | `Tutorial_05_MD_Validation.ipynb` | OpenMM-based MD validation on top candidates | [Open](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/tutorials/Tutorial_05_MD_Validation.ipynb) |
 | `Tutorial_06_Web_Interface.ipynb` | Local and cloud deployment of the Streamlit app | [Open](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/tutorials/Tutorial_06_Web_Interface.ipynb) |
-| `Colab_Full_Pipeline_Run.ipynb` | **Full pipeline**: tier-1 gate → ML → yeast pilot (500) → publication | [Open](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/cursor/full-pipeline-improvements-6dd9/notebooks/Colab_Full_Pipeline_Run.ipynb) |
+| `Colab_Full_Pipeline_Run.ipynb` | **Complete end-to-end pipeline** (install → tier-1 → ML → yeast → figures → export) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/cursor/full-pipeline-improvements-6dd9/notebooks/Colab_Full_Pipeline_Run.ipynb) |
+
+See [docs/COLAB_FULL_PIPELINE.md](docs/COLAB_FULL_PIPELINE.md) for presets (`quick` / `pilot` / `full`) and Drive setup.
 
 See also [docs/COLAB_FULL_PIPELINE.md](docs/COLAB_FULL_PIPELINE.md) for one-liner commands.
 
@@ -463,25 +465,27 @@ This software is provided for research and educational purposes. External tools 
 
 ## 🛠️ Project Status
 
-**Current Phase**: Phase 5 - Comparative analysis and documentation (Complete)  
-**Next Milestone**: Large-scale execution on full proteomes  
-**Target**: manuscript submission package  
+**Current Phase**: Phase 5 — Comparative analysis complete; proteome execution in progress  
+**Next Milestone**: Full yeast/human/dicty proteome screens + manuscript submission  
+**Estimated completion**: ~65% (core pipeline validated; large-scale screens and manuscript remain)
 
 ### Roadmap
 
 - [x] Core pipeline implementation
-- [x] ADAR2 validation
+- [x] ADAR2 validation (tier-1 gate passing in CI)
 - [x] Negative control validation
 - [x] Documentation and notebooks
-- [x] CI/CD setup
-- [x] **Protein engineering pipeline (MD + QM/MM)**
-- [ ] Yeast proteome screen
+- [x] CI/CD setup (PR CI + tier-1 gate)
+- [x] Protein engineering pipeline (MD + QM/MM)
+- [x] Yeast proteome pilot (500 proteins; strict screening recalibrated)
+- [ ] Yeast full proteome screen (~6,000 proteins)
 - [ ] Human proteome screen
 - [ ] Dictyostelium proteome screen
-- [x] Comparative analysis
+- [x] Comparative analysis framework
+- [x] Publication package automation (figures, methods, provenance)
 - [ ] Manuscript preparation
 
-**Last Updated**: February 2026
+**Last Updated**: June 2026
 
 ---
 

@@ -10,19 +10,33 @@ if ! command -v conda &>/dev/null; then
   bash /tmp/miniforge.sh -b -p /usr/local/miniforge3
   export PATH="/usr/local/miniforge3/bin:$PATH"
 fi
+# shellcheck disable=SC1091
 source "$(conda info --base)/etc/profile.d/conda.sh"
 
 echo "==> Installing structural biology tools..."
-conda install -y -c conda-forge fpocket freesasa apbs pdb2pqr propka
+conda install -y -c conda-forge fpocket freesasa apbs pdb2pqr propka pip
 
 echo "==> Installing Python dependencies..."
-pip install -q -r requirements.txt
-pip install -q -e .
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -q -r requirements.txt
+python -m pip install -q -e .
+python -m pip install -q ipywidgets tqdm
 
-echo "==> Verifying fpocket..."
-fpocket -h >/dev/null && echo "fpocket OK"
+echo "==> Verifying tools..."
+fpocket -h >/dev/null && echo "  fpocket OK"
+freesasa -h >/dev/null 2>&1 && echo "  freesasa OK" || echo "  freesasa: check manually"
+apbs --version >/dev/null 2>&1 && echo "  apbs OK" || echo "  apbs: check manually"
 
-echo "==> Done. Run notebooks/Colab_Full_Pipeline_Run.ipynb or:"
-echo "    python scripts/run_yeast_pilot_screen.py --n-proteins 500 --workers 2"
-echo "    python scripts/train_ml_classifier.py --skip-build-dataset"
-echo "    python scripts/run_publication_package.py --skip-dataset-build --with-electrostatics"
+echo "==> Verifying Python CLI..."
+python -c "import cryptic_ip; from cryptic_ip.validation import ValidationSuite; print('  cryptic_ip OK')"
+
+if command -v cryptic-ip &>/dev/null; then
+  cryptic-ip check-dependencies || echo "  (check-dependencies reported missing optional tools — continue if fpocket works)"
+fi
+
+echo ""
+echo "==> Done. Run the full pipeline:"
+echo "    python scripts/colab_run_all.py --preset quick"
+echo "    python scripts/colab_run_all.py --preset pilot   # ~2-4 h on Colab"
+echo ""
+echo "Or open notebooks/Colab_Full_Pipeline_Run.ipynb and Run All."

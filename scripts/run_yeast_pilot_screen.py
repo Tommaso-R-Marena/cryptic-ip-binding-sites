@@ -27,8 +27,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=Path("results/yeast_pilot"))
     parser.add_argument("--structures-dir", type=Path, default=Path("data/structures/yeast_pilot"))
     parser.add_argument("--n-proteins", type=int, default=500)
-    parser.add_argument("--score-threshold", type=float, default=0.60)
+    parser.add_argument("--score-threshold", type=float, default=0.75)
     parser.add_argument("--min-plddt", type=float, default=70.0)
+    parser.add_argument("--min-basic", type=int, default=4)
+    parser.add_argument("--max-sasa", type=float, default=10.0)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--skip-download", action="store_true")
     parser.add_argument("--skip-electrostatics", action="store_true", default=True)
@@ -50,9 +52,13 @@ def _analyze_structure(item: Dict[str, Any]) -> Dict[str, Any]:
         return {"uniprot_id": uniprot_id, "hits": []}
 
     filt = CandidateFilter(min_score=item["score_threshold"], min_plddt=item["min_plddt"])
-    ranked = filt.rank_candidates(scored)
-    confident = filt.filter_by_confidence(ranked, structure_path=str(pdb_path))
-    hits = confident.head(3).to_dict(orient="records")
+    ranked = filt.filter_cryptic_candidates(
+        scored,
+        structure_path=str(pdb_path),
+        min_basic=item.get("min_basic", 4),
+        max_sasa=item.get("max_sasa", 10.0),
+    )
+    hits = ranked.head(3).to_dict(orient="records")
     for hit in hits:
         hit["uniprot_id"] = uniprot_id
         hit["structure_path"] = str(pdb_path)
@@ -87,6 +93,8 @@ def main() -> int:
             "work_dir": str(work_root),
             "score_threshold": args.score_threshold,
             "min_plddt": args.min_plddt,
+            "min_basic": args.min_basic,
+            "max_sasa": args.max_sasa,
             "skip_electrostatics": skip_electrostatics,
         }
         for path in pdb_files
@@ -116,6 +124,8 @@ def main() -> int:
         "hit_rate": float(proteins_with_hits / len(pdb_files)) if len(pdb_files) else 0.0,
         "score_threshold": args.score_threshold,
         "min_plddt": args.min_plddt,
+        "min_basic": args.min_basic,
+        "max_sasa": args.max_sasa,
     }
     (args.output_dir / "yeast_pilot_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 

@@ -37,7 +37,7 @@ def main():
         '--threshold',
         '-t',
         type=float,
-        default=0.60,
+        default=0.75,
         help='Minimum composite score threshold'
     )
     parser.add_argument(
@@ -102,8 +102,7 @@ def main():
             scored = analyzer.run_pipeline(include_electrostatics=False)
 
             filt = CandidateFilter(min_score=args.threshold, min_plddt=args.min_plddt)
-            ranked = filt.rank_candidates(scored)
-            candidates = filt.filter_by_confidence(ranked, structure_path=pdb_path)
+            candidates = filt.filter_cryptic_candidates(scored, structure_path=pdb_path)
             candidates["uniprot_id"] = uniprot_id
             candidates["protein_file"] = row["filename"]
             if len(candidates) > 0:

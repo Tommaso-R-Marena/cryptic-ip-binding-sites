@@ -2,6 +2,26 @@
 
 This directory contains interactive Jupyter notebooks for analyzing cryptic IP binding sites.
 
+## Run everything on Google Colab
+
+**Start here** if you want the full pipeline in one session:
+
+| Notebook | Description |
+|----------|-------------|
+| [`Colab_Full_Pipeline_Run.ipynb`](Colab_Full_Pipeline_Run.ipynb) | Install → tier-1 gate → ML → yeast screen → publication figures → zip export |
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/cursor/full-pipeline-improvements-6dd9/notebooks/Colab_Full_Pipeline_Run.ipynb)
+
+Orchestrator script (same steps as the notebook):
+
+```bash
+bash scripts/colab_install.sh
+python scripts/colab_run_all.py --preset quick   # 25 proteins, ~30 min
+python scripts/colab_run_all.py --preset pilot   # 500 proteins, ~2-4 h
+```
+
+Details: [docs/COLAB_FULL_PIPELINE.md](../docs/COLAB_FULL_PIPELINE.md)
+
 ## Notebooks
 
 ### 01_Quick_Start.ipynb
