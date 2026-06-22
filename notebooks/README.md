@@ -10,7 +10,7 @@ This directory contains interactive Jupyter notebooks for analyzing cryptic IP b
 |----------|-------------|
 | [`Colab_Full_Pipeline_Run.ipynb`](Colab_Full_Pipeline_Run.ipynb) | Install → tier-1 gate → ML → yeast screen → publication figures → zip export |
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/cursor/full-pipeline-improvements-6dd9/notebooks/Colab_Full_Pipeline_Run.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/Colab_Full_Pipeline_Run.ipynb)
 
 Orchestrator script (same steps as the notebook):
 

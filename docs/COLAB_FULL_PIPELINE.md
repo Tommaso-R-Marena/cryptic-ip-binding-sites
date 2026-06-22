@@ -2,7 +2,7 @@
 
 ## One-click open
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/cursor/full-pipeline-improvements-6dd9/notebooks/Colab_Full_Pipeline_Run.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/Colab_Full_Pipeline_Run.ipynb)
 
 ## What “entire pipeline” means
 

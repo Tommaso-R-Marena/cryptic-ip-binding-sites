@@ -60,7 +60,7 @@ All tutorials in `notebooks/tutorials/` include one-click Colab launch links.
 | `Tutorial_04_Comparative_Analysis.ipynb` | Compare 3 organisms with stats + figures | [Open](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/tutorials/Tutorial_04_Comparative_Analysis.ipynb) |
 | `Tutorial_05_MD_Validation.ipynb` | OpenMM-based MD validation on top candidates | [Open](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/tutorials/Tutorial_05_MD_Validation.ipynb) |
 | `Tutorial_06_Web_Interface.ipynb` | Local and cloud deployment of the Streamlit app | [Open](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/tutorials/Tutorial_06_Web_Interface.ipynb) |
-| `Colab_Full_Pipeline_Run.ipynb` | **Complete end-to-end pipeline** (install → tier-1 → ML → yeast → figures → export) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/cursor/full-pipeline-improvements-6dd9/notebooks/Colab_Full_Pipeline_Run.ipynb) |
+| `Colab_Full_Pipeline_Run.ipynb` | **Complete end-to-end pipeline** (install → tier-1 → ML → yeast → figures → export) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Tommaso-R-Marena/cryptic-ip-binding-sites/blob/main/notebooks/Colab_Full_Pipeline_Run.ipynb) |
 
 See [docs/COLAB_FULL_PIPELINE.md](docs/COLAB_FULL_PIPELINE.md) for presets (`quick` / `pilot` / `full`) and Drive setup.
 
