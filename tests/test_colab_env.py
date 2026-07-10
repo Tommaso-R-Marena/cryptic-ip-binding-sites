@@ -20,6 +20,7 @@ def test_bootstrap_returns_current_python_when_no_conda(tmp_path, monkeypatch):
     python = colab_env.bootstrap_colab_runtime()
 
     assert python == sys.executable
+    assert colab_env.is_python_executable(python)
 
 
 def test_write_and_read_runtime_marker(tmp_path, monkeypatch):
@@ -37,11 +38,11 @@ def test_bootstrap_prepends_conda_bin_to_path(tmp_path, monkeypatch):
     bin_dir = prefix / "bin"
     bin_dir.mkdir(parents=True)
     (bin_dir / "fpocket").write_text("", encoding="utf-8")
-    (bin_dir / "python").write_text("#!/bin/sh\necho py\n", encoding="utf-8")
+    (bin_dir / "python3.11").write_text("#!/bin/sh\necho py\n", encoding="utf-8")
     monkeypatch.setattr(colab_env, "CONDA_PREFIXES", (prefix,))
     monkeypatch.setenv("PATH", "/usr/bin")
 
     python = colab_env.bootstrap_colab_runtime()
 
-    assert python == str(bin_dir / "python")
+    assert python == str(bin_dir / "python3.11")
     assert str(bin_dir) in os.environ["PATH"].split(os.pathsep)

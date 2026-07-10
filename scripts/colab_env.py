@@ -10,9 +10,25 @@ from typing import Optional
 CONDA_PREFIXES: tuple[Path, ...] = (
     Path("/usr/local/miniforge3"),
     Path("/opt/conda"),
+    Path("/usr/share/miniconda"),
     Path.home() / "miniforge3",
     Path.home() / "miniconda3",
 )
+
+
+def is_python_executable(path: str | Path) -> bool:
+    """Return True when ``path`` points to a Python interpreter binary."""
+    return Path(path).name.startswith("python")
+
+
+def _resolve_python_exe(bin_dir: Path) -> Optional[Path]:
+    """Pick the best Python executable inside a conda prefix."""
+    for name in ("python", "python3"):
+        candidate = bin_dir / name
+        if candidate.exists():
+            return candidate
+    versioned = sorted(p for p in bin_dir.glob("python3.*") if p.is_file())
+    return versioned[0] if versioned else None
 
 
 def find_conda_prefix() -> Optional[Path]:
@@ -35,8 +51,8 @@ def bootstrap_colab_runtime() -> str:
     if str(bin_dir) not in existing.split(os.pathsep):
         os.environ["PATH"] = os.pathsep.join(path_entries + [existing])
 
-    python_exe = bin_dir / "python"
-    if python_exe.exists():
+    python_exe = _resolve_python_exe(bin_dir)
+    if python_exe is not None:
         return str(python_exe)
     return sys.executable
 

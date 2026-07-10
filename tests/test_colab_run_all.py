@@ -17,7 +17,7 @@ def test_colab_env_bootstrap_returns_python():
     colab_env = _load_colab_env()
     python = colab_env.bootstrap_colab_runtime()
     assert python
-    assert python.endswith("python") or python.endswith("python3")
+    assert colab_env.is_python_executable(python)
 
 
 def test_colab_run_all_presets():
