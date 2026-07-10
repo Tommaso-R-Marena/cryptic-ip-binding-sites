@@ -1,0 +1,44 @@
+[
+  {
+    "table": "S1_validation_dataset.csv",
+    "source": "data/validation/ip_binding_validation_dataset.csv",
+    "rows": 136
+  },
+  {
+    "table": "S2_control_benchmark.csv",
+    "source": "results/publication/validation/control_benchmark.csv",
+    "rows": 5
+  },
+  {
+    "table": "S3_ml_benchmark.csv",
+    "source": "results/publication/ml_training/ml_vs_threshold_comparison.csv",
+    "rows": 2
+  },
+  {
+    "table": "S4_comparative_hit_rates.csv",
+    "source": "results/publication/comparative/hit_rates.csv",
+    "rows": 3
+  },
+  {
+    "table": "S5_gallery_candidates.csv",
+    "source": "results/publication/gallery/gallery_inputs.csv",
+    "rows": 3
+  },
+  {
+    "table": "S6_yeast_pilot_summary.json",
+    "source": "results/yeast_pilot"
+  },
+  {
+    "table": "S6_yeast_pilot_hits.csv",
+    "source": "results/yeast_pilot/yeast_pilot_hits.csv",
+    "rows": 1484
+  },
+  {
+    "table": "S3_ml_feature_summary.json",
+    "summary": {
+      "n_pockets": 12190,
+      "n_positive_pockets": 5,
+      "n_structures": 136
+    }
+  }
+]

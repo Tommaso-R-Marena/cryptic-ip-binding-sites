@@ -1,0 +1,6 @@
+protein,control_type,tier,pdb_id,ip_type,score,pocket_score,expected,passed,burial_class,total_pockets,sasa,basic_residues,electrostatic_potential,description,phosphate_sasa,burial_depth,plddt_confidence,decoy_mode
+ADAR2,positive,1,1ZY7,IP6,0.7731326069629539,0.6375217341798683,0.75,True,cryptic,76,0.0,8,,Gold standard - completely buried IP6,,,,
+Pds5B,positive,2,5HDT,IP6,0.18560286986833896,0.53029391390954,0.65,False,crystal_artifact,313,566.4129699568883,10,,Cohesin regulator - crystal shows surface-exposed IP6 (artifact),546.8747769256827,6.8844416799870025,,False
+HDAC1,positive,2,5ICN,IP4,0.26651649499999996,0.7614757,0.6,False,crystal_artifact,68,323.4897075755467,11,,Histone deacetylase with semi-cryptic IP at interface,288.2277050830474,6.7290369280610065,30.74,False
+PLCd1_PH,negative,1,1MAI,IP3,0.23751118256076062,0.6786033787450304,0.3,True,surface,11,99.11890698167906,6,,Classic surface-exposed PH domain,94.2883941175194,5.97563012602723,,False
+Btk_PH,negative,2,1BWN,IP4,0.27125,0.775,0.35,True,surface,52,589.9155513240296,9,,Kinase PH domain with surface-accessible IP4,394.73805072912756,10.141927973631454,27.72,True

@@ -1,5 +1,5 @@
 pipeline:
-  score_threshold: 0.60
+  score_threshold: 0.75
   max_structures: null
   seed: 42
   use_ml_model: true

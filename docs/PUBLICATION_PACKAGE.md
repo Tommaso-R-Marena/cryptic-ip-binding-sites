@@ -18,6 +18,8 @@ python scripts/run_publication_package.py --output-dir results/publication
 | `results/publication/RESULTS_SUMMARY.md` | Manuscript-ready results narrative |
 | `results/publication/METHODS_AUTO.md` | Auto-generated methods text |
 | `results/publication/provenance_manifest.jsonld` | Reproducibility manifest |
+| `results/publication/supplementary/` | Table S1–S6 + `SUPPLEMENTARY_INDEX.md` |
+| `manuscript/README.md` | Submission checklist and artifact map |
 
 ## Partial reruns
 

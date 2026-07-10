@@ -465,24 +465,24 @@ This software is provided for research and educational purposes. External tools 
 
 ## 🛠️ Project Status
 
-**Current Phase**: Phase 5 — Comparative analysis complete; proteome execution in progress  
-**Next Milestone**: Full yeast/human/dicty proteome screens + manuscript submission  
-**Estimated completion**: ~65% (core pipeline validated; large-scale screens and manuscript remain)
+**Current Phase**: Phase 5 — Comparative analysis complete; manuscript package in progress  
+**Next Milestone**: Full proteome screens + manuscript draft  
+**Estimated completion**: ~70% (tier-1 validated; supplements automated; proteome screens + draft remain)
 
 ### Roadmap
 
 - [x] Core pipeline implementation
-- [x] ADAR2 validation (tier-1 gate passing in CI)
+- [x] ADAR2 validation (tier-1 CI gate)
 - [x] Negative control validation
 - [x] Documentation and notebooks
 - [x] CI/CD setup (PR CI + tier-1 gate)
 - [x] Protein engineering pipeline (MD + QM/MM)
-- [x] Yeast proteome pilot (500 proteins; strict screening recalibrated)
+- [x] Yeast proteome pilot (500 proteins; re-screen with strict filters)
 - [ ] Yeast full proteome screen (~6,000 proteins)
 - [ ] Human proteome screen
 - [ ] Dictyostelium proteome screen
 - [x] Comparative analysis framework
-- [x] Publication package automation (figures, methods, provenance)
+- [x] Publication package (figures, methods, supplementary tables, `manuscript/`)
 - [ ] Manuscript preparation
 
 **Last Updated**: June 2026

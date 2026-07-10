@@ -180,24 +180,68 @@ def export_analysis_bundle(
 
 
 def generate_methods_text(config: Mapping[str, Any], manifest: Mapping[str, Any]) -> str:
+    """Generate journal-style methods text from pipeline config and provenance."""
     params = config.get("pipeline", {})
     data_sources = manifest.get("dataSources", {})
+    versions = manifest.get("softwareVersions", {})
+    score_threshold = params.get("score_threshold", 0.75)
+
     return "\n".join(
         [
             "# Methods (auto-generated)",
             "",
-            "We executed the cryptic IP-binding site pipeline with the following controlled parameters:",
-            f"- Pocket score threshold: {params.get('score_threshold')}",
-            f"- Maximum structures processed: {params.get('max_structures')}",
-            f"- Random seed: {params.get('seed')}",
-            f"- Deterministic sort columns: {', '.join(params.get('sort_columns', []))}",
+            "## Structural input and pocket detection",
             "",
-            "Data sources:",
-            f"- AlphaFold DB release date: {data_sources.get('alphafold_release_date', 'unknown')}",
-            f"- PDB retrieval date: {data_sources.get('pdb_fetch_date', 'unknown')}",
+            "Protein structures were obtained from the RCSB Protein Data Bank (PDB) for "
+            "validation benchmarks and from the AlphaFold Database for proteome screening. "
+            "Pockets were detected with **fpocket** (default minimum alpha-sphere count = 3). "
+            "Pocket-lining residues were assigned from fpocket atom records; solvent-accessible "
+            "surface area (SASA) was computed per residue with BioPython Shrake–Rupley.",
             "",
-            f"Pipeline commit: {manifest.get('pipelineVersion', 'unknown')}",
-            "Floating point note: tiny score differences may occur across BLAS implementations;",
-            "store outputs with >=6 decimal places and compare with tolerance (1e-6).",
+            "## Cryptic-site scoring",
+            "",
+            "Each pocket received a composite score (0–1) weighting pocket depth (25%), "
+            "burial/SASA (40%), basic residue count (20%), volume fit for IP3–IP6 (10%), "
+            "and optional electrostatic potential from APBS (5%). Proteome candidates were "
+            f"filtered at composite score ≥ {score_threshold}, pocket SASA ≤ 10 Ų, "
+            "≥ 4 basic residues (Arg/Lys/His), volume 300–800 Ų, and pocket mean pLDDT ≥ 70 "
+            "(AlphaFold models).",
+            "",
+            "## Validation controls",
+            "",
+            "**Tier-1 gate (Phase 1):** ADAR2/IP6 (PDB 1ZY7) positive control vs PLCδ1 PH/IP3 "
+            "(PDB 1MAI) negative control. Passing requires both controls to pass individual "
+            "criteria and tier-1 score separation > 0.50. Scores use burial-aware "
+            "cryptic-likeness (ligand SASA + pocket composite).",
+            "",
+            "**Tier-2 controls:** Pds5B (5HDT), HDAC1 (5ICN), Btk PH (1BWN). Crystal artifacts "
+            "(ligand SASA > 50 Ų) are flagged and excluded from positive-pass claims.",
+            "",
+            "## Machine learning benchmark",
+            "",
+            "Pocket-level labels were assigned within 8 Å of annotated ligand atoms. Models "
+            "(random forest, XGBoost) were evaluated with grouped cross-validation by PDB ID "
+            "to prevent structure leakage. Metrics: ROC AUC, PR AUC, Matthews correlation "
+            "coefficient (MCC).",
+            "",
+            "## RCSB validation dataset",
+            "",
+            "Structures containing inositol phosphate ligands (IP3–IP6) were retrieved from PDB "
+            "and classified by ligand SASA: Cryptic (≤ 5 Ų), Semi-cryptic (5–50 Ų), "
+            "Surface (> 50 Ų).",
+            "",
+            "## Reproducibility",
+            "",
+            f"- Random seed: {params.get('seed', 42)}",
+            f"- Score threshold: {score_threshold}",
+            f"- Pipeline commit: {manifest.get('pipelineVersion', 'unknown')}",
+            f"- AlphaFold DB snapshot: {data_sources.get('alphafold_release_date', 'unknown')}",
+            f"- PDB fetch date: {data_sources.get('pdb_fetch_date', 'unknown')}",
+            "",
+            "### Software versions",
+            "",
+            *(f"- {pkg}: {ver}" for pkg, ver in sorted(versions.items()) if pkg not in ("platform",)),
+            "",
+            "Floating-point note: compare scores with tolerance 1e-6 across BLAS implementations.",
         ]
     )
