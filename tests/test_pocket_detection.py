@@ -1,5 +1,7 @@
 """Tests for pocket detection via fpocket integration."""
 
+import shutil
+
 import pytest
 from pathlib import Path
 
@@ -7,11 +9,10 @@ from cryptic_ip.analysis import ProteinAnalyzer
 
 
 @pytest.fixture
-def adar2_path():
-    path = Path("data/validation/1ZY7.pdb")
-    if not path.exists():
-        pytest.skip("ADAR2 structure not available")
-    return path
+def adar2_path(adar2_structure_path):
+    if shutil.which("fpocket") is None:
+        pytest.skip("fpocket not installed")
+    return adar2_structure_path
 
 
 class TestPocketDetection:

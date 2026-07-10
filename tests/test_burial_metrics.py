@@ -12,11 +12,8 @@ from cryptic_ip.validation.control_scoring import (
 
 
 @pytest.fixture
-def adar2_pdb() -> Path:
-    path = Path("data/validation/1ZY7.pdb")
-    if not path.exists():
-        pytest.skip("ADAR2 structure not available")
-    return path
+def adar2_pdb(adar2_structure_path):
+    return adar2_structure_path
 
 
 def test_classify_burial_cryptic():
