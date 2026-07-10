@@ -150,7 +150,13 @@ def stage_tier1(output_dir: Path, with_electrostatics: bool, log_path: Path) -> 
     return summary
 
 
-def stage_ml(output_dir: Path, with_electrostatics: bool, log_path: Path) -> None:
+def stage_ml(
+    output_dir: Path,
+    with_electrostatics: bool,
+    log_path: Path,
+    *,
+    features_csv: Path | None = None,
+) -> None:
     log("STAGE ml", log_path)
     python = bootstrap_colab_runtime()
     cmd = [
@@ -162,6 +168,8 @@ def stage_ml(output_dir: Path, with_electrostatics: bool, log_path: Path) -> Non
         "--model-dir",
         str(ROOT / "models"),
     ]
+    if features_csv is not None and features_csv.exists():
+        cmd.extend(["--features-csv", str(features_csv)])
     if with_electrostatics:
         cmd.append("--include-electrostatics")
     run_cmd(cmd, log_path)
@@ -214,6 +222,8 @@ def stage_publication(
     with_electrostatics: bool,
     skip_figures: bool,
     log_path: Path,
+    skip_ml_training: bool = False,
+    skip_controls: bool = False,
 ) -> None:
     log("STAGE publication", log_path)
     python = bootstrap_colab_runtime()
@@ -226,6 +236,10 @@ def stage_publication(
     ]
     if skip_figures:
         cmd.append("--skip-figures")
+    if skip_ml_training:
+        cmd.append("--skip-ml-training")
+    if skip_controls:
+        cmd.append("--skip-controls")
     if with_electrostatics:
         cmd.append("--with-electrostatics")
     else:

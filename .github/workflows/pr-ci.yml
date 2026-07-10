@@ -108,16 +108,34 @@ jobs:
           path: data/validation
           key: ci-validation-pdbs-v1
 
-      - name: Download ADAR2 crystal structure
-        run: |
-          mkdir -p data/validation
-          if [ ! -f data/validation/1ZY7.pdb ]; then
-            wget -q -O data/validation/1ZY7.pdb https://files.rcsb.org/download/1ZY7.pdb
-          fi
-
-      - name: Run ADAR2 end-to-end test
+      - name: Download validation structures
         shell: bash -l {0}
-        run: python scripts/phase1_validate_adar2.py
+        run: |
+          mkdir -p data/validation data/validation/raw/structures tests/data/structures
+          for pdb in 1ZY7 1MAI 1BWN 5HDT 5ICN; do
+            if [ ! -f "data/validation/${pdb}.pdb" ]; then
+              wget -q -O "data/validation/${pdb}.pdb" "https://files.rcsb.org/download/${pdb}.pdb"
+            fi
+          done
+          if [ ! -f data/validation/AF-P78563-F1-model_v6.pdb ]; then
+            wget -q -O data/validation/AF-P78563-F1-model_v6.pdb \
+              https://alphafold.ebi.ac.uk/files/AF-P78563-F1-model_v6.pdb
+          fi
+          python - <<'PY'
+          import shutil
+          from pathlib import Path
+          root = Path("data/validation")
+          raw = root / "raw" / "structures"
+          raw.mkdir(parents=True, exist_ok=True)
+          for pdb in ("1ZY7", "1MAI", "1BWN", "5HDT", "5ICN"):
+              src = root / f"{pdb}.pdb"
+              if src.exists():
+                  shutil.copy2(src, raw / f"{pdb}.pdb")
+          PY
+
+      - name: Run minimal end-to-end pipeline test
+        shell: bash -l {0}
+        run: pytest tests/integration/test_colab_pipeline_e2e.py -v --tb=short
 
   publication-smoke:
     name: Publication Package Smoke Test

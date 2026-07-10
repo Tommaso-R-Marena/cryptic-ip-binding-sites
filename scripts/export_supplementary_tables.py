@@ -45,6 +45,15 @@ def _copy_table(src: Path, dest: Path) -> bool:
     return True
 
 
+def _csv_row_count(path: Path) -> int:
+    if not path.exists() or path.stat().st_size == 0:
+        return 0
+    try:
+        return len(pd.read_csv(path))
+    except pd.errors.EmptyDataError:
+        return 0
+
+
 def export_supplementary(
     publication_dir: Path,
     dataset_csv: Path,
@@ -65,7 +74,7 @@ def export_supplementary(
     ]
     for src, dest in mappings:
         if _copy_table(src, dest):
-            exported.append({"table": dest.name, "source": str(src), "rows": len(pd.read_csv(dest))})
+            exported.append({"table": dest.name, "source": str(src), "rows": _csv_row_count(dest)})
 
     if (yeast_dir / "yeast_pilot_summary.json").exists():
         shutil.copy2(yeast_dir / "yeast_pilot_summary.json", out / "S6_yeast_pilot_summary.json")
@@ -76,7 +85,7 @@ def export_supplementary(
             {
                 "table": "S6_yeast_pilot_hits.csv",
                 "source": str(yeast_dir / "yeast_pilot_hits.csv"),
-                "rows": len(pd.read_csv(out / "S6_yeast_pilot_hits.csv")),
+                "rows": _csv_row_count(out / "S6_yeast_pilot_hits.csv"),
             }
         )
 
