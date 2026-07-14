@@ -80,6 +80,33 @@ class CandidateFilter:
 
         return pd.DataFrame(kept)
 
+    def filter_by_burial_depth(
+        self,
+        results: pd.DataFrame,
+        min_depth: float = 15.0,
+        depth_col: str = "burial_depth",
+    ) -> pd.DataFrame:
+        """
+        Filter pockets by geometric burial depth below the protein surface.
+
+        Implements the "pocket depth >15 Å from surface" criterion using the
+        true geometric burial depth (distance from the pocket center to the
+        nearest solvent-exposed atom), removing shallow surface pockets that can
+        otherwise pass the composite score.
+
+        Args:
+            results: DataFrame with pocket analysis results
+            min_depth: Minimum burial depth in Angstroms
+            depth_col: Column holding the geometric burial depth
+
+        Returns:
+            Filtered DataFrame (unchanged if the depth column is absent)
+        """
+        if depth_col not in results.columns:
+            print(f"Warning: No '{depth_col}' column found, skipping burial-depth filter")
+            return results
+        return results[results[depth_col].fillna(0) >= min_depth].copy()
+
     def filter_by_criteria(
         self,
         results: pd.DataFrame,
@@ -118,8 +145,14 @@ class CandidateFilter:
         max_sasa: float = 10.0,
         min_volume: float = 300,
         max_volume: float = 800,
+        min_burial_depth: Optional[float] = None,
     ) -> pd.DataFrame:
-        """Apply score, burial, volume, and pLDDT gates for proteome screening."""
+        """Apply score, burial, volume, and pLDDT gates for proteome screening.
+
+        When ``min_burial_depth`` is provided, an additional geometric burial-depth
+        gate is applied (pocket center must be at least that many Angstroms below the
+        protein surface). It defaults to ``None`` so existing behavior is unchanged.
+        """
         filtered = self.filter_by_score(results)
         filtered = self.filter_by_criteria(
             filtered,
@@ -128,6 +161,8 @@ class CandidateFilter:
             min_volume=min_volume,
             max_volume=max_volume,
         )
+        if min_burial_depth is not None:
+            filtered = self.filter_by_burial_depth(filtered, min_depth=min_burial_depth)
         if structure_path:
             filtered = self.filter_by_confidence(filtered, structure_path=structure_path)
         return self.rank_candidates(filtered)

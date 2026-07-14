@@ -74,6 +74,7 @@ class ProteinAnalyzer:
         self.sasa_data = None
         self.electrostatic_data = None
         self.electrostatic_map_path: Optional[Path] = None
+        self._surface_atom_coords: Optional[np.ndarray] = None
 
     @timed()
     def run_pipeline(self, include_electrostatics: Optional[bool] = None) -> pd.DataFrame:
@@ -174,6 +175,75 @@ class ProteinAnalyzer:
 
         except Exception as e:
             raise RuntimeError(f"SASA calculation failed: {e}")
+
+    def _compute_surface_atom_coords(self, sasa_threshold: float = 1.0) -> np.ndarray:
+        """
+        Return coordinates of solvent-exposed protein atoms.
+
+        An atom is considered part of the molecular surface when its
+        Shrake-Rupley solvent accessible surface area exceeds ``sasa_threshold``
+        Å². Heteroatoms/ligands (e.g. bound inositol phosphates) are excluded so
+        that burial is measured relative to the protein surface only.
+
+        Args:
+            sasa_threshold: Minimum per-atom SASA (Å²) to count as exposed.
+
+        Returns:
+            Array of shape ``(n_surface_atoms, 3)`` with atom coordinates. Falls
+            back to all protein atom coordinates if no atom clears the threshold.
+        """
+        from Bio.PDB.SASA import ShrakeRupley
+
+        ShrakeRupley().compute(self.structure, level="A")
+
+        surface_coords: List[np.ndarray] = []
+        all_protein_coords: List[np.ndarray] = []
+        for model in self.structure:
+            for chain in model:
+                for residue in chain:
+                    # Skip heteroatoms/ligands; only protein residues define the surface.
+                    if residue.id[0] != " ":
+                        continue
+                    for atom in residue:
+                        all_protein_coords.append(atom.get_coord())
+                        if float(getattr(atom, "sasa", 0.0)) > sasa_threshold:
+                            surface_coords.append(atom.get_coord())
+
+        chosen = surface_coords or all_protein_coords
+        if not chosen:
+            return np.empty((0, 3), dtype=float)
+        return np.asarray(chosen, dtype=float)
+
+    @timed()
+    def calculate_pocket_burial_depth(
+        self, pocket_center: Tuple[float, float, float]
+    ) -> float:
+        """
+        Geometric burial depth of a pocket center below the protein surface.
+
+        Depth is defined as the Euclidean distance (Å) from the pocket center to
+        the nearest solvent-exposed protein atom. Deeply buried structural pockets
+        (e.g. the ADAR2 IP6 cavity) sit far from any exposed atom and yield large
+        depths (>15 Å), whereas surface signaling pockets sit adjacent to exposed
+        atoms and yield small depths. This implements the pipeline's
+        "pocket depth from surface" criterion as a true geometric measurement,
+        rather than fpocket's local hydrophobic density proxy.
+
+        Args:
+            pocket_center: (x, y, z) coordinate of the pocket center.
+
+        Returns:
+            Burial depth in Angstroms (0.0 when no surface atoms are available).
+        """
+        if self._surface_atom_coords is None:
+            self._surface_atom_coords = self._compute_surface_atom_coords()
+
+        if self._surface_atom_coords.size == 0:
+            return 0.0
+
+        center = np.asarray(pocket_center, dtype=float)
+        distances = np.linalg.norm(self._surface_atom_coords - center, axis=1)
+        return float(np.min(distances))
 
     @timed()
     def calculate_electrostatics(self, ph: float = 7.4) -> Optional[float]:
@@ -304,11 +374,13 @@ class ProteinAnalyzer:
         basic_count = self.count_basic_residues(pocket_id)
         pocket_potential = self.pocket_electrostatic_potential(pocket_center)
         plddt = self.pocket_plddt_confidence(pocket_residues)
+        burial_depth = self.calculate_pocket_burial_depth(pocket_center)
 
         return {
             "pocket_id": pocket_id,
             "volume": pocket.get("volume", 0),
             "depth": pocket.get("mean_local_hydrophobic_density", 0),
+            "burial_depth": burial_depth,
             "sasa": pocket_sasa,
             "basic_residues": basic_count,
             "residue_count": len(pocket_residues),
