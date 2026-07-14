@@ -127,12 +127,11 @@ def analyze(pdb_file, output, score_threshold, use_ml_model, seed, model_path):
     click.echo(f"\nFound {len(candidates)} candidates above threshold {score_threshold}\n")
 
     if len(candidates) > 0:
+        display_cols = ["pocket_id", "composite_score", "volume", "sasa", "basic_residues"]
+        if "burial_depth" in candidates.columns:
+            display_cols.insert(2, "burial_depth")
         click.echo("Top candidates:")
-        click.echo(
-            candidates[["pocket_id", "composite_score", "volume", "sasa", "basic_residues"]]
-            .head(10)
-            .to_string()
-        )
+        click.echo(candidates[display_cols].head(10).to_string())
 
     # Save results
     if output:

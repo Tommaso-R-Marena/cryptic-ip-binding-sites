@@ -277,8 +277,19 @@ def main() -> None:
 
         top_hits = results_df.head(10).copy()
         st.subheader("Score breakdown table")
+        table_cols = [
+            "pocket_id",
+            "composite_score",
+            "classification",
+            "volume",
+            "depth",
+            "sasa",
+            "basic_residues",
+        ]
+        if "burial_depth" in top_hits.columns:
+            table_cols.insert(4, "burial_depth")
         st.dataframe(
-            top_hits[["pocket_id", "composite_score", "classification", "volume", "depth", "sasa", "basic_residues"]],
+            top_hits[[col for col in table_cols if col in top_hits.columns]],
             use_container_width=True,
         )
 
