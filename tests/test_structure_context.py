@@ -13,11 +13,8 @@ from cryptic_ip.validation.structure_context import (
 
 
 @pytest.fixture
-def adar2_pdb() -> Path:
-    path = Path("data/validation/1ZY7.pdb")
-    if not path.exists():
-        pytest.skip("ADAR2 crystal structure not available")
-    return path
+def adar2_pdb(adar2_structure_path):
+    return adar2_structure_path
 
 
 class TestLoadStructure:

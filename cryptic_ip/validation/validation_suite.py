@@ -415,7 +415,9 @@ class ValidationSuite:
             print(f"  Positive controls: {sep.get('positive_mean', 0):.3f}")
             print(f"  Negative controls: {sep.get('negative_mean', 0):.3f}")
             print(f"  Separation: {sep.get('separation', 0):.3f}")
-            print(f"  Tier-1 separation (ADAR2 vs PLCδ1): {sep.get('tier1_separation', 0):.3f}")
+            tier1 = sep.get("tier1_separation")
+            tier1_display = f"{float(tier1):.3f}" if tier1 is not None else "n/a"
+            print(f"  Tier-1 separation (ADAR2 vs PLCδ1): {tier1_display}")
             print(f"  Clear separation (>0.30): {sep.get('clear_separation', False)}")
             print(f"  Phase 1 gate passed: {sep.get('phase1_ready', False)}")
             print(f"  All positives passed: {sep.get('all_positive_passed', False)}")

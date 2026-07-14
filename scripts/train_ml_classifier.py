@@ -56,6 +56,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--work-dir", type=Path, default=Path("results/ml_training"))
     parser.add_argument("--model-dir", type=Path, default=Path("models"))
     parser.add_argument("--skip-build-dataset", action="store_true")
+    parser.add_argument(
+        "--features-csv",
+        type=Path,
+        default=None,
+        help="Reuse pre-extracted pocket features instead of running fpocket on all structures",
+    )
     parser.add_argument("--include-electrostatics", action="store_true")
     parser.add_argument("--random-state", type=int, default=42)
     return parser.parse_args()
@@ -241,12 +247,16 @@ def main() -> None:
     if not args.skip_build_dataset:
         run_dataset_builder(args.dataset_csv, args.download_dir)
 
-    pocket_df = extract_pocket_features(
-        args.dataset_csv,
-        args.download_dir,
-        args.work_dir,
-        include_electrostatics=args.include_electrostatics,
-    )
+    if args.features_csv and args.features_csv.exists():
+        pocket_df = pd.read_csv(args.features_csv)
+        pocket_df.to_csv(args.work_dir / "validation_pocket_features.csv", index=False)
+    else:
+        pocket_df = extract_pocket_features(
+            args.dataset_csv,
+            args.download_dir,
+            args.work_dir,
+            include_electrostatics=args.include_electrostatics,
+        )
     if pocket_df.empty:
         raise RuntimeError("No pocket features were extracted; unable to train model.")
 

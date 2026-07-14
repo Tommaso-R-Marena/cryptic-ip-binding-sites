@@ -112,6 +112,20 @@ def main() -> int:
         hit_rows.extend(result.get("hits", []))
 
     hits_df = pd.DataFrame(hit_rows)
+    if hits_df.empty:
+        hits_df = pd.DataFrame(
+            columns=[
+                "pocket_id",
+                "composite_score",
+                "basic_residues",
+                "sasa",
+                "volume",
+                "rank",
+                "classification",
+                "uniprot_id",
+                "structure_path",
+            ]
+        )
     hits_path = args.output_dir / "yeast_pilot_hits.csv"
     hits_df.to_csv(hits_path, index=False)
 

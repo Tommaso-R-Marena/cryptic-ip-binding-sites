@@ -132,6 +132,7 @@ class CandidateFilter:
             filtered = self.filter_by_confidence(filtered, structure_path=structure_path)
         return self.rank_candidates(filtered)
 
+    def rank_candidates(self, results: pd.DataFrame) -> pd.DataFrame:
         """
         Rank candidates by composite score and add classification.
 
@@ -141,6 +142,9 @@ class CandidateFilter:
         Returns:
             Ranked DataFrame with classification
         """
+        if results.empty:
+            return results.copy()
+
         ranked = results.sort_values("composite_score", ascending=False).copy()
         ranked["rank"] = range(1, len(ranked) + 1)
 
