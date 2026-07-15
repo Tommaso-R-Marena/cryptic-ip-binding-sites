@@ -26,12 +26,12 @@
   },
   {
     "table": "S6_yeast_pilot_summary.json",
-    "source": "results/yeast_pilot"
+    "source": "/workspace/results/yeast_pilot"
   },
   {
     "table": "S6_yeast_pilot_hits.csv",
-    "source": "results/yeast_pilot/yeast_pilot_hits.csv",
-    "rows": 1484
+    "source": "/workspace/results/yeast_pilot/yeast_pilot_hits.csv",
+    "rows": 1
   },
   {
     "table": "S3_ml_feature_summary.json",
