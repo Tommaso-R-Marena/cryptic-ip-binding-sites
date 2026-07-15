@@ -1,0 +1,36 @@
+[
+  {
+    "rank": 1,
+    "uniprot_id": "P07264",
+    "composite_score": 0.9545617762366922,
+    "classification": "High confidence cryptic IP site",
+    "pocket_id": 2,
+    "volume": 481.398,
+    "burial_depth": 2.8439356382903616,
+    "sasa": 7.299300173372133,
+    "basic_residues": 7,
+    "plddt_confidence": 93.47481481481482,
+    "electrostatic_potential": null,
+    "structure_path": "data/structures/yeast_pilot/AF-P07264-F1-model_v6.pdb",
+    "gene_name": "LEU1",
+    "protein_name": "3-isopropylmalate dehydratase",
+    "organism": "Saccharomyces cerevisiae (strain ATCC 204508 / S288c)",
+    "sequence_length": 779,
+    "function": "Catalyzes the isomerization between 2-isopropylmalate and 3-isopropylmalate, via the formation of 2-isopropylmaleate",
+    "subcellular_location": [],
+    "go_molecular_function": [
+      "F:3-isopropylmalate dehydratase activity",
+      "F:4 iron, 4 sulfur cluster binding",
+      "F:metal ion binding"
+    ],
+    "coordinating_residues": [
+      "H40",
+      "H70",
+      "H122",
+      "H143",
+      "R449",
+      "R631",
+      "H633"
+    ]
+  }
+]
