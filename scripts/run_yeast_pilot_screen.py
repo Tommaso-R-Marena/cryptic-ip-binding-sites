@@ -136,6 +136,16 @@ def main() -> int:
             ]
         )
     hits_path = args.output_dir / "yeast_pilot_hits.csv"
+
+    # ParallelProcessor.run() only returns newly processed items on a resumed run,
+    # so merge with any previously written hits to keep the aggregate complete.
+    if hits_path.exists():
+        previous = pd.read_csv(hits_path)
+        combined = pd.concat([previous, hits_df], ignore_index=True)
+        dedup_keys = [k for k in ("uniprot_id", "pocket_id", "structure_path") if k in combined.columns]
+        if dedup_keys:
+            combined = combined.drop_duplicates(subset=dedup_keys, keep="last")
+        hits_df = combined.reset_index(drop=True)
     hits_df.to_csv(hits_path, index=False)
 
     proteins_with_hits = int(hits_df["uniprot_id"].nunique()) if not hits_df.empty else 0
