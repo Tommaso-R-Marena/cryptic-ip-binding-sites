@@ -1,20 +1,11 @@
-Figure 1 | Overview of cryptic IP-binding site discovery workflow.
-(A) ADAR2 structure with buried IP6 shown in stick representation and pocket surface shading.
-(B) End-to-end computational pipeline: AlphaFold structural input, fpocket cavity detection,
-FreeSASA solvent accessibility filtering, APBS electrostatic features, and final scoring.
-(C) Receiver operating characteristic (ROC) curves benchmarking candidate scoring performance.
+Figure 1 | Overview of cryptic IP-binding site discovery.
+(A) ADAR2 (PDB 1ZY7) positive control with buried IP6 (tier-1 separation = 0.564).
+(B) Pipeline: AlphaFold/PDB input → fpocket → SASA burial → optional APBS → composite scoring.
+(C) ROC curves on RCSB validation pockets (n = 136 structures; ML AUC = 0.499, threshold AUC = 0.556).
 
-Figure 2 | Comparative proteomics of predicted IP-binding sites.
-(A) Hit-rate comparison across organisms with statistical significance annotations.
-(B) Correlation between IP6 concentration and predicted hit rate.
-(C) GO term enrichment heatmap for high-confidence candidates.
-(D) Phylogenetic conservation profile across top predicted hits.
+Figure 2 | Burial-class distribution in the RCSB IP-binding validation set.
+(A) Cryptic-fraction by organism or ligand class (n = 136 structures, 1 cryptic). (B) IP6 concentration vs burial proxy. (C) Burial-class enrichment. (D) Conservation among top cryptic structures.
+Note: full three-organism proteome panels require completed yeast/human/dicty screens.
 
-Figure 3 | Structural gallery of top predicted cryptic IP-binding candidates.
-Top 10 candidates shown with matched structural and electrostatic views,
-unified color scales, and consistent annotation/scale bars.
-
-Figure 4 | Validation benchmark on the curated RCSB IP-binding dataset.
-(A) Ligand solvent accessibility by burial class with cryptic/surface thresholds.
-(B) Dataset burial-class composition. (C) Positive vs negative control score separation.
-(D) Ligand accessibility versus crystallographic resolution, colored by burial class.
+Figure 3 | Structural gallery of tier-1/tier-2 positive controls (n = 3).
+Each panel shows pocket metrics (depth, SASA, basic residues) for the top-scoring pocket.

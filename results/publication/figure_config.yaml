@@ -15,3 +15,14 @@ figure3:
 figure4:
   dataset_csv: data/validation/ip_binding_validation_dataset.csv
   control_benchmark_csv: results/publication/validation/control_benchmark.csv
+figure_legends: "Figure 1 | Overview of cryptic IP-binding site discovery.\n(A) ADAR2\
+  \ (PDB 1ZY7) positive control with buried IP6 (tier-1 separation = 0.564).\n(B)\
+  \ Pipeline: AlphaFold/PDB input \u2192 fpocket \u2192 SASA burial \u2192 optional\
+  \ APBS \u2192 composite scoring.\n(C) ROC curves on RCSB validation pockets (n =\
+  \ 136 structures; ML AUC = 0.499, threshold AUC = 0.556).\n\nFigure 2 | Burial-class\
+  \ distribution in the RCSB IP-binding validation set.\n(A) Cryptic-fraction by organism\
+  \ or ligand class (n = 136 structures, 1 cryptic). (B) IP6 concentration vs burial\
+  \ proxy. (C) Burial-class enrichment. (D) Conservation among top cryptic structures.\n\
+  Note: full three-organism proteome panels require completed yeast/human/dicty screens.\n\
+  \nFigure 3 | Structural gallery of tier-1/tier-2 positive controls (n = 3).\nEach\
+  \ panel shows pocket metrics (depth, SASA, basic residues) for the top-scoring pocket."
