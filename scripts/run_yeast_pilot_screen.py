@@ -31,6 +31,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-plddt", type=float, default=70.0)
     parser.add_argument("--min-basic", type=int, default=4)
     parser.add_argument("--max-sasa", type=float, default=10.0)
+    parser.add_argument(
+        "--min-burial-depth",
+        type=float,
+        default=None,
+        help="Optional geometric burial-depth gate in Angstroms (pocket center depth "
+        "below the protein surface)",
+    )
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--skip-download", action="store_true")
     parser.add_argument("--skip-electrostatics", action="store_true", default=True)
@@ -57,6 +64,7 @@ def _analyze_structure(item: Dict[str, Any]) -> Dict[str, Any]:
         structure_path=str(pdb_path),
         min_basic=item.get("min_basic", 4),
         max_sasa=item.get("max_sasa", 10.0),
+        min_burial_depth=item.get("min_burial_depth"),
     )
     hits = ranked.head(3).to_dict(orient="records")
     for hit in hits:
@@ -95,6 +103,7 @@ def main() -> int:
             "min_plddt": args.min_plddt,
             "min_basic": args.min_basic,
             "max_sasa": args.max_sasa,
+            "min_burial_depth": args.min_burial_depth,
             "skip_electrostatics": skip_electrostatics,
         }
         for path in pdb_files
@@ -140,6 +149,7 @@ def main() -> int:
         "min_plddt": args.min_plddt,
         "min_basic": args.min_basic,
         "max_sasa": args.max_sasa,
+        "min_burial_depth": args.min_burial_depth,
     }
     (args.output_dir / "yeast_pilot_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
