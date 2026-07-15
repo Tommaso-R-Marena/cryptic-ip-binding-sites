@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from .analysis import ProteinAnalyzer
+from .analysis import units
 from .validation import validate_adar2, ValidationSuite, StructureValidator, ResultsValidator
 from .validation.md_validation import OpenMMMDValidationPipeline
 from .database import ProteomeDownloader, ProteomeManager, DatabaseIntegrityChecker
@@ -89,12 +90,19 @@ def check_dependencies():
 @click.option("--use-ml-model", is_flag=True, help="Use trained ML classifier if available")
 @click.option("--seed", type=int, default=42, show_default=True, help="Random seed")
 @click.option(
+    "--min-burial-depth",
+    type=float,
+    default=None,
+    help="Optional geometric burial-depth gate in Angstroms (distance of the pocket "
+    "center below the protein surface)",
+)
+@click.option(
     "--model-path",
     type=click.Path(exists=False),
     default="models/cryptic_ip_classifier_v1.pkl",
     help="Path to serialized ML model",
 )
-def analyze(pdb_file, output, score_threshold, use_ml_model, seed, model_path):
+def analyze(pdb_file, output, score_threshold, use_ml_model, seed, min_burial_depth, model_path):
     """
     Analyze a single protein structure for cryptic IP binding sites.
     """
@@ -126,17 +134,40 @@ def analyze(pdb_file, output, score_threshold, use_ml_model, seed, model_path):
 
     click.echo(f"\nFound {len(candidates)} candidates above threshold {score_threshold}\n")
 
+    if min_burial_depth is not None:
+        if "burial_depth" not in candidates.columns:
+            click.secho(
+                "No burial_depth column available; skipping burial-depth gate.", fg="yellow"
+            )
+        else:
+            before = len(candidates)
+            candidates = candidates[candidates["burial_depth"].fillna(0) >= min_burial_depth]
+            click.echo(
+                f"Applied burial-depth gate >= {min_burial_depth} {units.ANGSTROM}: "
+                f"{len(candidates)}/{before} candidates retained\n"
+            )
+
     if len(candidates) > 0:
         display_cols = ["pocket_id", "composite_score", "volume", "sasa", "basic_residues"]
         if "burial_depth" in candidates.columns:
             display_cols.insert(2, "burial_depth")
-        click.echo("Top candidates:")
-        click.echo(candidates[display_cols].head(10).to_string())
+        click.echo("Top candidates (column units in headers):")
+        labeled = candidates[display_cols].head(10).rename(
+            columns=units.label_columns(display_cols)
+        )
+        click.echo(labeled.to_string())
 
     # Save results
     if output:
         scored.to_csv(output, index=False)
         click.echo(f"\nResults saved to {output}")
+        # Machine-readable units sidecar so persisted results carry their units
+        # without altering the CSV column names that downstream tools rely on.
+        units_path = Path(output).with_suffix(Path(output).suffix + ".units.json")
+        units_path.write_text(
+            json.dumps(units.units_mapping(scored.columns), indent=2, ensure_ascii=False)
+        )
+        click.echo(f"Column units written to {units_path}")
 
 
 @main.command()
