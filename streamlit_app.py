@@ -15,6 +15,7 @@ import py3Dmol
 import streamlit as st
 import streamlit.components.v1 as components
 
+from cryptic_ip.analysis import units
 from cryptic_ip.analysis.analyzer import ProteinAnalyzer
 from cryptic_ip.analysis.scorer import PocketScorer
 from cryptic_ip.database.alphafold_client import AlphaFoldClient
@@ -277,6 +278,7 @@ def main() -> None:
 
         top_hits = results_df.head(10).copy()
         st.subheader("Score breakdown table")
+        st.caption("Column headers include physical units (Å = Ångström).")
         table_cols = [
             "pocket_id",
             "composite_score",
@@ -288,8 +290,9 @@ def main() -> None:
         ]
         if "burial_depth" in top_hits.columns:
             table_cols.insert(4, "burial_depth")
+        present_cols = [col for col in table_cols if col in top_hits.columns]
         st.dataframe(
-            top_hits[[col for col in table_cols if col in top_hits.columns]],
+            top_hits[present_cols].rename(columns=units.label_columns(present_cols)),
             use_container_width=True,
         )
 
@@ -311,6 +314,8 @@ def main() -> None:
             "generated_at": datetime.utcnow().isoformat(),
             "results": top_hits.to_dict(orient="records"),
             "electrostatic_potential": potential,
+            "electrostatic_potential_unit": "kT/e",
+            "units": units.units_mapping(top_hits.columns),
         }
 
         st.subheader("Exports")
