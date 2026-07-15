@@ -17,6 +17,10 @@ figure3:
   top_candidates_csv: results/top_candidates/gallery_inputs.csv
   top_n: 10
 
+figure4:
+  dataset_csv: data/validation/ip_binding_validation_dataset.csv
+  control_benchmark_csv: results/publication/validation/control_benchmark.csv
+
 # Optional override. If omitted, default legends are written.
 # figure_legends: |
 #   Figure 1 | ...

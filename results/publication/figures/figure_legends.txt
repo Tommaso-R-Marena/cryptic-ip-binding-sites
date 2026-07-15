@@ -1,7 +1,7 @@
 Figure 1 | Overview of cryptic IP-binding site discovery workflow.
 (A) ADAR2 structure with buried IP6 shown in stick representation and pocket surface shading.
 (B) End-to-end computational pipeline: AlphaFold structural input, fpocket cavity detection,
-FreeSASA solvent accessibility filtering, APBS electrostatic feature extraction, and final scoring.
+FreeSASA solvent accessibility filtering, APBS electrostatic features, and final scoring.
 (C) Receiver operating characteristic (ROC) curves benchmarking candidate scoring performance.
 
 Figure 2 | Comparative proteomics of predicted IP-binding sites.
@@ -13,3 +13,8 @@ Figure 2 | Comparative proteomics of predicted IP-binding sites.
 Figure 3 | Structural gallery of top predicted cryptic IP-binding candidates.
 Top 10 candidates shown with matched structural and electrostatic views,
 unified color scales, and consistent annotation/scale bars.
+
+Figure 4 | Validation benchmark on the curated RCSB IP-binding dataset.
+(A) Ligand solvent accessibility by burial class with cryptic/surface thresholds.
+(B) Dataset burial-class composition. (C) Positive vs negative control score separation.
+(D) Ligand accessibility versus crystallographic resolution, colored by burial class.

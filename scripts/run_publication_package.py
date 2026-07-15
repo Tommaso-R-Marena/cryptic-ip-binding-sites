@@ -483,6 +483,10 @@ def write_figure_config(output_dir: Path, dataset_csv: Path, figure_legends: str
             "top_candidates_csv": str(output_dir / "gallery" / "gallery_inputs.csv"),
             "top_n": 10,
         },
+        "figure4": {
+            "dataset_csv": str(dataset_csv),
+            "control_benchmark_csv": str(output_dir / "validation" / "control_benchmark.csv"),
+        },
     }
     if figure_legends:
         config["figure_legends"] = figure_legends
