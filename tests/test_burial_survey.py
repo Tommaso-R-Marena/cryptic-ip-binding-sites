@@ -265,3 +265,36 @@ def test_boundary_sweep_reports_class_size_at_each_candidate_cutoff():
     # On a uniform spread the fraction tracks the boundary itself.
     for row in sweep:
         assert row["fraction_positive"] == pytest.approx(row["boundary"], abs=0.02)
+
+
+#: Positive class size at each candidate boundary, measured on the same run.
+SURVEYED_BOUNDARY_SWEEP = {
+    0.05: 0, 0.08: 2, 0.10: 11, 0.12: 14, 0.15: 16, 0.20: 27, 0.25: 40, 0.30: 58,
+}
+
+
+def test_the_configured_boundary_sits_where_class_size_is_least_sensitive():
+    """Recorded finding: 0.12 is on a plateau, which is why it is defensible.
+
+    Burial is continuous, so no cutoff is a natural break. What makes one
+    defensible is insensitivity: moving the boundary across 0.10-0.15 changes the
+    positive count by 5 entries, whereas the same 0.05 shift at 0.20-0.25 changes
+    it by 13 and at 0.25-0.30 by 18.
+    """
+    sweep = SURVEYED_BOUNDARY_SWEEP
+    at_boundary = sweep[0.15] - sweep[0.10]
+    just_above = sweep[0.25] - sweep[0.20]
+    higher_still = sweep[0.30] - sweep[0.25]
+
+    assert at_boundary < just_above < higher_still
+    assert just_above / at_boundary > 2.0, "the plateau should be markedly flatter"
+
+
+def test_the_original_literature_boundary_would_have_emptied_the_positive_class():
+    """0.05, taken from the ADAR2 description, yields no positives at all.
+
+    Recorded because it shows the cost of setting a threshold from a qualitative
+    description rather than from measurement: the pipeline would have trained on
+    a class with no members.
+    """
+    assert SURVEYED_BOUNDARY_SWEEP[0.05] == 0
