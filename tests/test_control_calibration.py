@@ -31,7 +31,9 @@ from cryptic_ip.validation.control_scoring import (
 )
 
 #: Measured on the deposited structures by scripts/calibrate_controls.py
-#: (GitHub Actions run 31241170491, 2026-08-08, 256 SASA sample points/atom).
+#: (GitHub Actions run 31252064686, 2026-08-08, 256 SASA sample points/atom).
+#: Composites and site volumes were refreshed after the volume window was
+#: corrected, so every value here comes from one run of one scorer.
 #: Five controls; ``site_composite`` is the composite at the pocket with the
 #: greatest ligand-atom overlap.
 MEASURED = {
@@ -45,9 +47,12 @@ MEASURED = {
         "burial_depth": 5.76,
         "enclosure": 0.941,
         "n_basic_residues": 8,
-        "pocket_volume": 1524.71,
-        "site_composite": 0.643,
-        # Composite of the pocket the old centre-distance rule selected.
+        "pocket_volume": 1487.53,
+        "site_composite": 0.727,
+        # Composite of the pocket the old centre-distance rule selected,
+        # measured under the scorer of the time (run 31241170491). Retained as
+        # a historical demonstration that centre-distance selection grades a
+        # pocket that does not hold the ligand, not as a current measurement.
         "nearest_centre_composite": 0.432,
     },
     "Pds5B": {
@@ -57,11 +62,11 @@ MEASURED = {
         "expected_class": "surface",
         "relative_sasa": 0.466,
         "relative_phosphate_sasa": 0.460,
-        "burial_depth": 5.63,
+        "burial_depth": 5.631,
         "enclosure": 0.738,
         "n_basic_residues": 8,
-        "pocket_volume": 894.59,
-        "site_composite": 0.561,
+        "pocket_volume": 908.96,
+        "site_composite": 0.582,
     },
     # Corrected. The earlier entry recorded 6A0 at relative SASA 0.089 and
     # classified HDAC1 as cryptic, but 6A0 carries no phosphate: it is not an
@@ -71,10 +76,8 @@ MEASURED = {
     # most buried *phosphorylated* copy in 5ICN is a solvent-exposed InsP6.
     # HDAC1 is therefore an exposed control, not a buried one.
     #
-    # burial_depth, n_basic_residues, pocket_volume and site_composite are not
-    # recorded here because the values previously stored described the 6A0 site;
-    # they are refreshed from the next calibration run rather than carried over
-    # from a measurement of the wrong molecule.
+    # Its depth, basic count, site volume and composite are measured at the
+    # InsP6 site, not carried over from the 6A0 measurement they replaced.
     "HDAC1": {
         "comp_id": "IHP",
         "pdb": "5ICN",
@@ -82,7 +85,11 @@ MEASURED = {
         "expected_class": "surface",
         "relative_sasa": 0.436,
         "relative_phosphate_sasa": 0.444,
+        "burial_depth": 4.392,
         "enclosure": 0.629,
+        "n_basic_residues": 4,
+        "pocket_volume": 939.34,
+        "site_composite": 0.677,
     },
     "PLCd1_PH": {
         "comp_id": "I3P",
@@ -94,8 +101,8 @@ MEASURED = {
         "burial_depth": 4.68,
         "enclosure": 0.598,
         "n_basic_residues": 5,
-        "pocket_volume": 1532.16,
-        "site_composite": 0.415,
+        "pocket_volume": 1533.9,
+        "site_composite": 0.499,
     },
     "Btk_PH": {
         "comp_id": "4IP",
@@ -104,10 +111,10 @@ MEASURED = {
         "expected_class": "surface",
         "relative_sasa": 0.253,
         "relative_phosphate_sasa": 0.266,
-        "burial_depth": 5.98,
+        "burial_depth": 5.977,
         "enclosure": 0.668,
         "n_basic_residues": 3,
-        "pocket_volume": 491.44,
+        "pocket_volume": 499.97,
         "site_composite": 0.498,
     },
 }
