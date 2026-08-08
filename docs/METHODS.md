@@ -81,11 +81,41 @@ at 0.253–0.466 — and the boundary of **0.12** sits inside it. Pds5B, annotat
 in the literature as a frequent crystallisation artefact, measures as the most
 exposed of all five, consistent with that annotation.
 
-Two caveats. HDAC1's interface InsP4 measures as buried as ADAR2 (0.089) rather
-than semi-cryptic; its phosphate ratio is unavailable, which suggests the matched
-ligand copy may not be the phosphorylated species and warrants checking. And five
+Two caveats. HDAC1 measures as buried as ADAR2 (0.089) rather than semi-cryptic,
+and its burial was measured on component `6A0` with an **undefined phosphate
+ratio**, meaning no phosphate group was resolved on the matched copy. Whether
+that reflects the deposited chemistry or a matching problem is exactly the
+question the identifier alone cannot answer, which is why ligands are now
+identified from coordinates and the detected series is reported (below). Treat
+HDAC1 as provisional until its series reads `InsP4` or higher. And five
 structures remain a small calibration set: widen the panel before treating the
 boundaries as settled.
+
+### Ligands are identified from coordinates, not from a list of codes
+
+Which molecules count as inositol phosphates decides both what burial is measured
+on and which pockets become positive training labels, so it cannot rest on a
+hand-written list of PDB chemical component identifiers. Such a list has two
+defects: a site whose ligand code is absent is invisible rather than negative,
+and a code can name the wrong chemistry — the previous list contained `INS`
+(*myo*-inositol), which carries no phosphate at all and is recorded elsewhere in
+this codebase as an unphosphorylated negative reference.
+
+`cryptic_ip.analysis.inositol_detection` decides from the atoms instead:
+
+| Criterion | Test |
+| --- | --- |
+| Inositol core | six carbons in a ring at C–C bonding distance (≤ 1.75 Å) |
+| Hexahydroxylation | an oxygen within 1.65 Å of ≥ 5 of the 6 ring carbons |
+| Phosphorylation | phosphorus within 1.90 Å of one of those oxygens |
+| Series | `InsP{n}` from the phosphorus count, as for formulae |
+
+This mirrors the rule the database module applies to reported formulae, so both
+halves of the pipeline now define an inositol phosphate the same way. It needs no
+network access and no vocabulary, so a regioisomer, a pyrophosphate or a deoxy
+analogue is recognised on its structure rather than on whether anyone typed its
+code. Exact name matching remains available for callers measuring one named
+component.
 
 ### Burial depth does not discriminate on real structures
 
