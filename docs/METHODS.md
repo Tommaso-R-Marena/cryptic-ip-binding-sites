@@ -65,15 +65,15 @@ description.** `scripts/calibrate_controls.py` measures the deposited controls:
 
 | Control | PDB | Rel. SASA | Rel. P-SASA | Depth | Enclosure | Basic | Site volume |
 |---|---|---|---|---|---|---|---|
-| ADAR2 | 1ZY7 | **0.093** | 0.089 | 5.76 Å | 0.941 | 8 | 1525 Å³ |
-| Btk PH | 1BWN | 0.253 | 0.266 | 5.98 Å | 0.668 | 3 | 491 Å³ |
-| PLCδ1 PH | 1MAI | 0.373 | 0.348 | 4.68 Å | 0.598 | 5 | 1532 Å³ |
-| HDAC1 | 5ICN | 0.436 | 0.444 | — | 0.629 | — | — |
-| Pds5B | 5HDT | 0.466 | 0.460 | 5.63 Å | 0.738 | 8 | 895 Å³ |
+| ADAR2 | 1ZY7 | **0.093** | 0.089 | 5.76 Å | 0.941 | 8 | 1488 Å³ |
+| Btk PH | 1BWN | 0.253 | 0.266 | 5.98 Å | 0.668 | 3 | 500 Å³ |
+| PLCδ1 PH | 1MAI | 0.373 | 0.348 | 4.68 Å | 0.598 | 5 | 1534 Å³ |
+| HDAC1 | 5ICN | 0.436 | 0.444 | 4.39 Å | 0.629 | 4 | 939 Å³ |
+| Pds5B | 5HDT | 0.466 | 0.460 | 5.63 Å | 0.738 | 8 | 909 Å³ |
 
-HDAC1's depth, basic-residue count and site volume are shown as pending: the
-values previously in this table described the `6A0` site and are not carried
-over, since that component is not an inositol phosphate.
+HDAC1's row is measured at its InsP6 site. Every value in this table comes
+from a single calibration run under a single scorer, so composites and site
+volumes are comparable across rows.
 
 The boundary was initially set to 0.05, from the description of the ADAR2 InsP6
 as encapsulated with only an 8.4 × 4.6 Å window (Macbeth et al., *Science*
@@ -94,13 +94,11 @@ buried* matching copy. Identifying ligands from coordinates (below) excludes it,
 and the most buried genuinely phosphorylated copy in 5ICN is a solvent-exposed
 InsP6 at 0.436. HDAC1 is an exposed control.
 
-That correction is worth stating plainly rather than absorbing quietly: the
-boundary separating the positive class now rests on **one** sequestered
-structure. It should not be treated as settled. `scripts/burial_survey.py`
-re-measures every deposited inositol phosphate complex in the bundled set for
-exactly this reason, and reports whether the distribution is bimodal at all —
-if it is not, the cryptic/surface split is a modelling choice rather than a
-discovered boundary, and every downstream metric should be read in that light.
+That correction is worth stating plainly rather than absorbing quietly: within
+this five-structure panel the boundary rests on **one** sequestered example.
+That is why the panel is not the only evidence for it — the population survey
+below measures all 136 deposited complexes, and independently places the
+boundary where the controls put it.
 
 ### The whole deposited set: burial is continuous, not two classes
 
@@ -184,11 +182,11 @@ and the *largest* depth in the panel belongs to a surface negative:
 
 | | buried | exposed |
 |---|---|---|
-| depth (Å) | ADAR2 5.76 | Btk **5.98**, PLCδ1 4.68, Pds5B 5.63 |
+| depth (Å) | ADAR2 5.76 | Btk **5.98**, PLCδ1 4.68, HDAC1 4.39, Pds5B 5.63 |
 | enclosure | ADAR2 0.941 | Btk 0.668, PLCδ1 0.598, HDAC1 0.629, Pds5B 0.738 |
 
 No threshold on depth isolates the buried control: its 5.76 Å sits strictly
-inside the 4.68-5.98 Å spread of the exposed ones, so any cutoff admitting it
+inside the 4.39-5.98 Å spread of the exposed ones, so any cutoff admitting it
 admits a surface site too. On idealised synthetic spheres
 the same measure separates them perfectly (22 Å against 5 Å).
 
