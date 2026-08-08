@@ -518,18 +518,14 @@ def main() -> int:
     ml_work = args.output_dir / "ml_training"
     if not args.skip_ml_training:
         run_subprocess(
+            # Training consumes a pocket feature table; dataset building and
+            # feature extraction are separate, independently runnable stages.
             [
                 sys.executable,
                 "scripts/train_ml_classifier.py",
-                "--dataset-csv",
-                str(args.dataset_csv),
-                "--download-dir",
-                str(args.download_dir),
                 "--work-dir",
                 str(ml_work),
-                "--skip-build-dataset",
             ]
-            + (["--include-electrostatics"] if use_electrostatics else []),
         )
         ml_comparison = export_roc_csv(ml_work, args.output_dir / "validation" / "roc_curves.csv")
     else:

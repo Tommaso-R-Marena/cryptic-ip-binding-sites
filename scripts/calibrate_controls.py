@@ -265,7 +265,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print("CONTROL BURIAL MEASUREMENTS (most buried ligand copy)")
     print("=" * 108)
     print(
-        f"{'control':<12}{'pdb':<6}{'role':<10}{'expected':<20}"
+        f"{'control':<12}{'pdb':<6}{'role':<10}{'expected':<20}{'ligand':<8}"
         f"{'relSASA':>9}{'relPSASA':>10}{'depth':>8}{'encl':>8}{'basic':>7}{'class':>16}"
     )
     for record in results:
@@ -278,7 +278,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             continue
         print(
             f"{record['name']:<12}{record['pdb_id']:<6}{record['role']:<10}"
-            f"{record['expected']:<20}"
+            f"{record['expected']:<20}{str(best.get('comp_id', '?')):<8}"
             f"{_format_value(best['relative_sasa'], 9)}"
             f"{_format_value(best['relative_phosphate_sasa'], 10)}"
             f"{_format_value(best['burial_depth'], 8, 2)}"

@@ -61,10 +61,18 @@ class ScoringParameters:
 
     Attributes:
         weights: Component weights; normalised to sum to one at use time.
-        volume_optimum_low: Lower edge of the ideal cavity volume (Å³). InsP3
-            occupies roughly 300 Å³ and InsP6 roughly 600 Å³ including its
-            hydration shell.
+        volume_optimum_low: Lower edge of the ideal cavity volume (Å³).
         volume_optimum_high: Upper edge of the ideal cavity volume (Å³).
+            **This is a cavity volume, not a ligand volume.** The window was
+            originally 300-800 Å³, the space InsP3-InsP6 themselves occupy, but
+            it is applied to fpocket's alpha-sphere volume, which measures the
+            cavity and is systematically larger. Measuring the control panel,
+            the pockets that genuinely hold an inositol phosphate span
+            491-1525 Å³ (ADAR2 1525, PLCδ1 1532, Pds5B 895, HDAC1 593,
+            Btk 491). Under the old window ADAR2 scored 0.16 on volume while the
+            Btk surface negative scored 1.00 - the component actively penalised
+            the paradigm positive and rewarded a negative. The upper edge is
+            therefore 1600 Å³, covering the observed range of real sites.
         volume_tolerance: Width over which the volume score decays outside the
             optimum (Å³).
         depth_midpoint: Burial depth scoring 0.5 (Å). The published criterion is
@@ -97,7 +105,7 @@ class ScoringParameters:
         }
     )
     volume_optimum_low: float = 300.0
-    volume_optimum_high: float = 800.0
+    volume_optimum_high: float = 1600.0
     volume_tolerance: float = 400.0
     depth_midpoint: float = 12.0
     depth_slope: float = 0.45

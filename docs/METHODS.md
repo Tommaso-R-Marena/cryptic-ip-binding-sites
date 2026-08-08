@@ -63,40 +63,61 @@ counted as sequestered.
 **These boundaries are calibrated on measurements, not on the literature
 description.** `scripts/calibrate_controls.py` measures the deposited controls:
 
-| Control | PDB | Relative SASA | Relative phosphate SASA | Burial depth | Enclosure | Basic |
-|---|---|---|---|---|---|---|
-| ADAR2 (buried cofactor) | 1ZY7 | **0.093** | 0.089 | 5.76 Å | 0.941 | 8 |
-| PLCδ1 PH (surface site) | 1MAI | **0.373** | 0.348 | 4.68 Å | 0.598 | 5 |
+| Control | PDB | Rel. SASA | Rel. P-SASA | Depth | Enclosure | Basic | Site volume |
+|---|---|---|---|---|---|---|---|
+| ADAR2 | 1ZY7 | **0.093** | 0.089 | 5.76 Å | 0.941 | 8 | 1525 Å³ |
+| HDAC1 | 5ICN | **0.089** | n/a | 4.10 Å | 0.906 | 3 | 593 Å³ |
+| Btk PH | 1BWN | 0.253 | 0.266 | 5.98 Å | 0.668 | 3 | 491 Å³ |
+| PLCδ1 PH | 1MAI | 0.373 | 0.348 | 4.68 Å | 0.598 | 5 | 1532 Å³ |
+| Pds5B | 5HDT | 0.466 | 0.460 | 5.63 Å | 0.738 | 8 | 895 Å³ |
 
 The boundary was initially set to 0.05, from the description of the ADAR2 InsP6
 as encapsulated with only an 8.4 × 4.6 Å window (Macbeth et al., *Science*
 309:1534, 2005). The measurement puts it at 0.093: a narrow window still exposes
-a measurable fraction of a 36-atom ligand. The cryptic boundary is therefore
-0.12, keeping the paradigm buried site inside with ~25 % margin while staying
-three times below the nearest surface control.
+a measurable fraction of a 36-atom ligand.
 
-This rests on two structures, which is thin. Re-run the calibration script over
-the full control panel before treating the boundaries as settled.
+The panel leaves a clear gap — sequestered ligands at 0.089–0.093, exposed ones
+at 0.253–0.466 — and the boundary of **0.12** sits inside it. Pds5B, annotated
+in the literature as a frequent crystallisation artefact, measures as the most
+exposed of all five, consistent with that annotation.
 
-### Burial depth is a weak discriminator on real structures
+Two caveats. HDAC1's interface InsP4 measures as buried as ADAR2 (0.089) rather
+than semi-cryptic; its phosphate ratio is unavailable, which suggests the matched
+ligand copy may not be the phosphorylated species and warrants checking. And five
+structures remain a small calibration set: widen the panel before treating the
+boundaries as settled.
 
-The same measurements show something the synthetic benchmark cannot: **depth
-barely separates the controls** — 5.76 Å for the buried ADAR2 site against
-4.68 Å for the surface PH-domain site — even though on idealised synthetic
-spheres it separates them perfectly (22 Å against 5 Å).
+### Burial depth does not discriminate on real structures
+
+The panel shows something the synthetic benchmark cannot: **depth is
+uninformative on deposited structures.** The values are completely interleaved,
+and the *largest* depth in the panel belongs to a surface negative:
+
+| | buried | exposed |
+|---|---|---|
+| depth (Å) | ADAR2 5.76, HDAC1 4.10 | Btk **5.98**, PLCδ1 4.68, Pds5B 5.63 |
+| enclosure | ADAR2 0.941, HDAC1 0.906 | Btk 0.668, PLCδ1 0.598, Pds5B 0.738 |
+
+No threshold on depth separates the two groups. On idealised synthetic spheres
+the same measure separates them perfectly (22 Å against 5 Å).
 
 The reason is the definition. Depth is the distance to the *nearest* solvent-
-exposed atom, a minimum over a large set. A real protein surface is irregular
+exposed atom — a minimum over a large set. A real protein surface is irregular
 enough that some exposed atom lies within a few Å of almost any interior point,
 so the minimum saturates. An idealised sphere has no such irregularity, which is
-exactly why the synthetic benchmark could not reveal this.
+exactly why the synthetic benchmark could not have revealed this, and it is a
+concrete limit on what synthetic validation can establish.
 
-Enclosure does separate the same two structures cleanly (0.941 against 0.598)
-because it integrates over directions rather than taking a minimum. Enclosure is
-therefore the more reliable burial discriminator on real data, and depth should
-be read as a supporting descriptor rather than a primary criterion. The finding
-is pinned in `tests/test_control_calibration.py` so it cannot be quietly
-forgotten.
+Enclosure separates the panel cleanly (minimum buried 0.906 against maximum
+exposed 0.738) because it integrates over directions rather than taking a
+minimum. Enclosure is therefore the reliable burial discriminator on real data,
+and depth should be read as a supporting descriptor rather than a criterion.
+
+The rule-based scorer still assigns depth 22 % of its weight, which on this
+evidence buys nothing. Rebalancing toward enclosure is the indicated change, but
+it is deferred: five controls are too few to fit weights on, and the scorer is a
+baseline rather than the deployed model. The finding is pinned in
+`tests/test_control_calibration.py` so it cannot be quietly forgotten.
 
 ### Implementation details that matter
 

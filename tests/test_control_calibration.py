@@ -31,32 +31,77 @@ from cryptic_ip.validation.control_scoring import (
 )
 
 #: Measured on the deposited structures by scripts/calibrate_controls.py
-#: (GitHub Actions run 31238630563, 2026-08-08, 256 SASA sample points/atom).
+#: (GitHub Actions run 31241170491, 2026-08-08, 256 SASA sample points/atom).
+#: Five controls; ``site_composite`` is the composite at the pocket with the
+#: greatest ligand-atom overlap.
 MEASURED = {
     "ADAR2": {
         "pdb": "1ZY7",
         "role": "positive",
+        "expected_class": "cryptic",
         "relative_sasa": 0.093,
         "relative_phosphate_sasa": 0.089,
         "burial_depth": 5.76,
         "enclosure": 0.941,
         "n_basic_residues": 8,
-        # Composite at the pocket with 100 % ligand-atom overlap.
-        "site_composite": 0.644,
+        "pocket_volume": 1524.71,
+        "site_composite": 0.643,
         # Composite of the pocket the old centre-distance rule selected.
         "nearest_centre_composite": 0.432,
+    },
+    "Pds5B": {
+        "pdb": "5HDT",
+        "role": "positive",
+        "expected_class": "surface",
+        "relative_sasa": 0.466,
+        "relative_phosphate_sasa": 0.460,
+        "burial_depth": 5.63,
+        "enclosure": 0.738,
+        "n_basic_residues": 8,
+        "pocket_volume": 894.59,
+        "site_composite": 0.561,
+    },
+    "HDAC1": {
+        "pdb": "5ICN",
+        "role": "positive",
+        "expected_class": "cryptic",
+        "relative_sasa": 0.089,
+        "relative_phosphate_sasa": None,
+        "burial_depth": 4.10,
+        "enclosure": 0.906,
+        "n_basic_residues": 3,
+        "pocket_volume": 593.04,
+        "site_composite": 0.530,
     },
     "PLCd1_PH": {
         "pdb": "1MAI",
         "role": "negative",
+        "expected_class": "surface",
         "relative_sasa": 0.373,
         "relative_phosphate_sasa": 0.348,
         "burial_depth": 4.68,
         "enclosure": 0.598,
         "n_basic_residues": 5,
+        "pocket_volume": 1532.16,
         "site_composite": 0.415,
     },
+    "Btk_PH": {
+        "pdb": "1BWN",
+        "role": "negative",
+        "expected_class": "surface",
+        "relative_sasa": 0.253,
+        "relative_phosphate_sasa": 0.266,
+        "burial_depth": 5.98,
+        "enclosure": 0.668,
+        "n_basic_residues": 3,
+        "pocket_volume": 491.44,
+        "site_composite": 0.498,
+    },
 }
+
+#: Controls whose ligand is genuinely sequestered, and those that are not.
+BURIED_CONTROLS = ("ADAR2", "HDAC1")
+EXPOSED_CONTROLS = ("Pds5B", "PLCd1_PH", "Btk_PH")
 
 
 def test_cryptic_boundary_admits_the_paradigm_buried_site():
@@ -84,19 +129,59 @@ def test_controls_are_classified_as_measured():
     )
 
 
-def test_burial_boundary_sits_between_the_two_controls():
-    """The boundary must separate the controls, not sit outside their range."""
-    assert (
-        MEASURED["ADAR2"]["relative_sasa"]
-        < CRYPTIC_RELATIVE_SASA_MAX
-        < MEASURED["PLCd1_PH"]["relative_sasa"]
-    )
+def test_burial_boundary_sits_in_the_gap_between_buried_and_exposed_controls():
+    """The boundary must fall in the gap the panel leaves, not outside the range.
+
+    Across five controls the buried ligands measure 0.089-0.093 and the exposed
+    ones 0.253-0.466, leaving a clear gap. The boundary sits inside it.
+    """
+    buried = [MEASURED[name]["relative_sasa"] for name in BURIED_CONTROLS]
+    exposed = [MEASURED[name]["relative_sasa"] for name in EXPOSED_CONTROLS]
+    assert max(buried) < CRYPTIC_RELATIVE_SASA_MAX < min(exposed)
 
 
-def test_burial_credit_separates_the_controls():
-    assert burial_component_relative(MEASURED["ADAR2"]["relative_sasa"]) == pytest.approx(1.0)
-    assert burial_component_relative(MEASURED["PLCd1_PH"]["relative_sasa"]) < 0.2
+def test_every_control_classifies_as_the_panel_measured_it():
+    for name, control in MEASURED.items():
+        assert (
+            classify_burial_relative(
+                control["relative_sasa"],
+                relative_phosphate_sasa=control["relative_phosphate_sasa"],
+            )
+            == control["expected_class"]
+        ), name
+
+
+def test_burial_credit_separates_buried_from_exposed_across_the_panel():
+    for name in BURIED_CONTROLS:
+        assert burial_component_relative(
+            MEASURED[name]["relative_sasa"]
+        ) == pytest.approx(1.0), name
+    for name in EXPOSED_CONTROLS:
+        assert burial_component_relative(MEASURED[name]["relative_sasa"]) < 0.6, name
     assert RELATIVE_BURIAL_FULL_CREDIT < RELATIVE_BURIAL_ZERO_CREDIT
+
+
+def test_volume_window_covers_every_real_ligand_site():
+    """The window applies to cavity volume, so it must span the observed sites.
+
+    Under the original 300-800 A^3 window - the volume of the *ligand* rather
+    than the cavity - ADAR2's site scored 0.16 while the Btk surface negative
+    scored 1.00, so the component penalised the paradigm positive and rewarded a
+    negative.
+    """
+    from cryptic_ip.analysis.scorer import PocketScorer
+
+    scorer = PocketScorer()
+    for name, control in MEASURED.items():
+        assert scorer.score_volume(control["pocket_volume"]) > 0.9, name
+
+    # The defect it replaces: the old window inverted the ranking.
+    old_window = PocketScorer(
+        parameters=type(scorer.parameters)(volume_optimum_high=800.0)
+    )
+    assert old_window.score_volume(MEASURED["ADAR2"]["pocket_volume"]) < old_window.score_volume(
+        MEASURED["Btk_PH"]["pocket_volume"]
+    )
 
 
 def test_tier1_gate_passes_on_the_measured_values():
@@ -159,23 +244,38 @@ def test_gate_would_fail_on_the_pocket_the_old_rule_selected():
     )
 
 
-def test_enclosure_separates_the_controls_more_cleanly_than_depth():
-    """Recorded finding: burial depth barely separates real controls.
+def test_depth_does_not_separate_the_control_panel():
+    """Recorded finding: burial depth is uninformative on real structures.
 
-    On idealised synthetic spheres, depth cleanly separates buried from surface
-    sites. On the deposited structures it does not - 5.76 A versus 4.68 A -
-    because a real protein surface is irregular enough that some exposed atom is
-    almost always within a few Angstrom of any interior point, and depth is a
-    minimum over all exposed atoms. Enclosure, which integrates over directions
-    rather than taking a minimum, separates the same two structures cleanly.
-    This test records that finding so a future change cannot quietly rely on
-    depth as the primary burial discriminator.
+    On idealised synthetic spheres depth separates buried from surface sites
+    cleanly (22 A against 5 A). On the five deposited controls the values are
+    completely interleaved - and the *largest* depth in the panel belongs to a
+    surface negative:
+
+        ADAR2 5.76 (buried)   Pds5B 5.63   HDAC1 4.10 (buried)
+        PLCd1 4.68 (surface)  Btk   5.98 (surface)
+
+    Depth is a minimum over all solvent-exposed atoms, and a real protein
+    surface is irregular enough that some exposed atom lies within a few
+    Angstrom of almost any interior point, so the minimum saturates. An
+    idealised sphere has no such irregularity, which is exactly why the
+    synthetic benchmark could not reveal this.
+
+    This test records the finding so a future change cannot quietly promote
+    depth to a primary burial criterion.
     """
-    depth_gap = MEASURED["ADAR2"]["burial_depth"] - MEASURED["PLCd1_PH"]["burial_depth"]
-    enclosure_gap = MEASURED["ADAR2"]["enclosure"] - MEASURED["PLCd1_PH"]["enclosure"]
+    buried_depths = [MEASURED[name]["burial_depth"] for name in BURIED_CONTROLS]
+    exposed_depths = [MEASURED[name]["burial_depth"] for name in EXPOSED_CONTROLS]
+    # No threshold on depth can separate the two groups.
+    assert max(exposed_depths) > max(buried_depths)
+    assert min(exposed_depths) > min(buried_depths)
 
-    # Relative separation, since the two quantities have different units.
-    depth_relative = depth_gap / MEASURED["PLCd1_PH"]["burial_depth"]
-    enclosure_relative = enclosure_gap / MEASURED["PLCd1_PH"]["enclosure"]
-    assert enclosure_relative > depth_relative
-    assert depth_relative < 0.30
+
+def test_enclosure_separates_the_control_panel():
+    """Enclosure, unlike depth, does separate buried from exposed controls."""
+    buried = [MEASURED[name]["enclosure"] for name in BURIED_CONTROLS]
+    exposed = [MEASURED[name]["enclosure"] for name in EXPOSED_CONTROLS]
+    assert min(buried) > max(exposed), (
+        "enclosure should separate the panel: "
+        f"buried {sorted(buried)} vs exposed {sorted(exposed)}"
+    )
