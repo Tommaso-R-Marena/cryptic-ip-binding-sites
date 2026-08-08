@@ -78,6 +78,13 @@ MIN_MODE_MASS_FRACTION = 0.10
 #: Without it, the shoulder of a single broad mode qualifies as a gap.
 MAX_DIP_RATIO = 0.5
 
+#: Boundaries at which class membership is reported. Because burial turns out to
+#: be continuous rather than two-class, the positive class is *defined* by
+#: whichever cutoff is chosen, and a single count hides how sensitive that
+#: definition is. Reporting the sweep makes the choice inspectable: a boundary
+#: whose neighbours give wildly different class sizes is a fragile one.
+BOUNDARY_SWEEP = (0.05, 0.08, 0.10, 0.12, 0.15, 0.20, 0.25, 0.30)
+
 
 @dataclass
 class EntryMeasurement:
@@ -356,6 +363,22 @@ def summarise(measurements: Sequence[EntryMeasurement]) -> Dict[str, Any]:
     summary["n_below_configured_boundary"] = int(
         (array <= CRYPTIC_RELATIVE_SASA_MAX).sum()
     )
+
+    # How many entries the positive class would contain at each candidate
+    # boundary, and how fast that count moves. On a continuous distribution the
+    # class size is a function of the cutoff, so this is the honest way to show
+    # what the choice costs.
+    sweep = []
+    for boundary in BOUNDARY_SWEEP:
+        n_positive = int((array <= boundary).sum())
+        sweep.append(
+            {
+                "boundary": float(boundary),
+                "n_positive": n_positive,
+                "fraction_positive": float(n_positive / array.size),
+            }
+        )
+    summary["boundary_sweep"] = sweep
     return summary
 
 

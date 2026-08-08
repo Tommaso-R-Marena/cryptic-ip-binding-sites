@@ -242,3 +242,26 @@ def test_cryptic_sites_are_a_small_minority_of_deposited_complexes():
     """14 of 135. The class is rare, which is why ranking metrics matter."""
     fraction = SURVEYED["n_below_configured_boundary"] / SURVEYED["n_measured"]
     assert 0.05 < fraction < 0.20
+
+
+def test_boundary_sweep_reports_class_size_at_each_candidate_cutoff():
+    """Burial is continuous, so the positive class is whatever the cutoff says.
+
+    A single class count hides that. The sweep makes the choice inspectable:
+    counts must rise monotonically with the boundary, and a cutoff whose
+    neighbours give very different class sizes is a fragile one.
+    """
+    measurements = [
+        EntryMeasurement(pdb_id=f"{i:04d}", relative_sasa=i / 100.0, burial_class="surface")
+        for i in range(1, 101)
+    ]
+    sweep = summarise(measurements)["boundary_sweep"]
+
+    boundaries = [row["boundary"] for row in sweep]
+    counts = [row["n_positive"] for row in sweep]
+    assert boundaries == sorted(boundaries)
+    assert counts == sorted(counts), "positives cannot fall as the cutoff rises"
+
+    # On a uniform spread the fraction tracks the boundary itself.
+    for row in sweep:
+        assert row["fraction_positive"] == pytest.approx(row["boundary"], abs=0.02)
