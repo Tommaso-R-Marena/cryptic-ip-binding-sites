@@ -37,6 +37,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from cryptic_ip.analysis.analyzer import ProteinAnalyzer  # noqa: E402
+from cryptic_ip.analysis.inositol_detection import detect_inositol_residues  # noqa: E402
 from cryptic_ip.analysis.labeling import LigandSite, assign_pocket_labels  # noqa: E402
 from cryptic_ip.analysis.scorer import PocketScorer  # noqa: E402
 from cryptic_ip.analysis.structure_arrays import load_structure_arrays  # noqa: E402
@@ -134,6 +135,26 @@ def measure_control(
 
     # Locate the pocket that actually holds the ligand, and break its score down.
     arrays = load_structure_arrays(path)
+
+    # Record what was actually measured, in composition terms. A control panel
+    # that reports only a component identifier cannot be checked: the identifier
+    # is a label, whereas the phosphate count is the property that decides
+    # whether the molecule is an inositol phosphate at all. Unphosphorylated
+    # inositols are included here so they show up as InsP0 rather than being
+    # silently absent.
+    record["inositol_residues"] = [
+        {
+            "comp_id": residue.comp_id,
+            "chain": residue.residue_key[1],
+            "resseq": residue.residue_key[2],
+            "series": residue.series,
+            "n_phosphorus": residue.n_phosphorus,
+            "n_substituted_ring_carbons": residue.n_substituted_ring_carbons,
+            "is_phosphorylated": residue.is_phosphorylated,
+        }
+        for residue in detect_inositol_residues(arrays, require_phosphate=False)
+    ]
+
     found = find_ligand_instances(arrays)
     if not found:
         record["error"] = "no inositol phosphate ligand parsed"
@@ -236,6 +257,34 @@ def _format_value(value: Any, width: int = 8, precision: int = 3) -> str:
     if not np.isfinite(number):
         return "n/a".rjust(width)
     return f"{number:{width}.{precision}f}"
+
+
+def _json_safe(value: Any) -> Any:
+    """Convert a measurement tree into strictly valid JSON.
+
+    Not-a-number is what an undefined ratio evaluates to - a phosphate SASA
+    ratio is undefined when the ligand carries no phosphate - but ``NaN`` is not
+    part of the JSON grammar. Python emits it as a bare ``NaN`` token by default,
+    which every strict parser rejects, so the measurements file could not be read
+    by jq, JavaScript, or R even though Python round-tripped it happily. Undefined
+    values become ``null``, which is both valid and the correct meaning.
+
+    Args:
+        value: Arbitrary nested measurement structure.
+
+    Returns:
+        The same structure with non-finite floats replaced by ``None`` and numpy
+        scalars converted to built-in types.
+    """
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, np.generic):
+        value = value.item()
+    if isinstance(value, float):
+        return value if np.isfinite(value) else None
+    return value
 
 
 def _print_panel_summary(measured: Sequence[Dict[str, Any]]) -> None:
@@ -365,7 +414,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             )
 
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
-    args.output_json.write_text(json.dumps(results, indent=2, default=float), encoding="utf-8")
+    args.output_json.write_text(
+        json.dumps(_json_safe(results), indent=2, allow_nan=False), encoding="utf-8"
+    )
     print(f"\nWrote {args.output_json}")
 
     measured = [r for r in results if r.get("most_buried")]
