@@ -199,7 +199,10 @@ def stage_features(
     python = bootstrap_colab_runtime()
     structures_dir = structures_dir or (ROOT / "data" / "validation")
     ml_dir = output_dir / "ml_training"
-    features_csv = ml_dir / "pocket_features.csv"
+    # The publication package and the supplementary exporter both read
+    # ml_training/validation_pocket_features.csv, so the orchestrator writes
+    # that name rather than the standalone script's generic default.
+    features_csv = ml_dir / "validation_pocket_features.csv"
     run_cmd(
         [
             python,
@@ -251,6 +254,16 @@ def stage_ml(
         features_csv = stage_features(
             output_dir, log_path, structures_dir=structures_dir
         )
+
+    # Downstream stages read the feature table from the run's ml_training
+    # directory, so a table supplied from elsewhere is copied in under the
+    # published name rather than left where the caller happened to keep it.
+    published = output_dir / "ml_training" / "validation_pocket_features.csv"
+    features_csv = Path(features_csv)
+    if features_csv.resolve() != published.resolve():
+        published.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(features_csv, published)
+        features_csv = published
 
     log("STAGE ml", log_path)
     python = bootstrap_colab_runtime()
