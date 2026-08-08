@@ -49,7 +49,6 @@ from cryptic_ip.validation.burial_metrics import (  # noqa: E402
     compute_ligand_burial,
     find_ligand_instances,
 )
-from cryptic_ip.validation.structure_context import LIGAND_RESNAMES  # noqa: E402
 
 LOGGER = logging.getLogger("extract_pocket_features")
 
@@ -129,12 +128,15 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _ligand_sites(path: Path, comp_ids: Sequence[str], sasa_points: int) -> List[LigandSite]:
+def _ligand_sites(
+    path: Path, comp_ids: Optional[Sequence[str]], sasa_points: int
+) -> List[LigandSite]:
     """Locate ligand copies and attach their burial class.
 
     Args:
         path: Structure file.
-        comp_ids: Ligand component identifiers.
+        comp_ids: Ligand component identifiers, or ``None`` to identify
+            inositol phosphates from their coordinates.
         sasa_points: SASA sample points per atom.
 
     Returns:
@@ -147,7 +149,11 @@ def _ligand_sites(path: Path, comp_ids: Sequence[str], sasa_points: int) -> List
 
     burial_by_id = {
         instance.instance_id: instance.burial_class
-        for instance in compute_ligand_burial(path, comp_ids=list(comp_ids), n_points=sasa_points)
+        for instance in compute_ligand_burial(
+            path,
+            comp_ids=list(comp_ids) if comp_ids is not None else None,
+            n_points=sasa_points,
+        )
     }
 
     sites: List[LigandSite] = []
@@ -287,7 +293,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         format="%(asctime)s | %(levelname)s | %(message)s",
     )
 
-    comp_ids = list(args.comp_ids) if args.comp_ids else sorted(LIGAND_RESNAMES)
+    # None means identify inositol phosphates from coordinates rather than
+    # from a fixed identifier list; --comp-ids overrides for a targeted run.
+    comp_ids = list(args.comp_ids) if args.comp_ids else None
     structures = sorted(
         [
             path

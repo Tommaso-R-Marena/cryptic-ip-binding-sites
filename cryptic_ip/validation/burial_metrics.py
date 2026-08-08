@@ -60,7 +60,7 @@ from ..analysis.structure_arrays import (
     load_structure_arrays,
     phosphate_group_indices,
 )
-from .structure_context import LIGAND_RESNAMES
+from ..analysis.inositol_detection import detect_inositol_residues
 
 LOGGER = logging.getLogger(__name__)
 
@@ -327,17 +327,38 @@ def classify_burial(
 def find_ligand_instances(
     arrays: StructureArrays, comp_ids: Optional[Iterable[str]] = None
 ) -> List[Tuple[ResidueKey, str, np.ndarray]]:
-    """Locate every copy of the requested ligand components.
+    """Locate every inositol phosphate copy in a structure.
+
+    With no ``comp_ids``, copies are identified from their coordinates by
+    :func:`~cryptic_ip.analysis.inositol_detection.detect_inositol_residues`:
+    a six-carbon ring bearing an oxygen at essentially every position, with at
+    least one phosphate bonded through those oxygens. Identifying the ligand by
+    what its atoms are, rather than by whether its identifier appears in a set,
+    means a site is not missed because nobody typed its component code, and an
+    unphosphorylated inositol is not mistaken for an inositol phosphate.
+
+    Passing ``comp_ids`` restores exact name matching, for callers that need to
+    measure one named component and nothing else.
 
     Args:
         arrays: Parsed structure arrays.
-        comp_ids: Component identifiers to match. Defaults to
-            :data:`cryptic_ip.validation.structure_context.LIGAND_RESNAMES`.
+        comp_ids: Component identifiers to match exactly. When omitted, ligands
+            are identified structurally.
 
     Returns:
         ``(residue_key, comp_id, atom_indices)`` per copy, ordered by key.
     """
-    wanted = {str(c).upper() for c in (comp_ids or LIGAND_RESNAMES)}
+    if comp_ids is None:
+        detected = detect_inositol_residues(arrays, require_phosphate=True)
+        return sorted(
+            (
+                (residue.residue_key, residue.comp_id, residue.atom_indices)
+                for residue in detected
+            ),
+            key=lambda item: item[0],
+        )
+
+    wanted = {str(c).upper() for c in comp_ids}
     out: List[Tuple[ResidueKey, str, np.ndarray]] = []
     for slot, key in enumerate(arrays.residue_keys):
         atom_indices = np.flatnonzero(arrays.residue_index == slot)
@@ -566,8 +587,9 @@ def compute_ligand_burial(
 
     Args:
         path: Path to a PDB or mmCIF file.
-        comp_ids: Component identifiers to measure. Defaults to the built-in
-            inositol phosphate residue names.
+        comp_ids: Component identifiers to measure. When omitted, inositol
+            phosphates are identified from their coordinates rather than from a
+            fixed list of identifiers.
         n_points: SASA sample points per atom.
 
     Returns:
