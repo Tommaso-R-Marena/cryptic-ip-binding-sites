@@ -159,10 +159,13 @@ def stage_ml(
 ) -> None:
     log("STAGE ml", log_path)
     python = bootstrap_colab_runtime()
+    # Dataset building and feature extraction are separate stages now
+    # (build_ip_validation_dataset.py, extract_pocket_features.py), so training
+    # consumes a feature table and no longer takes --skip-build-dataset or
+    # --include-electrostatics.
     cmd = [
         python,
         "scripts/train_ml_classifier.py",
-        "--skip-build-dataset",
         "--work-dir",
         str(output_dir / "ml_training"),
         "--model-dir",
@@ -170,8 +173,7 @@ def stage_ml(
     ]
     if features_csv is not None and features_csv.exists():
         cmd.extend(["--features-csv", str(features_csv)])
-    if with_electrostatics:
-        cmd.append("--include-electrostatics")
+    _ = with_electrostatics
     run_cmd(cmd, log_path)
 
 

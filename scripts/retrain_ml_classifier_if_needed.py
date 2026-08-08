@@ -52,7 +52,6 @@ def main() -> None:
         str(args.model_dir),
         "--work-dir",
         str(args.work_dir),
-        "--skip-build-dataset",
     ]
     subprocess.run(cmd, check=True)
 
