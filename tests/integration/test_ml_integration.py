@@ -7,7 +7,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from cryptic_ip.analysis.ml_classifier import CrypticSiteMLClassifier, MLPocketScorer
+from cryptic_ip.analysis.ml_classifier import (
+    FEATURE_COLUMNS,
+    CrypticSiteMLClassifier,
+    MLPocketScorer,
+)
 from cryptic_ip.database.batch_processing import AnalysisCache, append_results_to_file
 
 try:
@@ -24,7 +28,15 @@ def test_classifier_training_integrates_with_batch_outputs(tmp_path: Path, valid
     """Model probabilities should flow into batch result rows and cache/export outputs."""
     X, y = validation_feature_set
 
-    clf = CrypticSiteMLClassifier(random_state=12)
+    # The shared fixture supplies the legacy six-feature schema, so the model is
+    # constructed against it explicitly rather than the full descriptor suite.
+    clf = CrypticSiteMLClassifier(
+        random_state=12,
+        n_splits=2,
+        inner_splits=2,
+        n_search_iter=2,
+        feature_names=FEATURE_COLUMNS,
+    )
     clf.fit(X, y)
     scorer = MLPocketScorer(clf)
 

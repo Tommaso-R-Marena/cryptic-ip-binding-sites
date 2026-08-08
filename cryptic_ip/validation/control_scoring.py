@@ -7,13 +7,52 @@ from typing import Dict, Optional
 BURIAL_CLASSES = ("cryptic", "semi_cryptic", "surface", "crystal_artifact", "unknown")
 
 
+#: Relative-SASA anchors for the burial component, taken from the measured
+#: controls (``scripts/calibrate_controls.py``): ADAR2 1ZY7 measures 0.093 and
+#: PLC-delta-1 PH 1MAI measures 0.373. Full credit is given at or below the
+#: cryptic boundary and none at or above the surface anchor.
+RELATIVE_BURIAL_FULL_CREDIT = 0.12
+RELATIVE_BURIAL_ZERO_CREDIT = 0.40
+
+
 def burial_component(ligand_sasa: float) -> float:
-    """Return 1.0 for cryptic ligands and 0.0 for surface ligands."""
+    """Return 1.0 for cryptic ligands and 0.0 for surface ligands.
+
+    Absolute-SASA interface, retained for callers and stored results that only
+    have Å². Prefer :func:`burial_component_relative`, which is invariant to
+    ligand size and copy count.
+    """
     if ligand_sasa <= 5.0:
         return 1.0
     if ligand_sasa >= 50.0:
         return 0.0
     return float((50.0 - ligand_sasa) / 45.0)
+
+
+def burial_component_relative(relative_sasa: Optional[float]) -> float:
+    """Burial credit from the size-normalised relative SASA.
+
+    Absolute thresholds cannot serve here: the same 50 Å² means "mostly buried"
+    for InsP6 and "fully exposed" for InsP3, and it scales with the number of
+    ligand copies a crystal happened to contain. The relative measure removes
+    both dependencies, and its anchors come from the measured controls rather
+    than from a guess.
+
+    Args:
+        relative_sasa: Fraction of the ligand surface accessible in the complex.
+
+    Returns:
+        Credit in ``[0, 1]``; ``0.5`` (neutral) when the measure is unavailable.
+    """
+    if relative_sasa is None or relative_sasa != relative_sasa:
+        return 0.5
+    value = float(relative_sasa)
+    if value <= RELATIVE_BURIAL_FULL_CREDIT:
+        return 1.0
+    if value >= RELATIVE_BURIAL_ZERO_CREDIT:
+        return 0.0
+    span = RELATIVE_BURIAL_ZERO_CREDIT - RELATIVE_BURIAL_FULL_CREDIT
+    return float((RELATIVE_BURIAL_ZERO_CREDIT - value) / span)
 
 
 def electrostatic_component(pocket_potential: Optional[float]) -> float:
@@ -30,8 +69,20 @@ def cryptic_likeness(
     *,
     pocket_potential: Optional[float] = None,
     use_electrostatics: bool = False,
+    relative_sasa: Optional[float] = None,
 ) -> float:
-    """Unified score: higher values indicate more cryptic/buried binding."""
+    """Unified score: higher values indicate more cryptic/buried binding.
+
+    When ``relative_sasa`` is supplied it takes precedence over ``ligand_sasa``,
+    because it is invariant to ligand size and copy count.
+    """
+    if relative_sasa is not None and relative_sasa == relative_sasa:
+        burial = burial_component_relative(relative_sasa)
+        base = float(0.55 * burial + 0.35 * pocket_composite)
+        if use_electrostatics:
+            elec = electrostatic_component(pocket_potential)
+            return float(0.75 * base + 0.25 * elec)
+        return base
     if ligand_sasa is not None:
         burial = burial_component(ligand_sasa)
         base = float(0.55 * burial + 0.35 * pocket_composite)
@@ -50,6 +101,7 @@ def validation_score(
     *,
     pocket_potential: Optional[float] = None,
     use_electrostatics: bool = False,
+    relative_sasa: Optional[float] = None,
 ) -> float:
     """Return cryptic-likeness on a single scale for separation analysis."""
     _ = control_type, basic_residues
@@ -58,6 +110,7 @@ def validation_score(
         ligand_sasa,
         pocket_potential=pocket_potential,
         use_electrostatics=use_electrostatics,
+        relative_sasa=relative_sasa,
     )
 
 
@@ -69,10 +122,31 @@ def positive_passed(
     *,
     burial_class: str = "cryptic",
     score_threshold: float = 0.55,
+    relative_sasa: Optional[float] = None,
 ) -> bool:
-    """Phase 1 positive-control pass criteria."""
+    """Phase 1 positive-control pass criteria.
+
+    When ``relative_sasa`` is available the burial gate uses it, since the
+    absolute-SASA cutoffs below were calibrated against a copy-summed measure
+    that no longer exists. On the measured controls a buried site clears the
+    cryptic boundary (ADAR2 0.093) while a surface site does not (PLC-delta-1
+    0.373).
+    """
     if burial_class == "crystal_artifact":
         return False
+    if relative_sasa is not None and relative_sasa == relative_sasa:
+        if burial_class == "semi_cryptic":
+            return (
+                basic_residues >= 4
+                and pocket_composite >= 0.45
+                and validation_value >= 0.40
+            )
+        return (
+            float(relative_sasa) <= RELATIVE_BURIAL_FULL_CREDIT
+            and basic_residues >= 4
+            and pocket_composite >= 0.50
+            and validation_value >= score_threshold
+        )
     if burial_class == "semi_cryptic":
         return (
             ligand_sasa is not None
@@ -98,9 +172,13 @@ def negative_passed(
     *,
     score_threshold: float = 0.45,
     decoy_mode: bool = False,
+    relative_sasa: Optional[float] = None,
 ) -> bool:
     """Phase 1 negative-control pass criteria (low cryptic-likeness)."""
     threshold = 0.55 if decoy_mode else score_threshold
+    if relative_sasa is not None and relative_sasa == relative_sasa:
+        # A surface ligand must not reach the cryptic-likeness of a buried one.
+        return validation_value <= threshold
     if ligand_sasa is not None:
         if ligand_sasa >= 50.0:
             return validation_value <= threshold

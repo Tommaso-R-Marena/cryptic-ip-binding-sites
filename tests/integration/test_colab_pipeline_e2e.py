@@ -31,6 +31,7 @@ def fpocket_available() -> None:
     pytest.skip("fpocket not installed")
 
 
+@pytest.mark.requires_network
 def test_colab_pipeline_minimal_e2e(tmp_path: Path, fpocket_available) -> None:
     """Run tier-1 -> ML -> yeast (n=2) -> publication -> supplements on a tiny subset."""
     from scripts.colab_run_all import (

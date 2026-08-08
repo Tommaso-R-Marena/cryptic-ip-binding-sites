@@ -89,12 +89,20 @@ Cryptic IP-binding site candidates must satisfy:
 
 | Criterion | Threshold | Rationale |
 |-----------|-----------|----------|
-| **Pocket Depth** | >15 Å | Deeply buried, not surface-accessible |
+| **Burial Depth** | >15 Å | Distance from the pocket centre to the nearest solvent-exposed atom |
+| **Enclosure** | >0.75 | Fraction of directions out of the site blocked by protein |
 | **Solvent Accessibility** | SASA <5 Å² | Minimal water exposure |
 | **Electrostatic Potential** | >+5 kT/e | Strong positive charge for phosphate coordination |
 | **Basic Residue Cluster** | ≥4 Arg/Lys/His | Direct coordination of phosphates |
 | **Pocket Volume** | 300–800 Å³ | Appropriate for IP3–IP6 |
 | **Structure Confidence** | pLDDT ≥70 | High AlphaFold confidence |
+
+Ligand burial in the ground-truth dataset is measured **per ligand copy** and
+normalised by the ligand's own surface (`relative_sasa`), so it does not depend
+on ligand size or on how many copies a crystal happened to contain. Enclosure is
+reported alongside SASA because they answer different questions: SASA asks
+whether solvent touches the site, enclosure asks whether the site is surrounded.
+Full detail in [docs/METHODS.md](docs/METHODS.md).
 
 ### Validation Strategy
 
@@ -196,6 +204,41 @@ docker run --rm -it -v $(pwd):/workspace cryptic-ip cryptic-ip --help
 ```
 
 See [INSTALLATION.md](docs/INSTALLATION.md) and [README_DOCKER.md](README_DOCKER.md) for detailed instructions.
+
+---
+
+### Building the ground truth
+
+The validation dataset is collected from the RCSB rather than shipped as a fixed
+list. The ligand vocabulary itself is discovered and validated at run time, so no
+inositol phosphate species is missed because it was absent from a hand-written
+list, and no mistyped identifier silently contributes nothing:
+
+```bash
+# Every inositol phosphate structure in the PDB, plus matched negatives
+python scripts/build_ip_validation_dataset.py --n-decoys 500 --jobs 8
+
+# Pocket descriptors and labels
+python scripts/extract_pocket_features.py --jobs 8
+
+# Nested, grouped, calibrated model comparison
+python scripts/train_ml_classifier.py
+```
+
+Each stage is resumable and writes provenance (checksums, queries, API
+statistics, seeds, software versions). See
+[docs/DATA_ACQUISITION.md](docs/DATA_ACQUISITION.md).
+
+### Verify the installation without network access
+
+```bash
+cryptic-ip self-check
+```
+
+This builds synthetic structures whose burial follows from their construction — a
+ligand at the centre of a closed shell *must* measure as cryptic — and checks
+that the pipeline recovers it. It validates the machinery, not the biology, and
+needs no PDB access, so it works in sandboxes and air-gapped environments.
 
 ---
 

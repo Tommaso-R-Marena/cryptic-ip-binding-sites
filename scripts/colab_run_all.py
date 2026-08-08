@@ -150,28 +150,152 @@ def stage_tier1(output_dir: Path, with_electrostatics: bool, log_path: Path) -> 
     return summary
 
 
+def has_current_feature_schema(path: Path) -> bool:
+    """Whether a feature table matches the schema the trainer expects.
+
+    Feature tables produced before the descriptor rework carry the legacy
+    six-column schema and labels from the previous labelling scheme. Training on
+    one would reproduce the defect it was built with, so such a table is
+    regenerated rather than reused.
+
+    Args:
+        path: Candidate feature CSV.
+
+    Returns:
+        ``True`` when the table carries the current descriptor schema.
+    """
+    if path is None or not Path(path).exists():
+        return False
+    try:
+        with Path(path).open("r", encoding="utf-8") as handle:
+            header = handle.readline().strip().split(",")
+    except OSError:
+        return False
+    required = {"group_key", "label", "burial_depth", "enclosure", "coulomb_potential_kt"}
+    return required.issubset(set(header))
+
+
+def stage_features(
+    output_dir: Path,
+    log_path: Path,
+    *,
+    structures_dir: Path | None = None,
+    jobs: int = 2,
+    sasa_points: int = 256,
+) -> Path:
+    """Extract pocket descriptors and labels from the control structures.
+
+    Args:
+        output_dir: Run output directory.
+        log_path: Log file.
+        structures_dir: Directory of structures; defaults to the validation set.
+        jobs: Worker processes.
+        sasa_points: SASA sample points per atom.
+
+    Returns:
+        Path to the feature table written.
+    """
+    log("STAGE features", log_path)
+    python = bootstrap_colab_runtime()
+    structures_dir = structures_dir or (ROOT / "data" / "validation")
+    ml_dir = output_dir / "ml_training"
+    # The publication package and the supplementary exporter both read
+    # ml_training/validation_pocket_features.csv, so the orchestrator writes
+    # that name rather than the standalone script's generic default.
+    features_csv = ml_dir / "validation_pocket_features.csv"
+    run_cmd(
+        [
+            python,
+            "scripts/extract_pocket_features.py",
+            "--structures-dir",
+            str(structures_dir),
+            "--entry-csv",
+            str(ROOT / "data" / "validation" / "ip_binding_validation_dataset.csv"),
+            "--output-csv",
+            str(features_csv),
+            "--cache-dir",
+            str(ml_dir / "feature_cache"),
+            "--summary-json",
+            str(ml_dir / "labeling_summary.json"),
+            "--jobs",
+            str(jobs),
+            "--sasa-points",
+            str(sasa_points),
+        ],
+        log_path,
+    )
+    return features_csv
+
+
 def stage_ml(
     output_dir: Path,
     with_electrostatics: bool,
     log_path: Path,
     *,
     features_csv: Path | None = None,
+    structures_dir: Path | None = None,
+    n_splits: int = 2,
+    n_search_iter: int = 4,
+    n_bootstrap: int = 100,
 ) -> None:
+    """Train and compare classifiers on a current pocket feature table.
+
+    Dataset building and feature extraction are separate, independently runnable
+    stages now, so this consumes a feature table. When none is supplied - or the
+    supplied one predates the descriptor rework - features are extracted first
+    rather than training on a stale table.
+    """
+    if not has_current_feature_schema(features_csv):
+        if features_csv is not None:
+            log(
+                f"features table {features_csv} predates the current schema; regenerating",
+                log_path,
+            )
+        features_csv = stage_features(
+            output_dir, log_path, structures_dir=structures_dir
+        )
+
+    # Downstream stages read the feature table from the run's ml_training
+    # directory, so a table supplied from elsewhere is copied in under the
+    # published name rather than left where the caller happened to keep it.
+    published = output_dir / "ml_training" / "validation_pocket_features.csv"
+    features_csv = Path(features_csv)
+    if features_csv.resolve() != published.resolve():
+        published.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(features_csv, published)
+        features_csv = published
+
     log("STAGE ml", log_path)
     python = bootstrap_colab_runtime()
+    # A deliberately light search budget. This stage demonstrates the pipeline
+    # end to end on a small control set; the full default (five model families,
+    # 5x3 nested folds, 40 search iterations, 2000 bootstrap resamples) takes
+    # over ten minutes on a set this size and is meant for the real training run
+    # via scripts/train_ml_classifier.py.
     cmd = [
         python,
         "scripts/train_ml_classifier.py",
-        "--skip-build-dataset",
+        "--features-csv",
+        str(features_csv),
         "--work-dir",
         str(output_dir / "ml_training"),
         "--model-dir",
         str(ROOT / "models"),
+        "--model-name",
+        "cryptic_ip_classifier_colab",
+        "--models",
+        "logistic_regression",
+        "random_forest",
+        "--n-splits",
+        str(n_splits),
+        "--inner-splits",
+        "2",
+        "--n-search-iter",
+        str(n_search_iter),
+        "--n-bootstrap",
+        str(n_bootstrap),
     ]
-    if features_csv is not None and features_csv.exists():
-        cmd.extend(["--features-csv", str(features_csv)])
-    if with_electrostatics:
-        cmd.append("--include-electrostatics")
+    _ = with_electrostatics
     run_cmd(cmd, log_path)
 
 

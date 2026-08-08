@@ -20,6 +20,10 @@ jobs:
       - name: Setup Conda
         uses: conda-incubator/setup-miniconda@v3
         with:
+          # The post-job package cleanup prints a line per package - well over a
+          # hundred - which buries the diagnostic output these jobs exist to
+          # produce. The runner is discarded either way.
+          run-post: 'false'
           auto-update-conda: true
           python-version: '3.11'
           channels: conda-forge,bioconda,defaults
@@ -37,16 +41,35 @@ jobs:
         uses: actions/cache@v4
         with:
           path: data/validation
-          key: ci-validation-pdbs-v1
+          key: ci-validation-pdbs-v2
 
-      - name: Download tier-1 control structures
+      - name: Download control structures
         run: |
+          # 1ZY7/1MAI are the tier-1 gate. The rest widen the calibration panel:
+          # the burial boundary currently rests on two structures, which is thin.
           mkdir -p data/validation
-          for pdb in 1ZY7 1MAI; do
+          for pdb in 1ZY7 1MAI 5HDT 5ICN 1BWN; do
             if [ ! -f "data/validation/${pdb}.pdb" ]; then
               wget -q -O "data/validation/${pdb}.pdb" "https://files.rcsb.org/download/${pdb}.pdb"
             fi
           done
+
+      - name: Control calibration diagnostics
+        shell: bash -l {0}
+        # Non-blocking. Prints what the controls actually measure - per-copy
+        # burial and the scorer's component breakdown at the true ligand site -
+        # so any threshold change can cite evidence rather than being tuned
+        # until the gate passes.
+        continue-on-error: true
+        run: python scripts/calibrate_controls.py --sasa-points 256
+
+      - name: Upload control calibration measurements
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: control-calibration
+          path: results/calibration/control_measurements.json
+          if-no-files-found: warn
 
       - name: Run tier-1 validation gate
         shell: bash -l {0}
@@ -70,3 +93,62 @@ jobs:
         shell: bash -l {0}
         run: |
           pytest tests/test_control_scoring.py tests/test_structure_context.py tests/test_burial_metrics.py -q
+
+      - name: Calibration digest
+        shell: bash -l {0}
+        # Last step in the job on purpose. Which ligand each control matched, and
+        # what it measured, is the evidence the burial threshold rests on; run
+        # last it stays reachable from a short log tail and is echoed to the run
+        # summary, instead of sitting behind the full component breakdown.
+        if: always()
+        continue-on-error: true
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          path = Path("results/calibration/control_measurements.json")
+          if not path.exists():
+              print("no calibration measurements were produced")
+              raise SystemExit(0)
+
+          # Every field the recorded panel in tests/test_control_calibration.py
+          # needs, so a change of measurement can be transcribed from one place
+          # rather than reconstructed from scattered output.
+          print(
+              "| control | pdb | ligand | series | relSASA | relPSASA | depth "
+              "| enclosure | basic | volume | composite | class |"
+          )
+          print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+          for record in json.loads(path.read_text()):
+              best = record.get("most_buried")
+              # Phosphate count comes from the structural test, so the table
+              # states what the molecule is, not merely what it is called.
+              series = {
+                  (r.get("comp_id") or ""): r.get("series")
+                  for r in record.get("inositol_residues", [])
+              }
+              if not best:
+                  detected = ", ".join(f"{k}={v}" for k, v in series.items()) or "none"
+                  print(
+                      f"| {record['name']} | {record['pdb_id']} | - | {detected} "
+                      f"| - | - | - | - | - | - | - | not measured |"
+                  )
+                  continue
+              def cell(value):
+                  if value is None:
+                      return "n/a"
+                  value = float(value)
+                  return "n/a" if value != value else f"{value:.3f}"
+              comp_id = best.get("comp_id", "?")
+              site = record.get("site_pocket") or {}
+              measured = site.get("measurements") or {}
+              print(
+                  f"| {record['name']} | {record['pdb_id']} | {comp_id} | "
+                  f"{series.get(comp_id, 'unclassified')} | "
+                  f"{cell(best.get('relative_sasa'))} | {cell(best.get('relative_phosphate_sasa'))} | "
+                  f"{cell(best.get('burial_depth'))} | {cell(best.get('enclosure'))} | "
+                  f"{cell(best.get('n_basic_residues'))} | {cell(measured.get('pocket_volume'))} | "
+                  f"{cell(site.get('composite_score'))} | {best.get('burial_class')} |"
+              )
+          PY

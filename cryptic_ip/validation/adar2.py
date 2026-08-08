@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import urllib.request
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, Optional, Set, Tuple
 
 import pandas as pd
 from Bio.PDB import NeighborSearch, PDBParser
 from Bio.PDB.SASA import ShrakeRupley
 
 from ..analysis import ProteinAnalyzer
+from ..analysis.scorer import ScoringParameters
 from ..database.alphafold_client import AlphaFoldClient
 
 from .structure_context import BASIC_RESNAMES, LIGAND_RESNAMES, ligand_context
@@ -82,42 +83,42 @@ def _ligand_centroid(pdb_path: Path) -> Optional[Tuple[float, float, float]]:
     return (float(sum(xs) / len(xs)), float(sum(ys) / len(ys)), float(sum(zs) / len(zs)))
 
 
+def _ligand_coords(pdb_path: Path):
+    """Return inositol phosphate heavy-atom coordinates, or ``None``."""
+    import numpy as np
+    from Bio.PDB import PDBParser
+
+    structure = PDBParser(QUIET=True).get_structure("validation", str(pdb_path))
+    coords = [
+        atom.coord
+        for residue in structure.get_residues()
+        if residue.get_resname() in LIGAND_RESNAMES
+        for atom in residue.get_atoms()
+    ]
+    return np.asarray(coords, dtype=float) if coords else None
+
+
 def _select_site_pocket(
     scored: pd.DataFrame,
     analyzer: ProteinAnalyzer,
     site_residues: Set[int],
     ligand_centroid: Optional[Tuple[float, float, float]] = None,
+    ligand_coords=None,
 ) -> pd.Series:
-    """Pick the pocket that best matches the reference binding site."""
-    if scored.empty:
-        raise ValueError("No scored pockets available for ADAR2 validation")
+    """Pick the pocket that actually contains the ligand.
 
-    import numpy as np
+    Selection is by **ligand-atom overlap**, the same criterion used for training
+    labels. The previous centre-to-centroid rule chose the wrong pocket on the
+    ADAR2 crystal structure: the pocket with 100 % ligand overlap scores 0.644,
+    while the nearest-centre pocket scores 0.432, so the gate was grading a
+    pocket that does not hold the inositol phosphate.
+    """
+    from .site_selection import select_ligand_pocket
 
-    pockets = analyzer.pockets
-    best_row = scored.iloc[0]
-    best_key = (-float("inf"), -1, -1.0)
-
-    for _, row in scored.iterrows():
-        pocket_id = int(row["pocket_id"])
-        nearby = set(analyzer.get_pocket_residues(pocket_id, distance_cutoff=8.0))
-        overlap = len(nearby.intersection(site_residues))
-
-        distance = float("inf")
-        if ligand_centroid is not None and pockets is not None:
-            pocket = pockets[pockets["pocket_id"] == pocket_id].iloc[0]
-            center = np.array([pocket["center_x"], pocket["center_y"], pocket["center_z"]], dtype=float)
-            distance = float(np.linalg.norm(center - np.array(ligand_centroid, dtype=float)))
-
-        if ligand_centroid is not None:
-            key = (-distance, overlap, float(row["composite_score"]))
-        else:
-            key = (overlap, -distance, float(row["composite_score"]))
-        if key > best_key:
-            best_key = key
-            best_row = row
-
-    return best_row
+    row, _ = select_ligand_pocket(
+        scored, analyzer, ligand_coords, fallback_site_residues=site_residues
+    )
+    return row
 
 
 def validate_adar2(
@@ -136,6 +137,10 @@ def validate_adar2(
 
     site_residues, ligand_sasa = _ligand_site_residues(structure_path_obj)
     _, _, ligand_centroid = ligand_context(structure_path_obj)
+    # Per-copy, size-normalised burial: the measure the control criteria use.
+    from .burial_metrics import compute_burial_metrics
+
+    burial = compute_burial_metrics(structure_path_obj)
     if not site_residues:
         site_residues = {376, 519, 522, 651, 672}
 
@@ -149,7 +154,9 @@ def validate_adar2(
     if use_electrostatics:
         analyzer.calculate_electrostatics()
     scored = analyzer.score_all_pockets()
-    top_pocket = _select_site_pocket(scored, analyzer, site_residues, ligand_centroid)
+    top_pocket = _select_site_pocket(
+        scored, analyzer, site_residues, ligand_centroid, _ligand_coords(structure_path_obj)
+    )
     if "center" in top_pocket and top_pocket["center"] is not None:
         pocket_center = tuple(float(v) for v in top_pocket["center"])
     else:
@@ -170,6 +177,10 @@ def validate_adar2(
         "total_pockets": len(pockets),
         "top_pocket_id": int(top_pocket["pocket_id"]),
         "top_pocket_score": float(top_pocket["composite_score"]),
+        "relative_sasa": burial.relative_sasa,
+        "relative_phosphate_sasa": burial.relative_phosphate_sasa,
+        "enclosure": burial.enclosure,
+        "burial_class": burial.burial_class,
         "volume": float(top_pocket["volume"]),
         "sasa": sasa_metric,
         "pocket_residue_sasa": float(top_pocket["sasa"]),
@@ -184,7 +195,15 @@ def validate_adar2(
             "score_above_0.7": float(top_pocket["composite_score"]) >= 0.55,
             "low_sasa": sasa_metric < 10.0,
             "sufficient_basic": basic_residues >= 4,
-            "appropriate_volume": 250 <= float(top_pocket["volume"]) <= 900,
+            # Cavity volume, not ligand volume: fpocket's alpha-sphere volume for
+            # the pockets that genuinely hold an inositol phosphate spans
+            # 491-1525 A^3 across the control panel, so a 250-900 window rejects
+            # the real ADAR2 site (~1493 A^3). See ScoringParameters.
+            "appropriate_volume": (
+                ScoringParameters().volume_optimum_low
+                <= float(top_pocket["volume"])
+                <= ScoringParameters().volume_optimum_high
+            ),
             "site_overlap": overlap >= min_overlap if ligand_centroid is None else True,
         },
     }
