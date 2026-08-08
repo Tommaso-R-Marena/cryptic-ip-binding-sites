@@ -11,6 +11,17 @@ name: Burial Survey
 # that runs on every commit.
 
 on:
+  # Re-run when the measurement, the entries being measured, or the boundary
+  # under test changes - those are exactly the events that can invalidate a
+  # published distribution. Not on every commit: this measures well over a
+  # hundred structures.
+  push:
+    paths:
+      - 'scripts/burial_survey.py'
+      - 'cryptic_ip/validation/burial_metrics.py'
+      - 'cryptic_ip/analysis/inositol_detection.py'
+      - 'data/validation/ip_binding_validation_dataset.csv'
+      - '.github/workflows/burial-survey.yml'
   workflow_dispatch:
     inputs:
       limit:
