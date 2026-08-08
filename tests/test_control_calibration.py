@@ -279,3 +279,37 @@ def test_enclosure_separates_the_control_panel():
         "enclosure should separate the panel: "
         f"buried {sorted(buried)} vs exposed {sorted(exposed)}"
     )
+
+
+def test_calibration_measurements_are_strictly_valid_json():
+    """Undefined ratios must serialise as null, not as a bare NaN token.
+
+    A phosphate SASA ratio is undefined when the matched ligand carries no
+    phosphate, and Python represents that as NaN. ``json.dumps`` emits NaN as a
+    bare ``NaN`` token by default, which is not part of the JSON grammar: the
+    measurements file round-tripped through Python but was rejected by jq,
+    JavaScript and R. Since that file is a published artifact of the calibration
+    run, it has to be readable by a strict parser.
+    """
+    import json
+
+    from scripts.calibrate_controls import _json_safe
+
+    payload = _json_safe(
+        {
+            "relative_sasa": 0.093,
+            "relative_phosphate_sasa": float("nan"),
+            "depth": float("inf"),
+            "instances": [{"enclosure": float("nan")}],
+            "n": 3,
+        }
+    )
+    # allow_nan=False makes the encoder raise rather than emit an invalid token.
+    text = json.dumps(payload, allow_nan=False)
+    reloaded = json.loads(text)
+
+    assert reloaded["relative_phosphate_sasa"] is None
+    assert reloaded["depth"] is None
+    assert reloaded["instances"][0]["enclosure"] is None
+    assert reloaded["relative_sasa"] == pytest.approx(0.093)
+    assert reloaded["n"] == 3

@@ -108,17 +108,32 @@ jobs:
               print("no calibration measurements were produced")
               raise SystemExit(0)
 
-          print("| control | pdb | ligand | relSASA | relPSASA | enclosure | class |")
-          print("| --- | --- | --- | --- | --- | --- | --- |")
+          print("| control | pdb | ligand | series | relSASA | relPSASA | enclosure | class |")
+          print("| --- | --- | --- | --- | --- | --- | --- | --- |")
           for record in json.loads(path.read_text()):
               best = record.get("most_buried")
+              # Phosphate count comes from the structural test, so the table
+              # states what the molecule is, not merely what it is called.
+              series = {
+                  (r.get("comp_id") or ""): r.get("series")
+                  for r in record.get("inositol_residues", [])
+              }
               if not best:
-                  print(f"| {record['name']} | {record['pdb_id']} | - | - | - | - | not measured |")
+                  detected = ", ".join(f"{k}={v}" for k, v in series.items()) or "none"
+                  print(
+                      f"| {record['name']} | {record['pdb_id']} | - | {detected} "
+                      f"| - | - | - | not measured |"
+                  )
                   continue
               def cell(value):
-                  return "n/a" if value is None else f"{float(value):.3f}"
+                  if value is None:
+                      return "n/a"
+                  value = float(value)
+                  return "n/a" if value != value else f"{value:.3f}"
+              comp_id = best.get("comp_id", "?")
               print(
-                  f"| {record['name']} | {record['pdb_id']} | {best.get('comp_id', '?')} | "
+                  f"| {record['name']} | {record['pdb_id']} | {comp_id} | "
+                  f"{series.get(comp_id, 'unclassified')} | "
                   f"{cell(best.get('relative_sasa'))} | {cell(best.get('relative_phosphate_sasa'))} | "
                   f"{cell(best.get('enclosure'))} | {best.get('burial_class')} |"
               )
