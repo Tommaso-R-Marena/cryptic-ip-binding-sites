@@ -142,6 +142,30 @@ The conclusion is therefore mixed, and both halves matter:
   enrichment — is conditioned on that choice. Reporting sensitivity of the model
   to the boundary is more informative than reporting performance at one value.
 
+### How much rides on the cutoff
+
+Because burial is continuous, the positive class is whatever the boundary says it
+is. The survey therefore reports class size across candidate cutoffs rather than
+at one:
+
+| boundary | 0.05 | 0.08 | 0.10 | **0.12** | 0.15 | 0.20 | 0.25 | 0.30 |
+|---|---|---|---|---|---|---|---|---|
+| positives | 0 | 2 | 11 | **14** | 16 | 27 | 40 | 58 |
+| fraction | 0.0 % | 1.5 % | 8.1 % | **10.4 %** | 11.9 % | 20.0 % | 29.6 % | 43.0 % |
+
+This is the strongest evidence for the configured value, and it is independent of
+the density estimate. **The class size is flat where the boundary sits.** Moving
+the cutoff across 0.10-0.15 changes the positive count by 5 entries; the same
+0.05 shift at 0.20-0.25 changes it by 13, and at 0.25-0.30 by 18. The boundary is
+therefore in the least sensitive part of the curve — nearly three times less
+sensitive than the region immediately above it — which is what makes a threshold
+on a continuum defensible even though the continuum has no natural break.
+
+It also shows the cost of the original choice. The boundary was first set to 0.05
+from the literature description of the ADAR2 site; on the deposited set that
+cutoff yields **zero** positives, so the pipeline would have had no positive class
+at all.
+
 Two limits on this survey. The bundled set is essentially one chemistry (134
 InsP6, 1 InsP5), so it calibrates InsP6 sequestration and says nothing about
 whether InsP3/InsP4 sites distribute the same way. And 6 entries fall under the
