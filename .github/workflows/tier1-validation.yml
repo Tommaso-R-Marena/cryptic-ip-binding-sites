@@ -48,6 +48,15 @@ jobs:
             fi
           done
 
+      - name: Control calibration diagnostics
+        shell: bash -l {0}
+        # Non-blocking. Prints what the controls actually measure - per-copy
+        # burial and the scorer's component breakdown at the true ligand site -
+        # so any threshold change can cite evidence rather than being tuned
+        # until the gate passes.
+        continue-on-error: true
+        run: python scripts/calibrate_controls.py --sasa-points 256
+
       - name: Run tier-1 validation gate
         shell: bash -l {0}
         run: |
