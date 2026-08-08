@@ -6,7 +6,6 @@ import os
 import subprocess
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -16,9 +15,11 @@ from Bio.PDB import PDBParser, PDBIO, Select
 from prody import parsePDB, calcSASA
 
 from .electrostatics import ElectrostaticsCalculator
+from .features import FEATURE_NAMES, PocketFeatureExtractor, legacy_feature_row
 from .fpocket_parser import FpocketParser
 from .ml_classifier import CrypticSiteMLClassifier, MLPocketScorer
 from .scorer import PocketScorer
+from .structure_arrays import load_structure_arrays
 from ..utils.profiling import timed
 from ..utils.resources import cleanup_files, set_memory_limit
 
@@ -75,6 +76,22 @@ class ProteinAnalyzer:
         self.electrostatic_data = None
         self.electrostatic_map_path: Optional[Path] = None
         self._surface_atom_coords: Optional[np.ndarray] = None
+        self._arrays = None
+        self._feature_extractor: Optional[PocketFeatureExtractor] = None
+        self._pocket_residue_cache: Dict[Tuple[int, float], List[int]] = {}
+
+    @property
+    def feature_extractor(self) -> PocketFeatureExtractor:
+        """Chain-aware descriptor extractor for this structure.
+
+        Built lazily and cached: it computes whole-structure SASA once, which
+        dominates the cost and is shared by every pocket.
+        """
+        if self._feature_extractor is None:
+            if self._arrays is None:
+                self._arrays = load_structure_arrays(self.pdb_path)
+            self._feature_extractor = PocketFeatureExtractor(self._arrays)
+        return self._feature_extractor
 
     @timed()
     def run_pipeline(self, include_electrostatics: Optional[bool] = None) -> pd.DataFrame:
@@ -98,19 +115,69 @@ class ProteinAnalyzer:
             return Path(model_path)
         return Path(__file__).resolve().parents[2] / "models" / "cryptic_ip_classifier_v1.pkl"
 
+    #: A model whose recorded out-of-fold AUROC is at or below this value has no
+    #: demonstrated skill, and using it is worse than the transparent rule-based
+    #: score, which at least means something.
+    MIN_USABLE_ROC_AUC = 0.55
+
+    def _recorded_model_roc_auc(self) -> Optional[float]:
+        """Read the out-of-fold AUROC recorded alongside the model, if any.
+
+        Returns:
+            The recorded AUROC, or ``None`` when no metadata is available.
+        """
+        metadata_path = self.model_path.with_suffix("").with_suffix(".metadata.json")
+        if not metadata_path.exists():
+            metadata_path = self.model_path.parent / f"{self.model_path.stem}.metadata.json"
+        if not metadata_path.exists():
+            return None
+        try:
+            import json
+
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+
+        selected = metadata.get("selected_model_type")
+        candidates = metadata.get("model_candidates") or {}
+        entry = candidates.get(selected, {})
+        for source in (entry.get("metrics", {}), entry, metadata):
+            value = source.get("roc_auc") if isinstance(source, dict) else None
+            if isinstance(value, (int, float)):
+                return float(value)
+        return None
+
     def _build_default_scorer(self, use_ml_model: bool) -> Any:
+        """Choose the scorer, refusing to deploy a model with no demonstrated skill.
+
+        Silently loading a model that performed at chance during validation is the
+        worst outcome available: it produces confident-looking numbers with no
+        information behind them. When the recorded metrics show no skill, this
+        falls back to the interpretable rule-based score and says why.
+        """
         if not use_ml_model:
             return PocketScorer()
 
         try:
             classifier = CrypticSiteMLClassifier.load(str(self.model_path))
-            return MLPocketScorer(classifier)
         except Exception as exc:  # noqa: BLE001 - fallback by design
             print(
                 f"Warning: Unable to load ML model from {self.model_path} ({exc}). "
-                "Falling back to threshold scoring."
+                "Falling back to rule-based scoring."
             )
             return PocketScorer()
+
+        recorded_auc = self._recorded_model_roc_auc()
+        if recorded_auc is not None and recorded_auc <= self.MIN_USABLE_ROC_AUC:
+            print(
+                f"Warning: the model at {self.model_path} recorded a validation AUROC of "
+                f"{recorded_auc:.3f}, which is not distinguishable from chance. Falling back "
+                "to rule-based scoring. Retrain with scripts/train_ml_classifier.py, or pass "
+                "an explicit --model-path to override this check."
+            )
+            return PocketScorer()
+
+        return MLPocketScorer(classifier)
 
     @timed()
     def detect_pockets(self, min_alpha_sphere: int = 3) -> pd.DataFrame:
@@ -288,16 +355,30 @@ class ProteinAnalyzer:
         return float(summary["plddt_mean"])
 
     @timed()
-    @lru_cache(maxsize=512)
     def get_pocket_residues(self, pocket_id: int, distance_cutoff: float = 8.0) -> List[int]:
         """
         Get residue numbers lining a pocket.
 
         Uses fpocket pocket atom residue IDs when available, otherwise falls back
         to CA atoms within ``distance_cutoff`` of the pocket alpha-sphere centroid.
+
+        Results are memoised per analyzer instance. An ``lru_cache`` on the method
+        was previously used, which had two defects: the cache was keyed on ``self``
+        and so kept every analyzer (and its parsed structure) alive for the life of
+        the process, and stacking it under ``@timed`` hid ``cache_clear`` from
+        :meth:`cleanup`, which therefore raised ``AttributeError`` on every call.
+
+        Note the residue numbers here are chain-blind, and are retained for
+        callers that expect that. Descriptor extraction uses chain-aware residue
+        keys via :mod:`cryptic_ip.analysis.features`.
         """
         if self.pockets is None:
             raise ValueError("Run detect_pockets() first")
+
+        cache_key = (int(pocket_id), float(distance_cutoff))
+        cached = self._pocket_residue_cache.get(cache_key)
+        if cached is not None:
+            return list(cached)
 
         pocket = self.pockets[self.pockets["pocket_id"] == pocket_id].iloc[0]
         if "fpocket_residue_ids" in pocket and pd.notna(pocket["fpocket_residue_ids"]):
@@ -307,7 +388,8 @@ class ProteinAnalyzer:
                 if token.strip()
             ]
             if fpocket_ids:
-                return fpocket_ids
+                self._pocket_residue_cache[cache_key] = fpocket_ids
+                return list(fpocket_ids)
 
         center = np.array([pocket["center_x"], pocket["center_y"], pocket["center_z"]])
         residue_numbers = []
@@ -321,7 +403,9 @@ class ProteinAnalyzer:
                     if distance <= distance_cutoff:
                         residue_numbers.append(residue.id[1])
 
-        return sorted(set(residue_numbers))
+        resolved = sorted(set(residue_numbers))
+        self._pocket_residue_cache[cache_key] = resolved
+        return list(resolved)
 
     def count_basic_residues(self, pocket_id: int, distance_cutoff: float = 5.0) -> int:
         """
@@ -346,10 +430,44 @@ class ProteinAnalyzer:
 
         return basic_count
 
+    def _pocket_alpha_spheres(self, pocket_id: int) -> Optional[np.ndarray]:
+        """Return alpha-sphere centres for a pocket, if fpocket wrote them.
+
+        Alpha-sphere centres describe the cavity itself, whereas the pocket atom
+        file describes the residues lining it. Shape and hull-volume descriptors
+        are computed from the cavity, so the vertex file is preferred.
+
+        Args:
+            pocket_id: Pocket identifier.
+
+        Returns:
+            Coordinates, or ``None`` when no pocket file is available.
+        """
+        pockets_dir = self.pdb_path.parent / f"{self.pdb_path.stem}_out" / "pockets"
+        for filename in (f"pocket{int(pocket_id)}_vert.pqr", f"pocket{int(pocket_id)}_atm.pdb"):
+            path = pockets_dir / filename
+            if path.exists():
+                atoms = self.fpocket_parser.parse_pocket_atoms(path)
+                if atoms:
+                    return np.asarray(
+                        [[atom["x"], atom["y"], atom["z"]] for atom in atoms], dtype=float
+                    )
+        return None
+
     @timed()
     def analyze_pocket(self, pocket_id: int) -> Dict:
         """
         Complete analysis of a single pocket.
+
+        Returns the full descriptor suite from
+        :mod:`cryptic_ip.analysis.features` alongside the legacy keys.
+
+        Note on ``depth``: it now carries the **geometric burial depth** -
+        distance from the pocket centre to the nearest solvent-exposed atom.
+        Earlier versions populated it from fpocket's mean local hydrophobic
+        density, a composition statistic unrelated to depth, while computing the
+        real depth and discarding it. fpocket's value is still reported, under
+        the accurate name ``mean_local_hydrophobic_density``.
 
         Args:
             pocket_id: Pocket identifier
@@ -365,29 +483,49 @@ class ProteinAnalyzer:
 
         pocket = self.pockets[self.pockets["pocket_id"] == pocket_id].iloc[0]
         pocket_residues = self.get_pocket_residues(pocket_id)
-        pocket_center = (float(pocket["center_x"]), float(pocket["center_y"]), float(pocket["center_z"]))
+        pocket_center = (
+            float(pocket["center_x"]),
+            float(pocket["center_y"]),
+            float(pocket["center_z"]),
+        )
 
-        pocket_sasa_values = [self.sasa_data.get(int(resnum), 0.0) for resnum in pocket_residues]
-        pocket_sasa = float(np.mean(pocket_sasa_values)) if pocket_sasa_values else 0.0
-
-        # Count basic residues
-        basic_count = self.count_basic_residues(pocket_id)
         pocket_potential = self.pocket_electrostatic_potential(pocket_center)
-        plddt = self.pocket_plddt_confidence(pocket_residues)
-        burial_depth = self.calculate_pocket_burial_depth(pocket_center)
+        fpocket_volume = pocket.get("volume", None)
+        if fpocket_volume is not None and not pd.isna(fpocket_volume):
+            fpocket_volume = float(fpocket_volume)
+        else:
+            fpocket_volume = None
 
-        return {
-            "pocket_id": pocket_id,
-            "volume": pocket.get("volume", 0),
-            "depth": pocket.get("mean_local_hydrophobic_density", 0),
-            "burial_depth": burial_depth,
-            "sasa": pocket_sasa,
-            "basic_residues": basic_count,
-            "residue_count": len(pocket_residues),
-            "electrostatic_potential": pocket_potential,
-            "plddt_confidence": plddt,
-            "center": pocket_center,
-        }
+        descriptors = self.feature_extractor.extract(
+            int(pocket_id),
+            pocket_center,
+            alpha_sphere_coords=self._pocket_alpha_spheres(pocket_id),
+            fpocket_volume=fpocket_volume,
+            apbs_potential=pocket_potential,
+        )
+        features = dict(descriptors.features)
+
+        result: Dict[str, Any] = {"pocket_id": int(pocket_id)}
+        result.update(features)
+        # Legacy keys retained for existing callers and stored result schemas.
+        result.update(
+            {
+                "volume": fpocket_volume if fpocket_volume is not None else np.nan,
+                "depth": features.get("burial_depth", np.nan),
+                "burial_depth": features.get("burial_depth", np.nan),
+                "sasa": features.get("sasa_mean", np.nan),
+                "basic_residues": features.get("n_basic_residues", np.nan),
+                "residue_count": len(descriptors.residue_keys),
+                "electrostatic_potential": pocket_potential,
+                "plddt_confidence": features.get("plddt_mean", np.nan),
+                "mean_local_hydrophobic_density": pocket.get(
+                    "mean_local_hydrophobic_density", np.nan
+                ),
+                "center": pocket_center,
+                "pocket_residue_numbers": pocket_residues,
+            }
+        )
+        return result
 
     @timed()
     def score_all_pockets(self) -> pd.DataFrame:
@@ -415,15 +553,14 @@ class ProteinAnalyzer:
             return pd.DataFrame(results)
 
         if hasattr(self.scorer, "calculate_composite_scores"):
+            # Supply both the full descriptor schema and the legacy column names,
+            # so a model trained on either schema can be scored without the
+            # caller needing to know which one it was.
             samples = pd.DataFrame(
                 [
                     {
-                        "pocket_depth": row["depth"],
-                        "sasa": row["sasa"],
-                        "electrostatic_potential": row.get("electrostatic_potential"),
-                        "n_basic_residues": row["basic_residues"],
-                        "pocket_volume": row["volume"],
-                        "plddt_confidence": row.get("plddt_confidence", np.nan),
+                        **{name: row.get(name, np.nan) for name in FEATURE_NAMES},
+                        **legacy_feature_row(row),
                     }
                     for row in results
                 ]
@@ -434,11 +571,19 @@ class ProteinAnalyzer:
         else:
             for row in results:
                 row["composite_score"] = self.scorer.calculate_composite_score(
-                    volume=row["volume"],
-                    depth=row["depth"],
-                    sasa=row["sasa"],
-                    basic_count=row["basic_residues"],
-                    potential=row.get("electrostatic_potential"),
+                    volume=row.get("pocket_volume", row.get("volume")),
+                    depth=row.get("burial_depth"),
+                    sasa=row.get("sasa_mean", row.get("sasa")),
+                    basic_count=row.get("n_basic_residues", row.get("basic_residues")),
+                    potential=(
+                        row.get("electrostatic_potential")
+                        if row.get("electrostatic_potential") is not None
+                        and np.isfinite(
+                            np.asarray(row.get("electrostatic_potential", np.nan), dtype=float)
+                        )
+                        else row.get("coulomb_potential_kt")
+                    ),
+                    enclosure=row.get("enclosure"),
                 )
 
         return pd.DataFrame(results).sort_values("composite_score", ascending=False)
@@ -447,4 +592,4 @@ class ProteinAnalyzer:
     def cleanup(self) -> None:
         """Clear analyzer intermediates from disk and reset in-memory caches."""
         cleanup_files([self.pdb_path.parent / f"{self.pdb_path.stem}_out", self.work_dir / "electrostatics"])
-        self.get_pocket_residues.cache_clear()
+        self._pocket_residue_cache.clear()

@@ -59,7 +59,20 @@ class FpocketParser:
 
         frame = pd.DataFrame(pockets)
         if frame.empty:
-            return frame
+            # A structure with no detected pocket is a legitimate outcome, not an
+            # error. Returning an empty frame that still carries the expected
+            # columns lets callers iterate over it and get zero rows, instead of
+            # raising KeyError on a missing 'pocket_id'.
+            return pd.DataFrame(
+                columns=[
+                    "pocket_id",
+                    "volume",
+                    "center_x",
+                    "center_y",
+                    "center_z",
+                    "fpocket_residue_ids",
+                ]
+            )
 
         pockets_dir = info_file.parent / "pockets"
         centers = []

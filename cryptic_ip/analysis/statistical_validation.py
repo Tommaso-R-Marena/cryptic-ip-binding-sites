@@ -321,6 +321,155 @@ class StatisticalValidation:
         return results.sort_values("p_value").reset_index(drop=True)
 
     @staticmethod
+    def wilson_interval(
+        successes: int, trials: int, confidence: float = 0.95
+    ) -> Tuple[float, float]:
+        """Wilson score interval for a binomial proportion.
+
+        The normal-approximation ("Wald") interval fails exactly where proteome
+        hit rates live: with a handful of hits in thousands of proteins it can
+        extend below zero and its coverage collapses. The Wilson interval stays
+        inside ``[0, 1]`` and holds nominal coverage for small counts.
+
+        Args:
+            successes: Number of successes.
+            trials: Number of trials.
+            confidence: Confidence level.
+
+        Returns:
+            ``(lower, upper)``; ``(nan, nan)`` when ``trials`` is zero.
+        """
+        if trials <= 0:
+            return (float("nan"), float("nan"))
+        if not 0 <= successes <= trials:
+            raise ValueError("successes must lie between 0 and trials")
+
+        z = float(stats.norm.ppf(1 - (1 - confidence) / 2))
+        proportion = successes / trials
+        denominator = 1 + z**2 / trials
+        centre = (proportion + z**2 / (2 * trials)) / denominator
+        margin = (
+            z
+            * np.sqrt(proportion * (1 - proportion) / trials + z**2 / (4 * trials**2))
+            / denominator
+        )
+        return (float(max(0.0, centre - margin)), float(min(1.0, centre + margin)))
+
+    @staticmethod
+    def clopper_pearson_interval(
+        successes: int, trials: int, confidence: float = 0.95
+    ) -> Tuple[float, float]:
+        """Exact (Clopper-Pearson) interval for a binomial proportion.
+
+        Guarantees at least nominal coverage, at the cost of being conservative.
+        Preferred over Wilson when a claim must not overstate precision - for
+        example when reporting that a hit rate differs between organisms.
+
+        Args:
+            successes: Number of successes.
+            trials: Number of trials.
+            confidence: Confidence level.
+
+        Returns:
+            ``(lower, upper)``.
+        """
+        if trials <= 0:
+            return (float("nan"), float("nan"))
+        alpha = 1 - confidence
+        lower = 0.0 if successes == 0 else float(stats.beta.ppf(alpha / 2, successes, trials - successes + 1))
+        upper = (
+            1.0
+            if successes == trials
+            else float(stats.beta.ppf(1 - alpha / 2, successes + 1, trials - successes))
+        )
+        return (lower, upper)
+
+    @staticmethod
+    def holm_bonferroni(p_values: Sequence[float], alpha: float = 0.05) -> pd.DataFrame:
+        """Holm-Bonferroni step-down correction controlling the family-wise error rate.
+
+        Benjamini-Hochberg controls the expected *proportion* of false discoveries
+        and suits screening, where a few false positives among many hits are
+        tolerable. Holm controls the probability of *any* false discovery and
+        suits confirmatory claims, such as a stated difference between organisms.
+        Both are provided because the two questions warrant different corrections.
+
+        Args:
+            p_values: Raw p-values.
+            alpha: Family-wise error rate.
+
+        Returns:
+            Frame of ``p_value``, ``holm_adjusted`` and ``reject``.
+        """
+        p_arr = np.asarray(p_values, dtype=float)
+        if p_arr.size == 0:
+            return pd.DataFrame({"p_value": [], "holm_adjusted": [], "reject": []})
+        if np.any((p_arr < 0) | (p_arr > 1)):
+            raise ValueError("All p-values must be in [0, 1].")
+
+        m = p_arr.size
+        order = np.argsort(p_arr)
+        ranked = p_arr[order]
+        adjusted = np.maximum.accumulate(ranked * (m - np.arange(m)))
+        adjusted = np.clip(adjusted, 0, 1)
+
+        out_adjusted = np.empty(m)
+        out_adjusted[order] = adjusted
+        return pd.DataFrame(
+            {
+                "p_value": p_arr,
+                "holm_adjusted": out_adjusted,
+                "reject": out_adjusted <= alpha,
+            }
+        )
+
+    @staticmethod
+    def cliffs_delta(group_a: Sequence[float], group_b: Sequence[float]) -> float:
+        """Cliff's delta: a non-parametric effect size in ``[-1, 1]``.
+
+        Cohen's d assumes roughly normal, equal-variance groups. Pocket
+        descriptors are skewed and bounded, so d can mislead. Cliff's delta is the
+        probability that a random member of A exceeds one of B, minus the reverse,
+        and makes no distributional assumption.
+
+        Args:
+            group_a: First sample.
+            group_b: Second sample.
+
+        Returns:
+            The effect size; ``nan`` when either group is empty.
+        """
+        a = np.asarray(group_a, dtype=float)
+        b = np.asarray(group_b, dtype=float)
+        if a.size == 0 or b.size == 0:
+            return float("nan")
+        comparison = np.sign(a[:, None] - b[None, :])
+        return float(np.mean(comparison))
+
+    @staticmethod
+    def hedges_g(group_a: Sequence[float], group_b: Sequence[float]) -> float:
+        """Hedges' g: Cohen's d with the small-sample bias correction applied.
+
+        Cohen's d overestimates the effect for small samples; the correction
+        factor matters at the sample sizes typical of control benchmarks.
+
+        Args:
+            group_a: First sample.
+            group_b: Second sample.
+
+        Returns:
+            The corrected effect size.
+        """
+        a = np.asarray(group_a, dtype=float)
+        b = np.asarray(group_b, dtype=float)
+        d = StatisticalValidation.cohens_d(a, b)
+        dof = a.size + b.size - 2
+        if dof <= 0:
+            return float("nan")
+        correction = 1.0 - 3.0 / (4.0 * dof - 1.0)
+        return float(d * correction)
+
+    @staticmethod
     def cohens_d(group_a: Sequence[float], group_b: Sequence[float]) -> float:
         """Compute Cohen's d effect size for two independent groups."""
         a = np.asarray(group_a, dtype=float)
@@ -399,39 +548,78 @@ class StatisticalValidation:
         group_b: Sequence[float],
         alpha: float = 0.05,
     ) -> str:
-        """Generate methods-style statistical report including assumption checks."""
+        """Generate a methods-style report whose test follows its own assumption checks.
+
+        The previous version tested normality and homoscedasticity, printed
+        whether they held, and then applied a t-test regardless. Checking an
+        assumption and ignoring the answer is worse than not checking: it lends
+        the appearance of rigour to a test that may be invalid. Here the reported
+        test is *selected* by the check - Welch's t-test when normality holds,
+        Mann-Whitney U when it does not - and the effect size follows the same
+        rule, with Cliff's delta reported for the non-parametric case.
+
+        Args:
+            group_a: First sample.
+            group_b: Second sample.
+            alpha: Significance level for both the assumption checks and the test.
+
+        Returns:
+            A multi-line methods paragraph.
+        """
         a = np.asarray(group_a, dtype=float)
         b = np.asarray(group_b, dtype=float)
+        if a.size < 3 or b.size < 3:
+            raise ValueError("Each group needs at least three observations for assumption checks.")
 
         shapiro_a = stats.shapiro(a)
         shapiro_b = stats.shapiro(b)
         levene_res = stats.levene(a, b, center="median")
-        t_res = stats.ttest_ind(a, b, equal_var=levene_res.pvalue >= alpha)
-        effect = StatisticalValidation.cohens_d(a, b)
-
         normality_ok = shapiro_a.pvalue >= alpha and shapiro_b.pvalue >= alpha
         variance_ok = levene_res.pvalue >= alpha
+
+        if normality_ok:
+            # Welch's t-test does not assume equal variances, so it is the safe
+            # default whenever normality holds.
+            result = stats.ttest_ind(a, b, equal_var=False)
+            test_name = "Welch's two-sample t-test"
+            statistic_label = "t"
+            effect_line = (
+                f"Effect size was reported as Hedges' g={StatisticalValidation.hedges_g(a, b):.3f} "
+                "(Cohen's d with the small-sample bias correction)."
+            )
+        else:
+            result = stats.mannwhitneyu(a, b, alternative="two-sided")
+            test_name = "Mann-Whitney U test (normality rejected)"
+            statistic_label = "U"
+            effect_line = (
+                f"Effect size was reported as Cliff's delta="
+                f"{StatisticalValidation.cliffs_delta(a, b):.3f} (non-parametric)."
+            )
 
         assumptions = [
             f"Normality assessed by Shapiro-Wilk: group A p={shapiro_a.pvalue:.4g}, "
             f"group B p={shapiro_b.pvalue:.4g} ({'met' if normality_ok else 'violated'}).",
             f"Homoscedasticity assessed by Levene's test: p={levene_res.pvalue:.4g} "
             f"({'met' if variance_ok else 'violated'}).",
-            "Independence of observations assumed by design (distinct proteins screened per organism).",
+            "Independence of observations assumed by design (distinct proteins per organism).",
         ]
 
         lines = [
             "Statistical analyses were performed using SciPy and scikit-learn in Python.",
             *assumptions,
             (
-                "Two-sample t-test was used for comparative proteomic summary metrics "
-                f"(t={t_res.statistic:.3f}, p={t_res.pvalue:.4g}, "
+                f"{test_name} was selected on the basis of those checks "
+                f"({statistic_label}={result.statistic:.3f}, p={result.pvalue:.4g}, "
                 f"two-sided, alpha={alpha})."
             ),
-            f"Effect size was reported as Cohen's d={effect:.3f}.",
-            "Multiple testing correction used Benjamini-Hochberg FDR control.",
+            effect_line,
+            "Proportions were reported with Wilson score intervals; exact Clopper-Pearson "
+            "intervals were used for confirmatory comparisons.",
+            "Multiple testing used Benjamini-Hochberg FDR control for screening and "
+            "Holm-Bonferroni family-wise control for confirmatory comparisons.",
             "Classification performance was quantified via AUROC and average precision with "
-            "95% bootstrap confidence intervals.",
+            "95% confidence intervals from bootstrap resampling of protein-level groups, and "
+            "paired model comparisons used DeLong's test.",
             "Functional enrichment significance was evaluated using two-sided permutation tests.",
         ]
 
