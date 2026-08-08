@@ -41,6 +41,7 @@ from cryptic_ip.analysis.labeling import LigandSite, assign_pocket_labels  # noq
 from cryptic_ip.analysis.scorer import PocketScorer  # noqa: E402
 from cryptic_ip.analysis.structure_arrays import load_structure_arrays  # noqa: E402
 from cryptic_ip.validation.burial_metrics import (  # noqa: E402
+    CRYPTIC_RELATIVE_SASA_MAX,
     compute_ligand_burial,
     find_ligand_instances,
 )
@@ -238,6 +239,52 @@ def _format_value(value: Any, width: int = 8, precision: int = 3) -> str:
     return f"{number:{width}.{precision}f}"
 
 
+def _print_panel_summary(measured: Sequence[Dict[str, Any]]) -> None:
+    """Restate the panel's decisive numbers as a compact block.
+
+    The component breakdown above is long, so on a CI run the burial table
+    scrolls far out of a log tail. The calibration is the evidence the burial
+    threshold rests on, so the numbers that decide it - the matched ligand, the
+    relative SASA, and the gap the boundary has to sit in - are repeated here,
+    last, where a short tail still reaches them.
+    """
+    print("\n" + "=" * 108)
+    print("PANEL SUMMARY (burial threshold evidence)")
+    print("=" * 108)
+    if not measured:
+        print("  no control could be measured")
+        return
+
+    for record in measured:
+        best = record["most_buried"]
+        print(
+            f"  {record['name']:<12}{record['pdb_id']:<6}"
+            f"ligand={str(best.get('comp_id', '?')):<6}"
+            f"relSASA={_format_value(best['relative_sasa'], 7)}  "
+            f"relPSASA={_format_value(best['relative_phosphate_sasa'], 7)}  "
+            f"encl={_format_value(best['enclosure'], 7)}  "
+            f"class={best['burial_class']}"
+        )
+
+    buried = [
+        r["most_buried"]["relative_sasa"]
+        for r in measured
+        if r["most_buried"]["burial_class"] in ("cryptic", "semi_cryptic")
+    ]
+    exposed = [
+        r["most_buried"]["relative_sasa"]
+        for r in measured
+        if r["most_buried"]["burial_class"] == "surface"
+    ]
+    if buried and exposed:
+        print(
+            f"\n  buried  max relSASA = {max(buried):.3f}"
+            f"   exposed min relSASA = {min(exposed):.3f}"
+            f"   gap = {min(exposed) - max(buried):+.3f}"
+        )
+        print(f"  boundary CRYPTIC_RELATIVE_SASA_MAX = {CRYPTIC_RELATIVE_SASA_MAX:.3f}")
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Entry point."""
     args = parse_args(argv)
@@ -323,6 +370,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"\nWrote {args.output_json}")
 
     measured = [r for r in results if r.get("most_buried")]
+    _print_panel_summary(measured)
     if not measured:
         LOGGER.error("No control could be measured; check that structures are available.")
         return 1
