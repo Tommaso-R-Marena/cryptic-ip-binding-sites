@@ -37,12 +37,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: data/validation
-          key: ci-validation-pdbs-v1
+          key: ci-validation-pdbs-v2
 
-      - name: Download tier-1 control structures
+      - name: Download control structures
         run: |
+          # 1ZY7/1MAI are the tier-1 gate. The rest widen the calibration panel:
+          # the burial boundary currently rests on two structures, which is thin.
           mkdir -p data/validation
-          for pdb in 1ZY7 1MAI; do
+          for pdb in 1ZY7 1MAI 5HDT 5ICN 1BWN; do
             if [ ! -f "data/validation/${pdb}.pdb" ]; then
               wget -q -O "data/validation/${pdb}.pdb" "https://files.rcsb.org/download/${pdb}.pdb"
             fi
