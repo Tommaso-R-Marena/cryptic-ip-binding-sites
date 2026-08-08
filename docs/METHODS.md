@@ -66,30 +66,41 @@ description.** `scripts/calibrate_controls.py` measures the deposited controls:
 | Control | PDB | Rel. SASA | Rel. P-SASA | Depth | Enclosure | Basic | Site volume |
 |---|---|---|---|---|---|---|---|
 | ADAR2 | 1ZY7 | **0.093** | 0.089 | 5.76 Å | 0.941 | 8 | 1525 Å³ |
-| HDAC1 | 5ICN | **0.089** | n/a | 4.10 Å | 0.906 | 3 | 593 Å³ |
 | Btk PH | 1BWN | 0.253 | 0.266 | 5.98 Å | 0.668 | 3 | 491 Å³ |
 | PLCδ1 PH | 1MAI | 0.373 | 0.348 | 4.68 Å | 0.598 | 5 | 1532 Å³ |
+| HDAC1 | 5ICN | 0.436 | 0.444 | — | 0.629 | — | — |
 | Pds5B | 5HDT | 0.466 | 0.460 | 5.63 Å | 0.738 | 8 | 895 Å³ |
+
+HDAC1's depth, basic-residue count and site volume are shown as pending: the
+values previously in this table described the `6A0` site and are not carried
+over, since that component is not an inositol phosphate.
 
 The boundary was initially set to 0.05, from the description of the ADAR2 InsP6
 as encapsulated with only an 8.4 × 4.6 Å window (Macbeth et al., *Science*
 309:1534, 2005). The measurement puts it at 0.093: a narrow window still exposes
 a measurable fraction of a 36-atom ligand.
 
-The panel leaves a clear gap — sequestered ligands at 0.089–0.093, exposed ones
-at 0.253–0.466 — and the boundary of **0.12** sits inside it. Pds5B, annotated
-in the literature as a frequent crystallisation artefact, measures as the most
+The panel leaves a gap — the sequestered ligand at 0.093, exposed ones at
+0.253–0.466 — and the boundary of **0.12** sits inside it. Pds5B, annotated in
+the literature as a frequent crystallisation artefact, measures as the most
 exposed of all five, consistent with that annotation.
 
-Two caveats. HDAC1 measures as buried as ADAR2 (0.089) rather than semi-cryptic,
-and its burial was measured on component `6A0` with an **undefined phosphate
-ratio**, meaning no phosphate group was resolved on the matched copy. Whether
-that reflects the deposited chemistry or a matching problem is exactly the
-question the identifier alone cannot answer, which is why ligands are now
-identified from coordinates and the detected series is reported (below). Treat
-HDAC1 as provisional until its series reads `InsP4` or higher. And five
-structures remain a small calibration set: widen the panel before treating the
-boundaries as settled.
+**The buried side of the panel is a single structure.** HDAC1 was previously
+recorded as buried at 0.093, which would have given two. That measurement was
+made on chemical component `6A0`, which carries no phosphate and is therefore not
+an inositol phosphate at all; it was admitted only because the old identifier
+whitelist listed it, and it was selected because burial is measured on the *most
+buried* matching copy. Identifying ligands from coordinates (below) excludes it,
+and the most buried genuinely phosphorylated copy in 5ICN is a solvent-exposed
+InsP6 at 0.436. HDAC1 is an exposed control.
+
+That correction is worth stating plainly rather than absorbing quietly: the
+boundary separating the positive class now rests on **one** sequestered
+structure. It should not be treated as settled. `scripts/burial_survey.py`
+re-measures every deposited inositol phosphate complex in the bundled set for
+exactly this reason, and reports whether the distribution is bimodal at all —
+if it is not, the cryptic/surface split is a modelling choice rather than a
+discovered boundary, and every downstream metric should be read in that light.
 
 ### Ligands are identified from coordinates, not from a list of codes
 
@@ -125,10 +136,12 @@ and the *largest* depth in the panel belongs to a surface negative:
 
 | | buried | exposed |
 |---|---|---|
-| depth (Å) | ADAR2 5.76, HDAC1 4.10 | Btk **5.98**, PLCδ1 4.68, Pds5B 5.63 |
-| enclosure | ADAR2 0.941, HDAC1 0.906 | Btk 0.668, PLCδ1 0.598, Pds5B 0.738 |
+| depth (Å) | ADAR2 5.76 | Btk **5.98**, PLCδ1 4.68, Pds5B 5.63 |
+| enclosure | ADAR2 0.941 | Btk 0.668, PLCδ1 0.598, HDAC1 0.629, Pds5B 0.738 |
 
-No threshold on depth separates the two groups. On idealised synthetic spheres
+No threshold on depth isolates the buried control: its 5.76 Å sits strictly
+inside the 4.68-5.98 Å spread of the exposed ones, so any cutoff admitting it
+admits a surface site too. On idealised synthetic spheres
 the same measure separates them perfectly (22 Å against 5 Å).
 
 The reason is the definition. Depth is the distance to the *nearest* solvent-
@@ -138,8 +151,8 @@ so the minimum saturates. An idealised sphere has no such irregularity, which is
 exactly why the synthetic benchmark could not have revealed this, and it is a
 concrete limit on what synthetic validation can establish.
 
-Enclosure separates the panel cleanly (minimum buried 0.906 against maximum
-exposed 0.738) because it integrates over directions rather than taking a
+Enclosure separates the panel cleanly (buried 0.941 against maximum exposed
+0.738) because it integrates over directions rather than taking a
 minimum. Enclosure is therefore the reliable burial discriminator on real data,
 and depth should be read as a supporting descriptor rather than a criterion.
 
@@ -329,7 +342,7 @@ number of ligand copies in the crystal.
 | Control | PDB | Notes |
 |---|---|---|
 | Pds5B | 5HDT | Often a surface/crystal artefact |
-| HDAC1 | 5ICN | Semi-cryptic interface site |
+| HDAC1 | 5ICN | Measures as surface (0.436); its InsP6 is solvent-exposed |
 | Btk PH | 1BWN | Surface negative (decoy mode) |
 
 ### Offline self-check

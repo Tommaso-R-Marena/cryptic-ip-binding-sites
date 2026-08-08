@@ -6,9 +6,9 @@ name: Burial Survey
 # re-measures every deposited inositol phosphate complex in the bundled dataset
 # with the per-copy definition and reports the distribution.
 #
-# It is deliberately not attached to push or pull_request: it downloads and
-# measures well over a hundred structures, which is far too slow for a check
-# that runs on every commit.
+# It runs only when its own inputs change, on demand, or monthly - never on
+# every commit: it downloads and measures well over a hundred structures, which
+# is far too slow for a per-commit check.
 
 on:
   # Re-run when the measurement, the entries being measured, or the boundary
@@ -47,6 +47,10 @@ jobs:
       - name: Setup Conda
         uses: conda-incubator/setup-miniconda@v3
         with:
+          # The post-job package cleanup prints a line per package - well over a
+          # hundred - which buries the diagnostic output these jobs exist to
+          # produce. The runner is discarded either way.
+          run-post: 'false'
           auto-update-conda: true
           python-version: '3.11'
           channels: conda-forge,bioconda,defaults
