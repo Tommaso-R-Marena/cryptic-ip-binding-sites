@@ -102,6 +102,54 @@ exactly this reason, and reports whether the distribution is bimodal at all —
 if it is not, the cryptic/surface split is a modelling choice rather than a
 discovered boundary, and every downstream metric should be read in that light.
 
+### The whole deposited set: burial is continuous, not two classes
+
+Five controls cannot say whether a cryptic/surface dichotomy exists at all.
+`scripts/burial_survey.py` re-measures every inositol phosphate complex in the
+bundled dataset with the per-copy definition and reports the distribution.
+**135 of 136 entries were measured**; one contained no phosphorylated inositol.
+That the coordinate-based ligand test resolved 99 % of deposited entries is
+itself the strongest evidence that it is not too strict.
+
+| q01 | q05 | q10 | q25 | q50 | q75 | q90 | q95 | q99 |
+|---|---|---|---|---|---|---|---|---|
+| 0.070 | 0.091 | 0.126 | 0.216 | 0.338 | 0.553 | 0.773 | 0.816 | 0.896 |
+
+Two independent boundary estimates were computed, deliberately, because either
+one alone would be easy to over-read:
+
+| estimate | value |
+|---|---|
+| density minimum (trough between modes) | **0.138** |
+| Otsu (maximum between-class variance) | **0.463** |
+| configured `CRYPTIC_RELATIVE_SASA_MAX` | 0.120 |
+
+**They disagree, and that disagreement is the result.** A genuine two-class
+structure would place both estimates in the same gap. Instead the density
+estimator finds a shallow trough near the low tail while Otsu — which splits to
+maximise between-class variance — cuts near the middle of a broad spread, which
+is what it does when there is one wide mode rather than two. The quantiles agree:
+burial runs smoothly from 0.07 to 0.90 with no chasm anywhere.
+
+The conclusion is therefore mixed, and both halves matter:
+
+* **The configured boundary is well placed.** 0.12 sits within one histogram bin
+  (0.025) of the density minimum at 0.138, and selects 14 of 135 entries as
+  cryptic. It was calibrated on ADAR2 alone and independently lands on the
+  population's sparsest region, which is meaningful corroboration.
+* **But it is a threshold on a continuum, not a natural class boundary.**
+  Sequestration is a matter of degree across deposited inositol phosphate
+  complexes. The positive class is *defined* by this cutoff rather than
+  discovered in the data, and every downstream metric — AUROC, precision@k,
+  enrichment — is conditioned on that choice. Reporting sensitivity of the model
+  to the boundary is more informative than reporting performance at one value.
+
+Two limits on this survey. The bundled set is essentially one chemistry (134
+InsP6, 1 InsP5), so it calibrates InsP6 sequestration and says nothing about
+whether InsP3/InsP4 sites distribute the same way. And 6 entries fall under the
+crystal-artefact rule (fewer than 8 protein contacts), which is a floor on how
+clean any deposited-structure ground truth can be.
+
 ### Ligands are identified from coordinates, not from a list of codes
 
 Which molecules count as inositol phosphates decides both what burial is measured
