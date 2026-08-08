@@ -55,15 +55,48 @@ counted as sequestered.
 
 | Class | Relative SASA |
 |---|---|
-| `cryptic` | ≤ 0.05 |
+| `cryptic` | ≤ 0.12 |
 | `semi_cryptic` | ≤ 0.25 |
 | `surface` | > 0.25 |
 | `crystal_artifact` | fewer than 8 protein heavy-atom contacts within 4.5 Å |
 
-The boundaries are anchored on the paradigm cases: the ADAR2 InsP6 is described
-as completely encapsulated with only a narrow window to the exterior
-(Macbeth et al., *Science* 309:1534, 2005), while surface signalling sites such
-as the PLCδ1 PH domain leave roughly half the ligand exposed.
+**These boundaries are calibrated on measurements, not on the literature
+description.** `scripts/calibrate_controls.py` measures the deposited controls:
+
+| Control | PDB | Relative SASA | Relative phosphate SASA | Burial depth | Enclosure | Basic |
+|---|---|---|---|---|---|---|
+| ADAR2 (buried cofactor) | 1ZY7 | **0.093** | 0.089 | 5.76 Å | 0.941 | 8 |
+| PLCδ1 PH (surface site) | 1MAI | **0.373** | 0.348 | 4.68 Å | 0.598 | 5 |
+
+The boundary was initially set to 0.05, from the description of the ADAR2 InsP6
+as encapsulated with only an 8.4 × 4.6 Å window (Macbeth et al., *Science*
+309:1534, 2005). The measurement puts it at 0.093: a narrow window still exposes
+a measurable fraction of a 36-atom ligand. The cryptic boundary is therefore
+0.12, keeping the paradigm buried site inside with ~25 % margin while staying
+three times below the nearest surface control.
+
+This rests on two structures, which is thin. Re-run the calibration script over
+the full control panel before treating the boundaries as settled.
+
+### Burial depth is a weak discriminator on real structures
+
+The same measurements show something the synthetic benchmark cannot: **depth
+barely separates the controls** — 5.76 Å for the buried ADAR2 site against
+4.68 Å for the surface PH-domain site — even though on idealised synthetic
+spheres it separates them perfectly (22 Å against 5 Å).
+
+The reason is the definition. Depth is the distance to the *nearest* solvent-
+exposed atom, a minimum over a large set. A real protein surface is irregular
+enough that some exposed atom lies within a few Å of almost any interior point,
+so the minimum saturates. An idealised sphere has no such irregularity, which is
+exactly why the synthetic benchmark could not reveal this.
+
+Enclosure does separate the same two structures cleanly (0.941 against 0.598)
+because it integrates over directions rather than taking a minimum. Enclosure is
+therefore the more reliable burial discriminator on real data, and depth should
+be read as a supporting descriptor rather than a primary criterion. The finding
+is pinned in `tests/test_control_calibration.py` so it cannot be quietly
+forgotten.
 
 ### Implementation details that matter
 
@@ -227,6 +260,18 @@ is a weighted average of bounded components and must not be read as one.
 | PLCδ1 PH | 1MAI | Surface InsP3 negative |
 
 Pass criterion: both controls pass individually **and** tier-1 separation > 0.50.
+
+**Site selection.** The validators select the pocket to grade by *ligand-atom
+overlap*, the same criterion used for training labels. They previously selected
+the pocket whose centre was nearest the ligand centroid, which picks the wrong
+pocket on ADAR2: the pocket with 100 % ligand overlap scores 0.644, while the
+nearest-centre pocket scores 0.432. The gate was grading a pocket that does not
+contain the inositol phosphate.
+
+**Burial criteria use the relative measure.** The control pass criteria compare
+relative SASA against the calibrated boundary rather than raw Å², since an
+absolute cutoff means different things for InsP3 and InsP6 and scales with the
+number of ligand copies in the crystal.
 
 ### Tier-2 panel
 

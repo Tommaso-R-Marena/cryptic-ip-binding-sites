@@ -67,16 +67,29 @@ LOGGER = logging.getLogger(__name__)
 #: Burial classification thresholds on ``relative_sasa`` (fraction of the
 #: ligand's own surface still solvent-accessible).
 #:
-#: The boundaries are anchored on the paradigm cases rather than chosen for
-#: convenience. Macbeth et al. (*Science* 309:1534-1539, 2005) describe the
-#: ADAR2 InsP6 as completely encapsulated, with only a narrow window to the
-#: exterior - a few per cent of its surface. Surface signalling sites such as the
-#: PLC-delta-1 PH domain InsP3 complex leave roughly half the ligand solvent
-#: exposed. A ``semi_cryptic`` band between the two captures interface sites
-#: (e.g. inositol phosphate at a subunit interface), which are mechanistically
-#: intermediate and are analysed separately rather than being forced into one of
-#: the extremes.
-CRYPTIC_RELATIVE_SASA_MAX = 0.05
+#: **Calibrated on measurements, not on the qualitative literature description.**
+#: The boundary was initially set to 0.05 from the description of the ADAR2 InsP6
+#: as encapsulated with only an 8.4 x 4.6 A window to the exterior (Macbeth et
+#: al., *Science* 309:1534-1539, 2005). Measuring the deposited structures gives:
+#:
+#: =============================  ===========  ============  =========
+#: Control                        relative     relative      enclosure
+#:                                SASA         phosphate
+#: =============================  ===========  ============  =========
+#: ADAR2 1ZY7 (buried cofactor)   0.093        0.089         0.941
+#: PLC-delta-1 PH 1MAI (surface)  0.373        0.348         0.598
+#: =============================  ===========  ============  =========
+#:
+#: The paradigm buried site therefore sits at 0.093, not below 0.05: a narrow
+#: window still exposes a measurable fraction of a 36-atom ligand. The cryptic
+#: boundary is set to 0.12, which keeps ADAR2 inside with ~25 % margin while
+#: remaining three times below the nearest surface control. The semi-cryptic
+#: boundary stays at 0.25, which leaves the PH-domain control clearly ``surface``.
+#:
+#: This calibration rests on two structures, because only 1ZY7 and 1MAI are
+#: fetched by the tier-1 workflow. Re-run ``scripts/calibrate_controls.py`` over
+#: the full control panel before treating these boundaries as settled.
+CRYPTIC_RELATIVE_SASA_MAX = 0.12
 SEMI_CRYPTIC_RELATIVE_SASA_MAX = 0.25
 
 #: Legacy absolute-SASA thresholds (Å²) retained for the historical

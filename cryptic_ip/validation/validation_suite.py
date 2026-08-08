@@ -6,9 +6,8 @@ from __future__ import annotations
 
 import urllib.request
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional
 
-import numpy as np
 import pandas as pd
 
 from .adar2 import validate_adar2
@@ -19,8 +18,21 @@ from .control_scoring import (
     separation_quality,
     validation_score,
 )
-from .structure_context import ligand_context
+from .structure_context import LIGAND_RESNAMES as LIGAND_RESNAMES_FOR_SELECTION, ligand_context
 from ..analysis import ProteinAnalyzer
+
+
+
+def _ligand_heavy_atom_coords(pdb_path):
+    """Return inositol phosphate heavy-atom coordinates for a structure."""
+    from ..analysis.structure_arrays import load_structure_arrays
+
+    try:
+        arrays = load_structure_arrays(pdb_path)
+    except Exception:  # noqa: BLE001 - selection falls back to residue overlap
+        return None
+    mask = arrays.mask_resnames(LIGAND_RESNAMES_FOR_SELECTION)
+    return arrays.coords[mask] if bool(mask.any()) else None
 
 
 class ValidationSuite:
@@ -96,36 +108,27 @@ class ValidationSuite:
 
     def _select_best_pocket(
         self,
-        scored: pd.DataFrame,
-        analyzer: ProteinAnalyzer,
-        site_residues: Set[int],
-        ligand_centroid: Optional[Tuple[float, float, float]],
+        scored,
+        analyzer,
+        site_residues,
+        ligand_centroid=None,
         *,
         decoy_mode: bool = False,
-    ) -> pd.Series:
-        if decoy_mode or ligand_centroid is None:
-            return scored.iloc[0]
+        ligand_coords=None,
+    ):
+        """Pick the pocket that actually contains the ligand.
 
-        best_row = scored.iloc[0]
-        best_key = (-float("inf"), -1, -1.0)
+        Selection is by ligand-atom overlap, matching the training-label rule.
+        The previous centre-to-centroid rule selected the wrong pocket on the
+        ADAR2 crystal structure, so the control gate was grading a pocket that
+        does not hold the inositol phosphate.
+        """
+        from .site_selection import select_ligand_pocket
 
-        for _, row in scored.iterrows():
-            pocket_id = int(row["pocket_id"])
-            overlap = len(
-                set(analyzer.get_pocket_residues(pocket_id, distance_cutoff=8.0)).intersection(site_residues)
-            )
-            distance = float("inf")
-            if analyzer.pockets is not None:
-                pocket = analyzer.pockets[analyzer.pockets["pocket_id"] == pocket_id].iloc[0]
-                center = np.array([pocket["center_x"], pocket["center_y"], pocket["center_z"]], dtype=float)
-                distance = float(np.linalg.norm(center - np.array(ligand_centroid, dtype=float)))
-
-            key = (-distance, overlap, float(row["composite_score"]))
-            if key > best_key:
-                best_key = key
-                best_row = row
-
-        return best_row
+        row, _ = select_ligand_pocket(
+            scored, analyzer, ligand_coords, fallback_site_residues=site_residues
+        )
+        return row
 
     def score_structure_with_ligand_context(
         self,
@@ -136,6 +139,7 @@ class ValidationSuite:
     ) -> Dict:
         site_residues, ligand_sasa, ligand_centroid = ligand_context(pdb_path)
         burial = compute_burial_metrics(pdb_path)
+        ligand_coords = _ligand_heavy_atom_coords(pdb_path)
 
         analyzer = ProteinAnalyzer(
             str(pdb_path),
@@ -147,7 +151,12 @@ class ValidationSuite:
             raise RuntimeError(f"No pockets scored for {pdb_path.name}")
 
         top_pocket = self._select_best_pocket(
-            scored, analyzer, site_residues, ligand_centroid, decoy_mode=decoy_mode
+            scored,
+            analyzer,
+            site_residues,
+            ligand_centroid,
+            decoy_mode=decoy_mode,
+            ligand_coords=ligand_coords,
         )
 
         pocket_composite = float(top_pocket["composite_score"])
@@ -161,6 +170,7 @@ class ValidationSuite:
             basic_residues,
             pocket_potential=pocket_potential,
             use_electrostatics=self.use_electrostatics,
+            relative_sasa=burial.relative_sasa,
         )
 
         pocket_residues = analyzer.get_pocket_residues(int(top_pocket["pocket_id"]))
@@ -177,6 +187,9 @@ class ValidationSuite:
             "delta_sasa": burial.delta_sasa,
             "burial_depth": burial.burial_depth,
             "burial_class": burial.burial_class,
+            "relative_sasa": burial.relative_sasa,
+            "relative_phosphate_sasa": burial.relative_phosphate_sasa,
+            "enclosure": burial.enclosure,
             "pocket_residue_sasa": float(top_pocket["sasa"]),
             "ligand_sasa": burial.ligand_sasa if burial.ligand_sasa is not None else ligand_sasa,
             "basic_residues": basic_residues,
@@ -204,9 +217,16 @@ class ValidationSuite:
                 int(result["basic_residues"]),
                 pocket_potential=pocket_potential,
                 use_electrostatics=self.use_electrostatics,
+                relative_sasa=result.get("relative_sasa"),
             )
+            burial_class = result.get("burial_class") or burial_class
             passed = positive_passed(
-                val_score, ligand_sasa, int(result["basic_residues"]), pocket_composite, burial_class=burial_class
+                val_score,
+                ligand_sasa,
+                int(result["basic_residues"]),
+                pocket_composite,
+                burial_class=burial_class,
+                relative_sasa=result.get("relative_sasa"),
             )
             return {
                 "protein": name,
@@ -228,9 +248,15 @@ class ValidationSuite:
 
         pdb_path = self.download_pdb(info["pdb"])
         metrics = self.score_structure_with_ligand_context(pdb_path, control_type="positive")
-        if metrics["ligand_sasa"] is not None and metrics["ligand_sasa"] > 100:
+        # Prefer the measured class: it accounts for contact count and the
+        # size-normalised burial, where the absolute-SASA rule below could only
+        # see a raw area that scales with ligand size and copy count.
+        measured_class = metrics.get("burial_class")
+        if measured_class in {"crystal_artifact", "cryptic", "semi_cryptic", "surface"}:
+            burial_class = measured_class
+        elif metrics["ligand_sasa"] is not None and metrics["ligand_sasa"] > 100:
             burial_class = "crystal_artifact"
-            metrics["burial_class"] = burial_class
+        metrics["burial_class"] = burial_class
 
         passed = positive_passed(
             metrics["validation_score"],
@@ -238,6 +264,7 @@ class ValidationSuite:
             metrics["basic_residues"],
             metrics["top_pocket_score"],
             burial_class=burial_class,
+            relative_sasa=metrics.get("relative_sasa"),
         )
         return self._result_row(name, "positive", info, metrics, passed, burial_class=burial_class)
 
@@ -253,6 +280,7 @@ class ValidationSuite:
             metrics.get("ligand_sasa"),
             metrics["top_pocket_score"],
             decoy_mode=decoy_mode,
+            relative_sasa=metrics.get("relative_sasa"),
         )
         return self._result_row(name, "negative", info, metrics, passed)
 
