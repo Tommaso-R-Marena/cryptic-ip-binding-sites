@@ -349,6 +349,67 @@ def screen(proteome_dir, output, score_threshold, max_structures, use_ml_model, 
         click.secho("\nNo candidates found above threshold", fg="yellow")
 
 
+@main.command("self-check")
+@click.option(
+    "--output-dir",
+    "-o",
+    default="results/self_check",
+    help="Directory for generated structures and results",
+)
+@click.option("--n-structures", default=6, show_default=True, help="Synthetic structures to build")
+@click.option(
+    "--sasa-points",
+    default=128,
+    show_default=True,
+    help="SASA sample points per atom; lower is faster",
+)
+def self_check(output_dir, n_structures, sasa_points):
+    """Verify the measurement pipeline offline against known ground truth.
+
+    Builds synthetic structures whose burial is fixed by construction, measures
+    them, and reports whether the pipeline recovers the right answer. This needs
+    no network access and no PDB downloads, so it works as an installation check
+    and as a smoke test in restricted environments.
+
+    It validates the machinery, not the biology: passing means the code measures
+    what it claims to, not that any biological conclusion is correct.
+    """
+    from .testing.synthetic import build_synthetic_benchmark
+    from .validation.burial_metrics import compute_burial_metrics
+
+    out = Path(output_dir)
+    n_each = max(1, int(n_structures) // 3)
+    click.echo(f"Building {n_each * 3} synthetic structures in {out}...")
+    benchmark = build_synthetic_benchmark(
+        out / "structures", n_buried=n_each, n_surface=n_each, n_decoy=n_each
+    )
+
+    failures = []
+    click.echo("\nMeasuring ligand burial:\n")
+    click.echo(f"{'structure':<18}{'expected':<10}{'measured':<16}{'rel.SASA':>9}{'depth':>8}{'encl':>7}")
+    for path, spec in zip(benchmark.paths, benchmark.specs):
+        metrics = compute_burial_metrics(path, n_points=sasa_points)
+        if not spec.include_ligand:
+            measured, expected = metrics.burial_class, "unknown"
+        else:
+            measured, expected = metrics.burial_class, spec.expected_burial_class
+        ok = measured == expected
+        if not ok:
+            failures.append((spec.name, expected, measured))
+        click.secho(
+            f"{spec.name:<18}{expected:<10}{measured:<16}"
+            f"{(metrics.relative_sasa if metrics.relative_sasa is not None else float('nan')):>9.3f}"
+            f"{(metrics.burial_depth if metrics.burial_depth is not None else float('nan')):>8.2f}"
+            f"{(metrics.enclosure if metrics.enclosure is not None else float('nan')):>7.2f}",
+            fg="green" if ok else "red",
+        )
+
+    if failures:
+        click.secho(f"\n✗ {len(failures)} structure(s) measured incorrectly", fg="red", bold=True)
+        raise click.exceptions.Exit(1)
+    click.secho("\n✓ Burial measurement matches ground truth on every structure", fg="green", bold=True)
+
+
 @main.command("md-validate")
 @click.argument("candidates_csv", type=click.Path(exists=True))
 @click.option("--output-dir", "-o", default="results/md_validation", help="Output directory")

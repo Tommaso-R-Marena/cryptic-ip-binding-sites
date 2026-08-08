@@ -22,7 +22,9 @@ def test_run_publication_package_importable():
     assert hasattr(module, "main") or "if __name__" in (ROOT / "scripts" / "run_publication_package.py").read_text()
 
 
+@pytest.mark.requires_network
 def test_publication_package_skip_flags(tmp_path):
+    """The control benchmark downloads its structures, so it needs the databases."""
     if shutil.which("fpocket") is None:
         pytest.skip("fpocket not installed")
     out = tmp_path / "publication_ci"

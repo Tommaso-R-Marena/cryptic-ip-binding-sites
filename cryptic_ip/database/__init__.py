@@ -10,6 +10,10 @@ __all__ = [
     "ParallelProcessor",
     "append_results_to_file",
     "DatabaseIntegrityChecker",
+    "RcsbClient",
+    "RcsbUnavailableError",
+    "IPLigand",
+    "discover_ip_ligands",
 ]
 
 
@@ -40,4 +44,12 @@ def __getattr__(name: str):
         from .integrity_checker import DatabaseIntegrityChecker
 
         return DatabaseIntegrityChecker
+    if name in {"RcsbClient", "RcsbUnavailableError"}:
+        from .rcsb_client import RcsbClient, RcsbUnavailableError
+
+        return {"RcsbClient": RcsbClient, "RcsbUnavailableError": RcsbUnavailableError}[name]
+    if name in {"IPLigand", "discover_ip_ligands"}:
+        from .ip_ligands import IPLigand, discover_ip_ligands
+
+        return {"IPLigand": IPLigand, "discover_ip_ligands": discover_ip_ligands}[name]
     raise AttributeError(name)

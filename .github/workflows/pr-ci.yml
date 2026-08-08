@@ -68,12 +68,25 @@ jobs:
           cryptic-ip validate --database tests/data/validation/example.db
           cryptic-ip validate --all --structure tests/data/validation/example.pdb --results tests/data/validation/example_results.csv --database tests/data/validation/example.db
 
+      - name: Offline pipeline self-check
+        shell: bash -l {0}
+        # Verifies the measurement path against synthetic structures whose burial
+        # follows from their construction. Needs no database access, so it fails
+        # only on a real defect.
+        run: cryptic-ip self-check --output-dir results/ci_self_check --n-structures 6
+
       - name: Run unit tests
         shell: bash -l {0}
         run: |
           pytest tests/ -v --cov=cryptic_ip --cov-report=term \
             -m "not requires_network and not slow" \
             --ignore=tests/integration
+
+      - name: Offline end-to-end pipeline test
+        shell: bash -l {0}
+        # Exercises structures -> features -> labels -> nested CV -> model card
+        # through the actual command-line scripts.
+        run: pytest tests/integration/test_synthetic_end_to_end.py -v
 
       - name: Run benchmark regression tests
         shell: bash -l {0}
