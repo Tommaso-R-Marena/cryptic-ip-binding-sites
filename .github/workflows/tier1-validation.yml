@@ -89,3 +89,37 @@ jobs:
         shell: bash -l {0}
         run: |
           pytest tests/test_control_scoring.py tests/test_structure_context.py tests/test_burial_metrics.py -q
+
+      - name: Calibration digest
+        shell: bash -l {0}
+        # Last step in the job on purpose. Which ligand each control matched, and
+        # what it measured, is the evidence the burial threshold rests on; run
+        # last it stays reachable from a short log tail and is echoed to the run
+        # summary, instead of sitting behind the full component breakdown.
+        if: always()
+        continue-on-error: true
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          path = Path("results/calibration/control_measurements.json")
+          if not path.exists():
+              print("no calibration measurements were produced")
+              raise SystemExit(0)
+
+          print("| control | pdb | ligand | relSASA | relPSASA | enclosure | class |")
+          print("| --- | --- | --- | --- | --- | --- | --- |")
+          for record in json.loads(path.read_text()):
+              best = record.get("most_buried")
+              if not best:
+                  print(f"| {record['name']} | {record['pdb_id']} | - | - | - | - | not measured |")
+                  continue
+              def cell(value):
+                  return "n/a" if value is None else f"{float(value):.3f}"
+              print(
+                  f"| {record['name']} | {record['pdb_id']} | {best.get('comp_id', '?')} | "
+                  f"{cell(best.get('relative_sasa'))} | {cell(best.get('relative_phosphate_sasa'))} | "
+                  f"{cell(best.get('enclosure'))} | {best.get('burial_class')} |"
+              )
+          PY
