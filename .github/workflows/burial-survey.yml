@@ -176,4 +176,15 @@ jobs:
           print(f"- at or below the configured boundary: **{summary['n_below_configured_boundary']}**")
           print(f"- class counts: `{summary['class_counts']}`")
           print(f"- series counts: `{summary['series_counts']}`")
+
+          sweep = summary.get("boundary_sweep") or []
+          if sweep:
+              print("\n### Positive class size vs boundary\n")
+              print("| boundary | positives | fraction |")
+              print("| --- | --- | --- |")
+              for row in sweep:
+                  print(
+                      f"| {row['boundary']:.2f} | {row['n_positive']} "
+                      f"| {row['fraction_positive']:.1%} |"
+                  )
           PY
