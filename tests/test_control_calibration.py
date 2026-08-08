@@ -36,6 +36,7 @@ from cryptic_ip.validation.control_scoring import (
 #: greatest ligand-atom overlap.
 MEASURED = {
     "ADAR2": {
+        "comp_id": "IHP",
         "pdb": "1ZY7",
         "role": "positive",
         "expected_class": "cryptic",
@@ -50,6 +51,7 @@ MEASURED = {
         "nearest_centre_composite": 0.432,
     },
     "Pds5B": {
+        "comp_id": "IHP",
         "pdb": "5HDT",
         "role": "positive",
         "expected_class": "surface",
@@ -62,6 +64,7 @@ MEASURED = {
         "site_composite": 0.561,
     },
     "HDAC1": {
+        "comp_id": "6A0",
         "pdb": "5ICN",
         "role": "positive",
         "expected_class": "cryptic",
@@ -74,6 +77,7 @@ MEASURED = {
         "site_composite": 0.530,
     },
     "PLCd1_PH": {
+        "comp_id": "I3P",
         "pdb": "1MAI",
         "role": "negative",
         "expected_class": "surface",
@@ -86,6 +90,7 @@ MEASURED = {
         "site_composite": 0.415,
     },
     "Btk_PH": {
+        "comp_id": "4IP",
         "pdb": "1BWN",
         "role": "negative",
         "expected_class": "surface",
@@ -99,6 +104,15 @@ MEASURED = {
     },
 }
 
+#: Which chemical component each control's burial was measured on. Recorded
+#: because the panel is only meaningful if it measured the right molecule: the
+#: identifier alone does not say whether a component is an inositol *phosphate*,
+#: which is why the pipeline now identifies ligands from coordinates and reports
+#: the phosphate count. HDAC1 (5ICN) matched 6A0 and reports an undefined
+#: phosphate SASA, meaning no phosphate group was resolved on it; the calibration
+#: digest now prints the detected series so this can be read off directly rather
+#: than inferred.
+#:
 #: Controls whose ligand is genuinely sequestered, and those that are not.
 BURIED_CONTROLS = ("ADAR2", "HDAC1")
 EXPOSED_CONTROLS = ("Pds5B", "PLCd1_PH", "Btk_PH")
