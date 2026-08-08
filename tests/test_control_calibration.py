@@ -63,18 +63,26 @@ MEASURED = {
         "pocket_volume": 894.59,
         "site_composite": 0.561,
     },
+    # Corrected. The earlier entry recorded 6A0 at relative SASA 0.089 and
+    # classified HDAC1 as cryptic, but 6A0 carries no phosphate: it is not an
+    # inositol phosphate, and burial had been measured on it because the old
+    # identifier whitelist admitted it and it happened to be the most buried
+    # matching copy. Identifying ligands from coordinates excludes it, and the
+    # most buried *phosphorylated* copy in 5ICN is a solvent-exposed InsP6.
+    # HDAC1 is therefore an exposed control, not a buried one.
+    #
+    # burial_depth, n_basic_residues, pocket_volume and site_composite are not
+    # recorded here because the values previously stored described the 6A0 site;
+    # they are refreshed from the next calibration run rather than carried over
+    # from a measurement of the wrong molecule.
     "HDAC1": {
-        "comp_id": "6A0",
+        "comp_id": "IHP",
         "pdb": "5ICN",
         "role": "positive",
-        "expected_class": "cryptic",
-        "relative_sasa": 0.089,
-        "relative_phosphate_sasa": None,
-        "burial_depth": 4.10,
-        "enclosure": 0.906,
-        "n_basic_residues": 3,
-        "pocket_volume": 593.04,
-        "site_composite": 0.530,
+        "expected_class": "surface",
+        "relative_sasa": 0.436,
+        "relative_phosphate_sasa": 0.444,
+        "enclosure": 0.629,
     },
     "PLCd1_PH": {
         "comp_id": "I3P",
@@ -114,8 +122,8 @@ MEASURED = {
 #: than inferred.
 #:
 #: Controls whose ligand is genuinely sequestered, and those that are not.
-BURIED_CONTROLS = ("ADAR2", "HDAC1")
-EXPOSED_CONTROLS = ("Pds5B", "PLCd1_PH", "Btk_PH")
+BURIED_CONTROLS = ("ADAR2",)
+EXPOSED_CONTROLS = ("Pds5B", "HDAC1", "PLCd1_PH", "Btk_PH")
 
 
 def test_cryptic_boundary_admits_the_paradigm_buried_site():
@@ -146,8 +154,15 @@ def test_controls_are_classified_as_measured():
 def test_burial_boundary_sits_in_the_gap_between_buried_and_exposed_controls():
     """The boundary must fall in the gap the panel leaves, not outside the range.
 
-    Across five controls the buried ligands measure 0.089-0.093 and the exposed
-    ones 0.253-0.466, leaving a clear gap. The boundary sits inside it.
+    The gap is real but the panel is now thin on the buried side. Correcting
+    HDAC1 - whose burial had been measured on a component carrying no phosphate -
+    moved it from the buried group to the exposed one, leaving ADAR2 at 0.093 as
+    the *only* sequestered control against four exposed ones at 0.253-0.466.
+
+    The boundary of 0.12 still sits inside the gap, but it now rests on a single
+    structure. Widening the buried side is the most valuable thing that can be
+    done to this calibration; scripts/burial_survey.py measures the whole
+    deposited set for that purpose.
     """
     buried = [MEASURED[name]["relative_sasa"] for name in BURIED_CONTROLS]
     exposed = [MEASURED[name]["relative_sasa"] for name in EXPOSED_CONTROLS]
@@ -186,7 +201,14 @@ def test_volume_window_covers_every_real_ligand_site():
     from cryptic_ip.analysis.scorer import PocketScorer
 
     scorer = PocketScorer()
-    for name, control in MEASURED.items():
+    with_volume = {
+        name: control
+        for name, control in MEASURED.items()
+        if control.get("pocket_volume") is not None
+    }
+    # Guard against the test quietly emptying itself if entries lose the field.
+    assert len(with_volume) >= 3, f"too few recorded volumes: {sorted(with_volume)}"
+    for name, control in with_volume.items():
         assert scorer.score_volume(control["pocket_volume"]) > 0.9, name
 
     # The defect it replaces: the old window inverted the ranking.
@@ -266,7 +288,7 @@ def test_depth_does_not_separate_the_control_panel():
     completely interleaved - and the *largest* depth in the panel belongs to a
     surface negative:
 
-        ADAR2 5.76 (buried)   Pds5B 5.63   HDAC1 4.10 (buried)
+        ADAR2 5.76 (buried)   Pds5B 5.63 (surface)
         PLCd1 4.68 (surface)  Btk   5.98 (surface)
 
     Depth is a minimum over all solvent-exposed atoms, and a real protein
@@ -278,11 +300,23 @@ def test_depth_does_not_separate_the_control_panel():
     This test records the finding so a future change cannot quietly promote
     depth to a primary burial criterion.
     """
-    buried_depths = [MEASURED[name]["burial_depth"] for name in BURIED_CONTROLS]
-    exposed_depths = [MEASURED[name]["burial_depth"] for name in EXPOSED_CONTROLS]
-    # No threshold on depth can separate the two groups.
+    buried_depths = [
+        MEASURED[name]["burial_depth"]
+        for name in BURIED_CONTROLS
+        if MEASURED[name].get("burial_depth") is not None
+    ]
+    exposed_depths = [
+        MEASURED[name]["burial_depth"]
+        for name in EXPOSED_CONTROLS
+        if MEASURED[name].get("burial_depth") is not None
+    ]
+    assert buried_depths and len(exposed_depths) >= 2
+
+    # No threshold on depth can isolate the buried control: its depth falls
+    # strictly inside the spread of the exposed ones, so any cutoff that admits
+    # it also admits a surface site.
+    assert min(exposed_depths) < min(buried_depths)
     assert max(exposed_depths) > max(buried_depths)
-    assert min(exposed_depths) > min(buried_depths)
 
 
 def test_enclosure_separates_the_control_panel():

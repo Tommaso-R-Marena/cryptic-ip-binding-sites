@@ -20,6 +20,10 @@ jobs:
       - name: Setup Conda
         uses: conda-incubator/setup-miniconda@v3
         with:
+          # The post-job package cleanup prints a line per package - well over a
+          # hundred - which buries the diagnostic output these jobs exist to
+          # produce. The runner is discarded either way.
+          run-post: 'false'
           auto-update-conda: true
           python-version: '3.11'
           channels: conda-forge,bioconda,defaults
@@ -108,8 +112,14 @@ jobs:
               print("no calibration measurements were produced")
               raise SystemExit(0)
 
-          print("| control | pdb | ligand | series | relSASA | relPSASA | enclosure | class |")
-          print("| --- | --- | --- | --- | --- | --- | --- | --- |")
+          # Every field the recorded panel in tests/test_control_calibration.py
+          # needs, so a change of measurement can be transcribed from one place
+          # rather than reconstructed from scattered output.
+          print(
+              "| control | pdb | ligand | series | relSASA | relPSASA | depth "
+              "| enclosure | basic | volume | composite | class |"
+          )
+          print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
           for record in json.loads(path.read_text()):
               best = record.get("most_buried")
               # Phosphate count comes from the structural test, so the table
@@ -122,7 +132,7 @@ jobs:
                   detected = ", ".join(f"{k}={v}" for k, v in series.items()) or "none"
                   print(
                       f"| {record['name']} | {record['pdb_id']} | - | {detected} "
-                      f"| - | - | - | not measured |"
+                      f"| - | - | - | - | - | - | - | not measured |"
                   )
                   continue
               def cell(value):
@@ -131,10 +141,14 @@ jobs:
                   value = float(value)
                   return "n/a" if value != value else f"{value:.3f}"
               comp_id = best.get("comp_id", "?")
+              site = record.get("site_pocket") or {}
+              measured = site.get("measurements") or {}
               print(
                   f"| {record['name']} | {record['pdb_id']} | {comp_id} | "
                   f"{series.get(comp_id, 'unclassified')} | "
                   f"{cell(best.get('relative_sasa'))} | {cell(best.get('relative_phosphate_sasa'))} | "
-                  f"{cell(best.get('enclosure'))} | {best.get('burial_class')} |"
+                  f"{cell(best.get('burial_depth'))} | {cell(best.get('enclosure'))} | "
+                  f"{cell(best.get('n_basic_residues'))} | {cell(measured.get('pocket_volume'))} | "
+                  f"{cell(site.get('composite_score'))} | {best.get('burial_class')} |"
               )
           PY
