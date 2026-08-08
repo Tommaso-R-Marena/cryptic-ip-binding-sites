@@ -8,6 +8,19 @@ from typing import Optional, Set, Tuple
 from Bio.PDB import MMCIFParser, PDBParser
 from Bio.PDB.SASA import ShrakeRupley
 
+#: Unphosphorylated inositols. These are *not* inositol phosphates:
+#: :mod:`cryptic_ip.database.ip_ligands` records ``INS`` (*myo*-inositol) as an
+#: unphosphorylated negative reference. They are named here so that a structure
+#: containing one can be recognised and excluded, rather than silently measured
+#: as though it were the ligand of interest.
+UNPHOSPHORYLATED_INOSITOL_RESNAMES = {"INS", "MYI"}
+
+#: Inositol phosphate component identifiers, used only where a caller needs
+#: name matching. Prefer
+#: :func:`cryptic_ip.analysis.inositol_detection.detect_inositol_residues`,
+#: which identifies ligands from coordinates and therefore also finds species
+#: absent from any list. This set deliberately excludes the unphosphorylated
+#: inositols above.
 LIGAND_RESNAMES = {
     "IP3",
     "IP4",
@@ -17,8 +30,11 @@ LIGAND_RESNAMES = {
     "I3P",
     "4IP",
     "6A0",
-    "INS",
 }
+
+#: Every inositol-cored component named here, phosphorylated or not.
+INOSITOL_RESNAMES = LIGAND_RESNAMES | UNPHOSPHORYLATED_INOSITOL_RESNAMES
+
 BASIC_RESNAMES = {"ARG", "LYS", "HIS"}
 
 

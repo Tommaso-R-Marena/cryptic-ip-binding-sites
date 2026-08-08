@@ -45,7 +45,6 @@ from cryptic_ip.validation.burial_metrics import (  # noqa: E402
     compute_ligand_burial,
     find_ligand_instances,
 )
-from cryptic_ip.validation.structure_context import LIGAND_RESNAMES  # noqa: E402
 
 LOGGER = logging.getLogger("calibrate_controls")
 
@@ -135,7 +134,7 @@ def measure_control(
 
     # Locate the pocket that actually holds the ligand, and break its score down.
     arrays = load_structure_arrays(path)
-    found = find_ligand_instances(arrays, LIGAND_RESNAMES)
+    found = find_ligand_instances(arrays)
     if not found:
         record["error"] = "no inositol phosphate ligand parsed"
         return record
