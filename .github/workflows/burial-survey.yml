@@ -1,0 +1,164 @@
+name: Burial Survey
+
+# Population-level calibration study, not a gate. The burial boundary defines
+# the positive class, and calibrating it on five hand-picked controls can show
+# that a gap exists but not where in that gap the boundary belongs. This job
+# re-measures every deposited inositol phosphate complex in the bundled dataset
+# with the per-copy definition and reports the distribution.
+#
+# It is deliberately not attached to push or pull_request: it downloads and
+# measures well over a hundred structures, which is far too slow for a check
+# that runs on every commit.
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Survey at most this many entries (0 = all)'
+        required: false
+        default: '0'
+      sasa_points:
+        description: 'SASA sample points per atom'
+        required: false
+        default: '128'
+  schedule:
+    - cron: '0 5 1 * *'
+
+jobs:
+  survey:
+    name: Per-copy relative burial survey
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda,defaults
+
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge fpocket freesasa pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+
+      - name: Cache survey structures
+        uses: actions/cache@v4
+        with:
+          path: data/validation/raw/structures
+          key: burial-survey-structures-v1
+
+      - name: Download dataset structures
+        shell: bash -l {0}
+        # Entries that cannot be fetched are skipped rather than failing the run:
+        # a survey reports on what it could measure, and the summary records how
+        # many entries were unavailable.
+        run: |
+          python - <<'PY'
+          import time
+          import urllib.request
+          from pathlib import Path
+
+          import pandas as pd
+
+          out = Path("data/validation/raw/structures")
+          out.mkdir(parents=True, exist_ok=True)
+          frame = pd.read_csv(
+              "data/validation/ip_binding_validation_dataset.csv", dtype={"pdb_id": str}
+          )
+          ids = sorted({str(v).strip().upper() for v in frame["pdb_id"].dropna()})
+
+          fetched = skipped = failed = 0
+          for pdb_id in ids:
+              target = out / f"{pdb_id}.pdb"
+              if target.exists() and target.stat().st_size > 0:
+                  skipped += 1
+                  continue
+              url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
+              try:
+                  with urllib.request.urlopen(url, timeout=60) as response:
+                      target.write_bytes(response.read())
+                  fetched += 1
+              except Exception as exc:
+                  failed += 1
+                  print(f"skip {pdb_id}: {exc}")
+              time.sleep(0.1)
+
+          print(f"fetched={fetched} cached={skipped} unavailable={failed} total={len(ids)}")
+          PY
+
+      - name: Run the survey
+        shell: bash -l {0}
+        run: |
+          python scripts/burial_survey.py \
+            --structures-dir data/validation/raw/structures \
+            --entry-csv data/validation/ip_binding_validation_dataset.csv \
+            --output-json results/calibration/burial_survey.json \
+            --output-csv results/calibration/burial_survey.csv \
+            --sasa-points "${{ github.event.inputs.sasa_points || '128' }}" \
+            --limit "${{ github.event.inputs.limit || '0' }}" \
+            --jobs 4
+
+      - name: Upload survey results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: burial-survey
+          path: results/calibration/burial_survey.*
+          if-no-files-found: warn
+
+      - name: Survey digest
+        shell: bash -l {0}
+        # Runs last so the distribution and the candidate boundaries stay
+        # reachable from a short log tail, and lands in the run summary.
+        if: always()
+        continue-on-error: true
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          path = Path("results/calibration/burial_survey.json")
+          if not path.exists():
+              print("no survey output was produced")
+              raise SystemExit(0)
+
+          summary = json.loads(path.read_text())["summary"]
+          print("## Per-copy relative burial survey\n")
+          print(f"- entries with structures: **{summary['n_entries']}**")
+          print(f"- measured: **{summary['n_measured']}**")
+          print(f"- failed: **{summary['n_failed']}**")
+          for reason, count in sorted(summary.get("failure_reasons", {}).items()):
+              print(f"    - {count} x {reason}")
+
+          stats = summary.get("relative_sasa")
+          if not stats:
+              raise SystemExit(0)
+
+          print("\n### Distribution of relative SASA\n")
+          print("| quantile | value |")
+          print("| --- | --- |")
+          for key, value in stats["quantiles"].items():
+              print(f"| {key} | {value:.3f} |")
+
+          candidates = summary["candidate_boundaries"]
+          def show(value):
+              return "none - no trough found" if value is None else f"{value:.3f}"
+
+          print("\n### Candidate boundaries\n")
+          print("| estimate | value |")
+          print("| --- | --- |")
+          print(f"| density minimum | {show(candidates['density_minimum'])} |")
+          print(f"| Otsu | {show(candidates['otsu'])} |")
+          print(f"| configured cryptic max | {candidates['configured_cryptic_max']:.3f} |")
+          print(f"\n- bimodal by density: **{summary['is_bimodal_by_density']}**")
+          print(f"- at or below the configured boundary: **{summary['n_below_configured_boundary']}**")
+          print(f"- class counts: `{summary['class_counts']}`")
+          print(f"- series counts: `{summary['series_counts']}`")
+          PY
