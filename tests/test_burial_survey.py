@@ -157,3 +157,88 @@ def test_all_digit_identifiers_are_not_mangled_into_numbers(tmp_path):
 
     resolved = resolve_structures(structures, csv)
     assert sorted(entry["pdb_id"] for entry in resolved) == ["0012", "1ZY7"]
+
+
+#: Measured across the bundled dataset by scripts/burial_survey.py in GitHub
+#: Actions (run 31250979693, 2026-08-08, 128 SASA sample points/atom, all 136
+#: entries). Recorded measurements, not expected outputs of the code under test:
+#: if the measurement changes such that these no longer describe the deposited
+#: set, re-run the survey and update them in the same commit as the change.
+SURVEYED = {
+    "n_entries": 136,
+    "n_measured": 135,
+    "n_failed": 1,
+    "quantiles": {
+        "q01": 0.070, "q05": 0.091, "q10": 0.126, "q25": 0.216, "q50": 0.338,
+        "q75": 0.553, "q90": 0.773, "q95": 0.816, "q99": 0.896,
+    },
+    "density_minimum": 0.138,
+    "otsu": 0.463,
+    "n_below_configured_boundary": 14,
+    "class_counts": {
+        "surface": 89, "semi_cryptic": 26, "cryptic": 14, "crystal_artifact": 6
+    },
+    "series_counts": {"InsP6": 134, "InsP5": 1},
+}
+
+
+def test_coordinate_ligand_detection_resolves_almost_every_deposited_entry():
+    """99% of deposited entries were identified from coordinates alone.
+
+    This is the evidence that the structural ligand test is not too strict. A
+    high failure rate here would mean the detector rejects real inositol
+    phosphates - a defect in the detector, not a property of the data.
+    """
+    assert SURVEYED["n_measured"] / SURVEYED["n_entries"] > 0.98
+
+
+def test_the_two_boundary_estimates_disagree_so_burial_is_not_two_classes():
+    """Recorded finding: relative burial is continuous, not bimodal.
+
+    A genuine two-class structure would put both estimators in the same gap.
+    The density minimum sits at 0.138 near the low tail while Otsu cuts at 0.463,
+    near the middle of a broad spread - what Otsu does when there is one wide
+    mode rather than two. The quantiles agree: burial runs smoothly from 0.07 to
+    0.90 with no chasm.
+
+    This test records the finding so a later change cannot quietly promote the
+    cryptic/surface split to a discovered class boundary. The positive class is
+    defined by a cutoff, and downstream metrics are conditioned on that choice.
+    """
+    trough = SURVEYED["density_minimum"]
+    otsu = SURVEYED["otsu"]
+    assert abs(otsu - trough) > 0.2, (
+        "estimators agreeing would be evidence of a real two-class split; "
+        f"got trough={trough} otsu={otsu}"
+    )
+
+    # No chasm: successive quantiles step smoothly rather than jumping a gap.
+    values = list(SURVEYED["quantiles"].values())
+    steps = [b - a for a, b in zip(values, values[1:])]
+    assert max(steps) < 0.25, f"a real gap would show as a large quantile step: {steps}"
+
+
+def test_configured_boundary_sits_at_the_population_density_minimum():
+    """0.12 was calibrated on one control and lands on the population trough.
+
+    Independent corroboration is worth pinning: the boundary was chosen from
+    ADAR2's measurement, before this survey existed, and falls within one
+    histogram bin (0.025) of the sparsest region of 135 deposited entries.
+    """
+    from cryptic_ip.validation.burial_metrics import CRYPTIC_RELATIVE_SASA_MAX
+
+    assert abs(SURVEYED["density_minimum"] - CRYPTIC_RELATIVE_SASA_MAX) <= 0.025
+
+
+def test_the_surveyed_set_is_essentially_one_chemistry():
+    """A limit on what this calibration covers: it is InsP6, not IP generally."""
+    counts = SURVEYED["series_counts"]
+    dominant = max(counts, key=counts.get)
+    assert dominant == "InsP6"
+    assert counts[dominant] / sum(counts.values()) > 0.95
+
+
+def test_cryptic_sites_are_a_small_minority_of_deposited_complexes():
+    """14 of 135. The class is rare, which is why ranking metrics matter."""
+    fraction = SURVEYED["n_below_configured_boundary"] / SURVEYED["n_measured"]
+    assert 0.05 < fraction < 0.20
