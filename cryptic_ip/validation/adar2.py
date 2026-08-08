@@ -13,6 +13,7 @@ from Bio.PDB import NeighborSearch, PDBParser
 from Bio.PDB.SASA import ShrakeRupley
 
 from ..analysis import ProteinAnalyzer
+from ..analysis.scorer import ScoringParameters
 from ..database.alphafold_client import AlphaFoldClient
 
 from .structure_context import BASIC_RESNAMES, LIGAND_RESNAMES, ligand_context
@@ -194,7 +195,15 @@ def validate_adar2(
             "score_above_0.7": float(top_pocket["composite_score"]) >= 0.55,
             "low_sasa": sasa_metric < 10.0,
             "sufficient_basic": basic_residues >= 4,
-            "appropriate_volume": 250 <= float(top_pocket["volume"]) <= 900,
+            # Cavity volume, not ligand volume: fpocket's alpha-sphere volume for
+            # the pockets that genuinely hold an inositol phosphate spans
+            # 491-1525 A^3 across the control panel, so a 250-900 window rejects
+            # the real ADAR2 site (~1493 A^3). See ScoringParameters.
+            "appropriate_volume": (
+                ScoringParameters().volume_optimum_low
+                <= float(top_pocket["volume"])
+                <= ScoringParameters().volume_optimum_high
+            ),
             "site_overlap": overlap >= min_overlap if ligand_centroid is None else True,
         },
     }

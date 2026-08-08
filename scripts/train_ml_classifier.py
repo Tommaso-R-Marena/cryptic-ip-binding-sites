@@ -154,7 +154,12 @@ def load_training_frame(
     frame = pd.read_csv(path)
     for column in (label_column, group_column):
         if column not in frame.columns:
-            raise ValueError(f"Required column {column!r} missing from {path}")
+            raise ValueError(
+                f"Required column {column!r} missing from {path}. Feature tables "
+                "written before the descriptor rework carry the legacy schema and "
+                "labels from the previous labelling scheme; regenerate with "
+                "`python scripts/extract_pocket_features.py` rather than reusing them."
+            )
 
     missing_features = [name for name in FEATURE_NAMES if name not in frame.columns]
     if missing_features:

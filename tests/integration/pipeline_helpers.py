@@ -54,12 +54,15 @@ def seed_yeast_structures(structures_dir: Path, *, n_proteins: int = 2) -> list[
 
 
 def resolve_ml_features_csv(raw_dir: Path) -> Path | None:
-    """Return bundled pocket features when local structure coverage is too sparse for training."""
-    copied = seed_ml_structures(raw_dir)
-    if copied >= 10:
-        return None
-    if BUNDLED_FEATURES.exists():
-        return BUNDLED_FEATURES
+    """Return a usable pocket feature table, or ``None`` to extract a fresh one.
+
+    Always ``None`` now. The bundled table at ``BUNDLED_FEATURES`` was produced by
+    the previous labelling scheme - 12 190 pockets with 5 positives, from a
+    copy-summed burial measure - and carries the legacy six-column schema.
+    Training on it would reproduce the defect it was built with, so the ML stage
+    extracts features from the control structures instead.
+    """
+    seed_ml_structures(raw_dir)
     return None
 
 
