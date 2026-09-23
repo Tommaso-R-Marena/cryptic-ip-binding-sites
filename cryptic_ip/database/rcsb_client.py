@@ -37,6 +37,7 @@ import hashlib
 import json
 import logging
 import os
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -209,14 +210,18 @@ class RcsbClient:
         self.min_interval_s = float(min_interval_s)
         self.stats = RequestStats()
         self._last_request_at = 0.0
+        self._throttle_lock = threading.Lock()
 
     # ------------------------------------------------------------------ HTTP
 
     def _throttle(self) -> None:
-        elapsed = time.monotonic() - self._last_request_at
-        if elapsed < self.min_interval_s:
-            time.sleep(self.min_interval_s - elapsed)
-        self._last_request_at = time.monotonic()
+        # download_structures calls this from several threads; without the
+        # lock two threads can read the same timestamp and both skip the wait.
+        with self._throttle_lock:
+            elapsed = time.monotonic() - self._last_request_at
+            if elapsed < self.min_interval_s:
+                time.sleep(self.min_interval_s - elapsed)
+            self._last_request_at = time.monotonic()
 
     def _request(
         self,
@@ -693,10 +698,21 @@ class RcsbClient:
 
             raw = response.content
             self.stats.bytes_downloaded += len(raw)
-            try:
-                content = gzip.decompress(raw) if decompress else raw
-            except (OSError, EOFError):
-                content = raw
+            content = raw
+            if decompress and raw[:2] == b"\x1f\x8b":
+                try:
+                    content = gzip.decompress(raw)
+                except (OSError, EOFError) as exc:
+                    # A cut or corrupt gzip stream is a failed download. It was
+                    # once stored as it was, leaving compressed bytes in a file
+                    # named .cif that every later run reused as cached.
+                    self.stats.errors += 1
+                    LOGGER.warning("Corrupt gzip for %s (%s): %s", identifier, fmt, exc)
+                    continue
+            if not _looks_like_structure(content, fmt):
+                self.stats.errors += 1
+                LOGGER.warning("Response for %s (%s) is not a %s file", identifier, fmt, fmt)
+                continue
 
             tmp = target.with_suffix(target.suffix + ".part")
             tmp.write_bytes(content)
@@ -758,6 +774,14 @@ class RcsbClient:
         records.sort(key=lambda rec: rec.identifier)
         LOGGER.info("Retrieved %d/%d structure files", len(records), len(unique))
         return records
+
+
+def _looks_like_structure(content: bytes, fmt: str) -> bool:
+    """Cheap check that a payload is the coordinate format it claims to be."""
+    head = content[:4096].lstrip()
+    if fmt == "cif":
+        return head.startswith(b"data_")
+    return b"ATOM" in content[:200_000] or b"HETATM" in content[:200_000]
 
 
 def _extract_identifiers(data: Mapping[str, Any]) -> List[str]:

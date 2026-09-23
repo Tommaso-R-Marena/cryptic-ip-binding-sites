@@ -117,74 +117,89 @@ class AlphaFoldBatchDownloader:
                 time.sleep(self.backoff_seconds * (2 ** (attempt - 1)))
         raise RuntimeError("Unreachable retry branch")
 
+    UNIPROT_STREAM_URL = "https://rest.uniprot.org/uniprotkb/stream"
+
     @timed()
     def fetch_proteome_uniprot_ids(self, proteome_id: str) -> List[str]:
-        """List all UniProt accessions for a proteome using UniProt pagination."""
-        cursor: Optional[str] = None
-        uniprot_ids: List[str] = []
+        """List every UniProt accession in a proteome in one streamed request.
 
-        while True:
-            params = {
-                "query": f"proteome:{proteome_id}",
-                "fields": "accession",
-                "format": "json",
-                "size": "500",
-            }
-            if cursor:
-                params["cursor"] = cursor
+        The ``stream`` endpoint returns the whole result set, where the
+        paginated ``search`` endpoint needed one request per 500 entries - 40
+        sequential round trips for the human proteome.
 
-            started = time.time()
-            response = self._request_with_retry("GET", self.UNIPROT_SEARCH_URL, params=params)
-            payload = response.json()
-            uniprot_ids.extend(entry["primaryAccession"] for entry in payload.get("results", []))
-            cursor = payload.get("nextCursor")
-            self._rate_limit(started)
+        Note that a proteome query lists more entries than the AlphaFold
+        proteome archive holds (it includes unreviewed entries); accessions
+        without a model are recorded as not found by the download, not as
+        failures. For whole proteomes the per-proteome archive is faster still.
+        """
+        response = self._request_with_retry(
+            "GET",
+            self.UNIPROT_STREAM_URL,
+            params={"query": f"proteome:{proteome_id}", "format": "list"},
+        )
+        return [line.strip() for line in response.text.splitlines() if line.strip()]
 
-            if not cursor:
-                break
+    def _fetch_models(self, uniprot_ids: Sequence[str]) -> Dict[str, Any]:
+        """Download models concurrently; returns accession -> FetchResult."""
+        from .async_fetch import fetch_alphafold_models
 
-        return uniprot_ids
+        return fetch_alphafold_models(
+            uniprot_ids,
+            self.output_dir,
+            concurrency=max(1, int(round(self.requests_per_second * 2))),
+            min_interval=1.0 / self.requests_per_second,
+            max_retries=self.max_retries,
+            backoff=self.backoff_seconds,
+            timeout=max(self.timeout_seconds, 60.0),
+        )
 
     @timed()
-    def download_proteomes(self, proteome_ids: Sequence[str], resume: bool = True) -> Dict[str, int]:
-        """Download AlphaFold structures for every protein in each proteome."""
+    def download_proteomes(
+        self, proteome_ids: Sequence[str], resume: bool = True, chunk_size: int = 500
+    ) -> Dict[str, int]:
+        """Download AlphaFold models for every protein in each proteome.
+
+        Downloads run concurrently in chunks; the resume state is saved after
+        each chunk, so an interrupted run loses at most one chunk. Accessions
+        with no AlphaFold model are counted separately from failures.
+        """
         state = self._load_state() if resume else {"completed": {}, "failed": {}}
-        summary = {"downloaded": 0, "skipped": 0, "failed": 0}
+        summary = {"downloaded": 0, "skipped": 0, "failed": 0, "not_found": 0}
 
         for proteome_id in proteome_ids:
             all_ids = self.fetch_proteome_uniprot_ids(proteome_id)
             completed = set(state["completed"].get(proteome_id, []))
             failed = set(state["failed"].get(proteome_id, []))
+            pending = [uid for uid in all_ids if uid not in completed]
+            summary["skipped"] += len(all_ids) - len(pending)
 
-            progress = tqdm(all_ids, desc=f"{proteome_id}", unit="protein")
-            for uniprot_id in progress:
-                if uniprot_id in completed:
-                    summary["skipped"] += 1
-                    continue
-
-                started = time.time()
-                try:
-                    self.af_client.fetch_structure(uniprot_id)
-                    completed.add(uniprot_id)
-                    failed.discard(uniprot_id)
-                    summary["downloaded"] += 1
-                except Exception as exc:
-                    log_with_context(
-                        self.logger,
-                        logging.WARNING,
-                        "Skipping failed structure download",
-                        proteome_id=proteome_id,
-                        uniprot_id=uniprot_id,
-                        error=str(exc),
-                    )
-                    failed.add(uniprot_id)
-                    summary["failed"] += 1
-                finally:
-                    state["completed"][proteome_id] = sorted(completed)
-                    state["failed"][proteome_id] = sorted(failed)
-                    self._save_state(state)
-                    self._rate_limit(started)
-                    progress.set_postfix(done=len(completed), failed=len(failed))
+            progress = tqdm(total=len(pending), desc=f"{proteome_id}", unit="protein")
+            for start in range(0, len(pending), max(1, chunk_size)):
+                chunk = pending[start : start + chunk_size]
+                for uniprot_id, result in self._fetch_models(chunk).items():
+                    if result.ok:
+                        completed.add(uniprot_id)
+                        failed.discard(uniprot_id)
+                        summary["downloaded"] += 1
+                    elif result.not_found:
+                        summary["not_found"] += 1
+                    else:
+                        log_with_context(
+                            self.logger,
+                            logging.WARNING,
+                            "Skipping failed structure download",
+                            proteome_id=proteome_id,
+                            uniprot_id=uniprot_id,
+                            error=result.error,
+                        )
+                        failed.add(uniprot_id)
+                        summary["failed"] += 1
+                state["completed"][proteome_id] = sorted(completed)
+                state["failed"][proteome_id] = sorted(failed)
+                self._save_state(state)
+                progress.update(len(chunk))
+                progress.set_postfix(done=len(completed), failed=len(failed))
+            progress.close()
 
         return summary
 

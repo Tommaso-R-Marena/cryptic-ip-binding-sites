@@ -1,21 +1,26 @@
 """AlphaFold Database API client for fetching protein structures."""
 
 import logging
+import re
 import requests
-import gzip
 from pathlib import Path
 from typing import Dict, Optional, List
-import time
+
+from .async_fetch import FetchJob, fetch_all, fetch_alphafold_models
 
 logger = logging.getLogger(__name__)
 
 
 class AlphaFoldClient:
     """Client for AlphaFold Protein Structure Database.
-    
-    Uses the AlphaFold API for metadata and FTP for file downloads:
-    - API: https://alphafold.ebi.ac.uk/api-docs
-    - FTP: https://ftp.ebi.ac.uk/pub/databases/alphafold/latest/
+
+    Model files are located through the prediction API
+    (https://alphafold.ebi.ac.uk/api-docs) and fetched by
+    :mod:`cryptic_ip.database.async_fetch`. Whole proteomes should come from the
+    per-proteome archives on the FTP site
+    (https://ftp.ebi.ac.uk/pub/databases/alphafold/latest/), as
+    ``scripts/proteome_screen.py`` and the proteome-screen workflow do; the FTP
+    ``latest`` directory holds only those archives, not individual models.
     """
     
     API_BASE = "https://alphafold.ebi.ac.uk/api"
@@ -34,64 +39,68 @@ class AlphaFoldClient:
             'User-Agent': 'CrypticIP/1.0 (https://github.com/Tommaso-R-Marena/cryptic-ip-binding-sites)'
         })
     
-    def fetch_structure(self, uniprot_id: str, version: Optional[int] = None) -> Path:
-        """Download AlphaFold structure for a UniProt ID.
+    def _cached_versions(self, uniprot_id: str) -> List[Path]:
+        """Cached models for ``uniprot_id``, newest version first.
 
-        Resolves the latest model version from the AlphaFold API when ``version``
-        is omitted, then downloads from the public file endpoint (falling back to
-        the legacy FTP mirror for older releases).
-
-        Cached files are returned without contacting the API when possible.
+        Sorted by the numeric version, not the file name: lexically "v10"
+        sorts before "v4".
         """
+        def version_of(path: Path) -> int:
+            match = re.search(r"_v(\d+)\.pdb$", path.name)
+            return int(match.group(1)) if match else -1
+
+        found = self.cache_dir.glob(f"AF-{uniprot_id}-F1-model_v*.pdb")
+        return sorted(found, key=version_of, reverse=True)
+
+    def fetch_structure(self, uniprot_id: str, version: Optional[int] = None) -> Path:
+        """Download the AlphaFold model for a UniProt accession.
+
+        The current model's URL comes from the prediction API, so a newer
+        release is fetched rather than a stale cached one being returned in its
+        place. The download is retried on transient failures, checked to be a
+        complete PDB file, and written atomically.
+
+        Only when the API cannot be reached is the newest cached model returned,
+        with a warning.
+
+        Args:
+            uniprot_id: UniProt accession.
+            version: Fetch this model version specifically instead of the
+                current one.
+
+        Raises:
+            ValueError: The accession has no AlphaFold model.
+            ConnectionError: The model could not be retrieved and none is cached.
+        """
+        uniprot_id = uniprot_id.strip().upper()
         if version is not None:
-            cached_candidates = [self.cache_dir / f"AF-{uniprot_id}-F1-model_v{version}.pdb"]
+            filename = f"AF-{uniprot_id}-F1-model_v{int(version)}.pdb"
+            (result,) = fetch_all(
+                [FetchJob(uniprot_id, f"https://alphafold.ebi.ac.uk/files/{filename}", self.cache_dir / filename)],
+                concurrency=1,
+            )
         else:
-            cached_candidates = sorted(self.cache_dir.glob(f"AF-{uniprot_id}-F1-model_v*.pdb"))
+            result = fetch_alphafold_models([uniprot_id], self.cache_dir, concurrency=1)[uniprot_id]
 
-        for cached_file in cached_candidates:
-            if cached_file.exists():
-                logger.info(f"Using cached structure: {cached_file}")
-                return cached_file
+        if result.ok:
+            if not result.from_cache:
+                logger.info("Downloaded %s to %s", uniprot_id, result.path)
+            return Path(result.path)
+        if result.not_found:
+            raise ValueError(
+                f"UniProt ID {uniprot_id} not found in AlphaFold Database "
+                f"(https://alphafold.ebi.ac.uk/entry/{uniprot_id}): {result.error}"
+            )
+        cached = self._cached_versions(uniprot_id)
+        if cached and version is None:
+            logger.warning(
+                "AlphaFold unreachable (%s); using cached %s, which may not be the current release",
+                result.error,
+                cached[0].name,
+            )
+            return cached[0]
+        raise ConnectionError(f"Could not retrieve AlphaFold model for {uniprot_id}: {result.error}")
 
-        metadata = self.get_metadata(uniprot_id)
-        resolved_version = int(version or metadata.get("model_version", 4))
-        filename = f"AF-{uniprot_id}-F1-model_v{resolved_version}.pdb"
-        cached_file = self.cache_dir / filename
-
-        if cached_file.exists():
-            logger.info(f"Using cached structure: {cached_file}")
-            return cached_file
-
-        file_url = f"https://alphafold.ebi.ac.uk/files/{filename}"
-        logger.info(f"Downloading {uniprot_id} from AlphaFold: {file_url}")
-
-        try:
-            response = self.session.get(file_url, timeout=60)
-            response.raise_for_status()
-            cached_file.write_bytes(response.content)
-            logger.info(f"Downloaded structure to {cached_file}")
-            return cached_file
-        except requests.HTTPError as file_error:
-            if file_error.response is not None and file_error.response.status_code != 404:
-                raise
-
-        ftp_url = f"{self.FTP_BASE}/{filename}.gz"
-        logger.info(f"Falling back to AlphaFold FTP mirror: {ftp_url}")
-        try:
-            response = self.session.get(ftp_url, timeout=60)
-            response.raise_for_status()
-            cached_file.write_bytes(gzip.decompress(response.content))
-            logger.info(f"Downloaded structure to {cached_file}")
-            return cached_file
-        except requests.HTTPError as e:
-            if e.response.status_code == 404:
-                raise ValueError(
-                    f"UniProt ID {uniprot_id} not found in AlphaFold Database.\n"
-                    f"Check if the protein exists at: https://alphafold.ebi.ac.uk/entry/{uniprot_id}\n"
-                    f"URLs attempted: {file_url}, {ftp_url}"
-                ) from e
-            raise
-    
     def get_metadata(self, uniprot_id: str) -> Dict:
         """Fetch AlphaFold prediction metadata.
         
@@ -130,33 +139,25 @@ class AlphaFoldClient:
                 raise ValueError(f"No metadata for {uniprot_id}")
             raise
     
-    def fetch_batch(self, uniprot_ids: List[str], delay: float = 0.5) -> Dict[str, Path]:
-        """Download multiple structures with rate limiting.
-        
+    def fetch_batch(
+        self, uniprot_ids: List[str], delay: float = 0.0, concurrency: int = 16
+    ) -> Dict[str, Optional[Path]]:
+        """Download many models concurrently.
+
         Args:
-            uniprot_ids: List of UniProt accessions
-            delay: Delay between requests in seconds
-            
+            uniprot_ids: UniProt accessions.
+            delay: Minimum interval between requests to one host, in seconds.
+            concurrency: Downloads in flight at once.
+
         Returns:
-            Dictionary mapping UniProt ID to file path
+            Mapping accession -> model path, or ``None`` when unavailable.
         """
-        results = {}
-        
-        for i, uniprot_id in enumerate(uniprot_ids):
-            try:
-                path = self.fetch_structure(uniprot_id)
-                results[uniprot_id] = path
-                logger.info(f"Downloaded {i+1}/{len(uniprot_ids)}: {uniprot_id}")
-            except Exception as e:
-                logger.error(f"Failed to download {uniprot_id}: {e}")
-                results[uniprot_id] = None
-            
-            # Rate limiting
-            if i < len(uniprot_ids) - 1:
-                time.sleep(delay)
-        
-        return results
-    
+        results = fetch_alphafold_models(
+            uniprot_ids, self.cache_dir, concurrency=concurrency, min_interval=delay,
+            manifest=self.cache_dir / "download_manifest.json",
+        )
+        return {key: Path(r.path) if r.ok else None for key, r in results.items()}
+
     def fetch_proteome(self, proteome_id: str, output_dir: Path) -> int:
         """Download entire AlphaFold proteome.
         

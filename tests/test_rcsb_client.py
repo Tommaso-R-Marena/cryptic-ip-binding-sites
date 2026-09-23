@@ -274,3 +274,24 @@ def test_entry_metadata_survives_a_failed_batch(monkeypatch):
     monkeypatch.setattr(client, "_request", fake_request)
     metadata = client.fetch_entry_metadata(["A001", "B002"], batch_size=1)
     assert len(metadata) == 1
+
+
+def test_corrupt_gzip_is_not_stored(tmp_path: Path, monkeypatch):
+    """A cut gzip stream used to be written as-is and reused as a cached .cif."""
+    client = RcsbClient(cache_dir=None, min_interval_s=0.0)
+    cut = __import__("gzip").compress(b"data_1ZY7\n#\n" * 50)[:-20]
+
+    def fake_request(method, url, allow_404=False, **kwargs):
+        return FakeResponse(content=cut) if url.endswith(".cif.gz") else None
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    assert client.download_structure("1ZY7", tmp_path) is None
+    assert not list(tmp_path.iterdir())
+
+
+def test_error_page_is_not_stored_as_a_structure(tmp_path: Path, monkeypatch):
+    client = RcsbClient(cache_dir=None, min_interval_s=0.0)
+    monkeypatch.setattr(
+        client, "_request", lambda *a, **k: FakeResponse(content=b"<html>maintenance</html>")
+    )
+    assert client.download_structure("1ZY7", tmp_path) is None
