@@ -137,3 +137,28 @@ class TestCatalogAndQc:
     def test_bad_shard_index(self, catalog):
         with pytest.raises(ValueError):
             shard(catalog, 2, 2)
+
+
+def test_local_distortion_is_flagged_not_excluded(tmp_path):
+    """Stretched steps in a low-confidence region flag a model; they do not drop it."""
+    text = _model_text(400)
+    lines = text.splitlines()
+    # Stretch 20 % of the chain: shift every residue from 320 on by 1.5 A in z,
+    # making the 319->320 step long, and give 60 steps extra length by spacing.
+    stretched = []
+    for i, line in enumerate(lines[:-1]):
+        if i >= 320:
+            z = float(line[46:54]) + 0.0
+            x = float(line[30:38]) + (i - 319) * 1.2
+            line = f"{line[:30]}{x:8.3f}{line[38:46]}{z:8.3f}{line[54:]}"
+        stretched.append(line)
+    stretched.append("END")
+    path = _write(tmp_path, "AF-P77777-F1-model_v6.pdb", "\n".join(stretched) + "\n")
+    record = measure_model(path)
+    assert 0.5 <= record.ca_geometry_fraction < 0.95
+    assert record.ca_pairs_long > 0
+    assert record.qc_pass
+    report = qc_report(build_catalog([path], "yeast"), "yeast")
+    geometry = report["checklist"]["geometry_is_protein"]
+    assert geometry["flagged_below_95pct"] == 1
+    assert geometry["failing_models"] == 0

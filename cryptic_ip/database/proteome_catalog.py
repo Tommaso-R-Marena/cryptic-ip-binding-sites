@@ -68,9 +68,17 @@ MIN_FILE_BYTES = 1024
 #: is not a protein chain - a corrupt coordinate block, a unit error, or a
 #: file that is not what its name says.
 CA_CA_RANGE = (3.6, 4.0)
-#: Fraction of consecutive pairs that must fall in :data:`CA_CA_RANGE`. Cis
-#: prolines (~2.9 A) are the only legitimate exception and are rare.
-MIN_CA_GEOMETRY_FRACTION = 0.95
+#: A model is *flagged* when fewer than this fraction of sequence-adjacent
+#: C-alpha pairs fall in :data:`CA_CA_RANGE`. On the yeast proteome (AlphaFold
+#: DB v6) 758 of 6,055 models fall below 95 %: AlphaFold does not enforce bond
+#: geometry in low-confidence regions, so this flags local distortion - it is
+#: reported, with its relation to pLDDT, not used to exclude models, which
+#: would bias the screen against disordered proteins.
+CA_GEOMETRY_FLAG_FRACTION = 0.95
+#: A model is *excluded* only below this: when most of the chain is not at
+#: peptide geometry the file is not a usable protein model at all (a unit
+#: error, a corrupt coordinate block, or not what its name says).
+MIN_CA_GEOMETRY_FRACTION = 0.50
 
 PLDDT_CUTOFF = 70.0
 
@@ -90,6 +98,8 @@ class ModelRecord:
     mean_plddt: float = float("nan")
     fraction_plddt_70: float = float("nan")
     ca_geometry_fraction: float = float("nan")
+    ca_pairs_long: int = 0
+    ca_pairs_short: int = 0
     complete: bool = False
     error: str = ""
 
@@ -110,18 +120,22 @@ def _open_text(path: Path):
     return open(path, "r", encoding="utf-8", errors="replace")
 
 
+def _adjacent_ca_distances(ca_coords: np.ndarray, resseqs: np.ndarray, chains: np.ndarray) -> np.ndarray:
+    if len(ca_coords) < 2:
+        return np.empty(0)
+    adjacent = (np.diff(resseqs) == 1) & (chains[1:] == chains[:-1])
+    return np.linalg.norm(np.diff(ca_coords, axis=0), axis=1)[adjacent]
+
+
 def ca_geometry_fraction(ca_coords: np.ndarray, resseqs: np.ndarray, chains: np.ndarray) -> float:
     """Fraction of sequence-adjacent C-alpha pairs at a peptide-bond distance.
 
     Only pairs adjacent in sequence *and* chain are compared, so a chain break
     or a numbering gap is not mistaken for bad geometry.
     """
-    if len(ca_coords) < 2:
+    distances = _adjacent_ca_distances(ca_coords, resseqs, chains)
+    if distances.size == 0:
         return float("nan")
-    adjacent = (np.diff(resseqs) == 1) & (chains[1:] == chains[:-1])
-    if not adjacent.any():
-        return float("nan")
-    distances = np.linalg.norm(np.diff(ca_coords, axis=0), axis=1)[adjacent]
     low, high = CA_CA_RANGE
     return float(np.mean((distances >= low) & (distances <= high)))
 
@@ -175,9 +189,11 @@ def measure_model(path: Path) -> ModelRecord:
         arr = np.asarray(plddt, dtype=float)
         record.mean_plddt = float(arr.mean())
         record.fraction_plddt_70 = float(np.mean(arr >= PLDDT_CUTOFF))
-        record.ca_geometry_fraction = ca_geometry_fraction(
-            np.asarray(coords, dtype=float), np.asarray(resseqs), np.asarray(chains)
-        )
+        ca, rs, ch = np.asarray(coords, dtype=float), np.asarray(resseqs), np.asarray(chains)
+        record.ca_geometry_fraction = ca_geometry_fraction(ca, rs, ch)
+        distances = _adjacent_ca_distances(ca, rs, ch)
+        record.ca_pairs_long = int(np.sum(distances > CA_CA_RANGE[1]))
+        record.ca_pairs_short = int(np.sum(distances < CA_CA_RANGE[0]))
     elif not record.error:
         record.error = "no C-alpha atoms"
     return record
@@ -201,7 +217,8 @@ def build_catalog(
     columns = [
         "uniprot_id", "fragment", "version", "organism_key", "organism", "proteome_id",
         "filename", "path", "n_bytes", "length", "mean_plddt", "fraction_plddt_70",
-        "ca_geometry_fraction", "name_ok", "complete", "qc_pass", "error",
+        "ca_geometry_fraction", "ca_pairs_long", "ca_pairs_short", "name_ok", "complete",
+        "qc_pass", "error",
     ]
     return pd.DataFrame(rows, columns=columns)
 
@@ -224,11 +241,10 @@ def qc_report(catalog: pd.DataFrame, organism_key: str) -> Dict[str, object]:
     small = int((catalog["n_bytes"] < MIN_FILE_BYTES).sum()) if not catalog.empty else 0
     truncated = int((~catalog["complete"]).sum()) if not catalog.empty else 0
     bad_names = int((~catalog["name_ok"]).sum()) if not catalog.empty else 0
-    geometry_fail = (
-        int((catalog["ca_geometry_fraction"].fillna(0) < MIN_CA_GEOMETRY_FRACTION).sum())
-        if not catalog.empty
-        else 0
-    )
+    fraction = catalog["ca_geometry_fraction"].fillna(0) if not catalog.empty else pd.Series(dtype=float)
+    geometry_fail = int((fraction < MIN_CA_GEOMETRY_FRACTION).sum())
+    flagged = catalog[fraction < CA_GEOMETRY_FLAG_FRACTION] if not catalog.empty else catalog
+    unflagged = catalog[fraction >= CA_GEOMETRY_FLAG_FRACTION] if not catalog.empty else catalog
     plddt_missing = int(catalog["mean_plddt"].isna().sum()) if not catalog.empty else 0
     versions = sorted(int(v) for v in catalog["version"].unique()) if not catalog.empty else []
 
@@ -263,6 +279,15 @@ def qc_report(catalog: pd.DataFrame, organism_key: str) -> Dict[str, object]:
                 "criterion": (
                     f">= {MIN_CA_GEOMETRY_FRACTION:.0%} of sequence-adjacent C-alpha pairs "
                     f"within {CA_CA_RANGE[0]}-{CA_CA_RANGE[1]} A"
+                ),
+                "flagged_below_95pct": int(len(flagged)),
+                "flagged_long_pairs": int(flagged["ca_pairs_long"].sum()) if len(flagged) else 0,
+                "flagged_short_pairs": int(flagged["ca_pairs_short"].sum()) if len(flagged) else 0,
+                "flagged_median_mean_plddt": (
+                    float(flagged["mean_plddt"].median()) if len(flagged) else None
+                ),
+                "unflagged_median_mean_plddt": (
+                    float(unflagged["mean_plddt"].median()) if len(unflagged) else None
                 ),
                 "passes": geometry_fail == 0,
             },
