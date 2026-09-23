@@ -13,6 +13,7 @@ on:
       - 'scripts/phase1_criteria.py'
       - 'cryptic_ip/validation/phase1_criteria.py'
       - 'cryptic_ip/validation/site_selection.py'
+      - 'cryptic_ip/analysis/electrostatics.py'
       - 'cryptic_ip/analysis/scorer.py'
       - 'cryptic_ip/analysis/analyzer.py'
       - 'cryptic_ip/analysis/features.py'

@@ -75,3 +75,48 @@ def test_analyze_ph_dependent_binding(monkeypatch, tmp_path):
     assert result.profile_comparison is not None
     assert result.plot_path.exists()
     assert set(result.profile_comparison["site_type"]) == {"cryptic", "surface"}
+
+
+def _write_apbs_dx(path, origin, delta, counts, func):
+    """Write an OpenDX map the way APBS does: z varies fastest, x slowest."""
+    nx, ny, nz = counts
+    values = [
+        func(origin[0] + i * delta[0], origin[1] + j * delta[1], origin[2] + k * delta[2])
+        for i in range(nx)
+        for j in range(ny)
+        for k in range(nz)
+    ]
+    lines = [
+        f"object 1 class gridpositions counts {nx} {ny} {nz}",
+        f"origin {origin[0]} {origin[1]} {origin[2]}",
+        f"delta {delta[0]} 0 0",
+        f"delta 0 {delta[1]} 0",
+        f"delta 0 0 {delta[2]}",
+        f"object 2 class gridconnections counts {nx} {ny} {nz}",
+        f"object 3 class array type double rank 0 items {nx * ny * nz} data follows",
+    ]
+    for start in range(0, len(values), 3):
+        lines.append(" ".join(f"{v:.6e}" for v in values[start : start + 3]))
+    lines.append('attribute "dep" string "positions"')
+    lines.append('object "regular positions regular connections" class field')
+    path.write_text("\n".join(lines) + "\n")
+
+
+@pytest.mark.parametrize("counts", [(5, 6, 7), (6, 6, 6)])
+def test_dx_sampling_reads_the_right_point(tmp_path, counts):
+    """A linear field is reproduced exactly by trilinear interpolation.
+
+    With x and z transposed the sample comes from the mirror point, which a
+    field that weights the axes differently exposes - including on a cubic
+    grid, where the transposed array still has the right shape.
+    """
+    from cryptic_ip.analysis.electrostatics import ElectrostaticsCalculator
+
+    def field(x, y, z):
+        return 1.0 * x + 10.0 * y + 100.0 * z
+
+    dx = tmp_path / "pot.dx"
+    _write_apbs_dx(dx, origin=(-2.0, 1.0, 3.0), delta=(0.5, 0.75, 1.0), counts=counts, func=field)
+    point = (-0.9, 2.3, 5.4)
+    sampled = ElectrostaticsCalculator.__new__(ElectrostaticsCalculator).sample_potential_at_point(dx, point)
+    assert sampled == pytest.approx(field(*point), rel=1e-6)
