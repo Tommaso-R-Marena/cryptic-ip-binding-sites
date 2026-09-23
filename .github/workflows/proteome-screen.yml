@@ -204,6 +204,15 @@ jobs:
 
       - name: Screen shard
         shell: bash -l {0}
+        # Inside the job's limit, so a shard that overruns still uploads the
+        # parts it has written (every 50 models) rather than losing them all.
+        timeout-minutes: 330
+        env:
+          # One process per core already; threaded BLAS in each would
+          # oversubscribe the runner.
+          OMP_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
         run: |
           python scripts/proteome_screen.py screen \
             --organism "${{ matrix.organism }}" \

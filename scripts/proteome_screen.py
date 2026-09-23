@@ -34,7 +34,7 @@ import sys
 import tempfile
 import time
 import urllib.parse
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -127,7 +127,13 @@ def _screen_one(item: Dict[str, str]) -> Dict[str, object]:
     started = time.time()
     source = Path(item["path"])
     work = Path(tempfile.mkdtemp(prefix=f"screen_{item['uniprot_id']}_"))
-    status = {"uniprot_id": item["uniprot_id"], "n_pockets": 0, "seconds": 0.0, "error": ""}
+    status = {
+        "uniprot_id": item["uniprot_id"],
+        "n_pockets": 0,
+        "seconds": 0.0,
+        "fpocket_seconds": float("nan"),
+        "error": "",
+    }
     try:
         pdb_path = work / source.name.replace(".gz", "")
         if source.suffix == ".gz":
@@ -136,22 +142,20 @@ def _screen_one(item: Dict[str, str]) -> Dict[str, object]:
         else:
             shutil.copy(source, pdb_path)
         analyzer = ProteinAnalyzer(str(pdb_path), work_dir=str(work / "work"), skip_electrostatics=True)
-        scored = analyzer.run_pipeline(include_electrostatics=False)
-        # Depth to the convex hull: the burial measure that survives on apo
-        # models, where depth to the nearest exposed atom collapses inside an
-        # empty cavity (see geometry.hull_depths). The deepest atom's hull
-        # depth is kept as the protein's own scale.
+        # run_pipeline without electrostatics, with fpocket timed on its own:
+        # the split says whether a slow shard is pocket detection or descriptors.
+        detect_started = time.time()
+        analyzer.detect_pockets()
+        status["fpocket_seconds"] = round(time.time() - detect_started, 2)
+        scored = analyzer.score_all_pockets()
+        # Each pocket's hull depth is one of its descriptors. The deepest
+        # atom's hull depth is kept as the protein's own scale, so a pocket's
+        # depth can be read relative to the size of the protein it sits in.
         arrays = load_structure_arrays(pdb_path)
         protein = arrays.coords[arrays.is_polymer]
-        centers = np.array(
-            [record.get("center") or (np.nan,) * 3 for record in scored.to_dict(orient="records")],
-            dtype=float,
-        ).reshape(-1, 3)
         try:
-            pocket_hull = hull_depths(protein, centers)
             protein_scale = float(hull_depths(protein, protein).max())
         except Exception:  # degenerate (e.g. planar) coordinates have no 3-D hull
-            pocket_hull = np.full(len(centers), np.nan)
             protein_scale = float("nan")
         rows = []
         for record in scored.to_dict(orient="records"):
@@ -162,7 +166,6 @@ def _screen_one(item: Dict[str, str]) -> Dict[str, object]:
             record["center_x"], record["center_y"], record["center_z"] = (float(c) for c in center)
             record["pocket_residues"] = ",".join(str(r) for r in residues)
             record["uniprot_id"] = item["uniprot_id"]
-            record["hull_depth"] = float(pocket_hull[len(rows)])
             record["protein_max_hull_depth"] = protein_scale
             rows.append(record)
         status["n_pockets"] = len(rows)
@@ -173,6 +176,12 @@ def _screen_one(item: Dict[str, str]) -> Dict[str, object]:
     finally:
         status["seconds"] = round(time.time() - started, 2)
         shutil.rmtree(work, ignore_errors=True)
+
+
+#: Report when no model has finished for this long, naming those in flight.
+HEARTBEAT_S = 600.0
+#: Log every model that takes at least this long.
+SLOW_S = 120.0
 
 
 def cmd_screen(args: argparse.Namespace) -> int:
@@ -205,9 +214,14 @@ def cmd_screen(args: argparse.Namespace) -> int:
         pd.DataFrame(statuses).to_csv(out / f"{tag}_status.csv", index=False)
 
     def record(done: int, result: Dict[str, object]) -> None:
-        statuses.append(result["status"])
+        status = result["status"]
+        statuses.append(status)
         part.extend(result["pockets"])
-        if done % 100 == 0 or done == len(items):
+        if status["seconds"] >= SLOW_S:
+            print(f"{tag}: slow model {status['uniprot_id']}: {status['seconds']:.0f} s "
+                  f"(fpocket {status['fpocket_seconds']:.0f} s), {status['n_pockets']} pockets "
+                  f"{status['error']}", flush=True)
+        if done % 50 == 0 or done == len(items):
             flush()
             rate = done / max(time.time() - started, 1e-9)
             errors = sum(1 for s in statuses if s["error"])
@@ -220,9 +234,22 @@ def cmd_screen(args: argparse.Namespace) -> int:
         # Fresh worker processes periodically, so memory from one giant model
         # is returned to the system rather than carried through the shard.
         with ProcessPoolExecutor(max_workers=args.workers, max_tasks_per_child=25) as pool:
-            futures = [pool.submit(_screen_one, item) for item in items]
-            for done, future in enumerate(as_completed(futures), start=1):
-                record(done, future.result())
+            futures = {pool.submit(_screen_one, item): item for item in items}
+            pending = set(futures)
+            done = 0
+            while pending:
+                finished, pending = wait(pending, timeout=HEARTBEAT_S, return_when=FIRST_COMPLETED)
+                if not finished:
+                    # Name what is running, so a stall is attributable to models.
+                    running = [futures[f]["uniprot_id"] for f in pending if f.running()]
+                    print(
+                        f"{tag}: nothing finished in {HEARTBEAT_S:.0f} s; "
+                        f"{done}/{len(items)} done; running {', '.join(running)}",
+                        flush=True,
+                    )
+                for future in finished:
+                    done += 1
+                    record(done, future.result())
     flush()
     return 0
 
@@ -424,6 +451,12 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
     )
     failed = status[status["error"] != ""]
     failed.to_csv(out / "failed_structures.csv", index=False)
+    # Models a shard never reached (it timed out, or its job failed) are
+    # neither screened nor failed: they are reported, and left out of every
+    # denominator, rather than disappearing without a count.
+    eligible = f1[f1["qc_pass"].astype(bool)] if "qc_pass" in f1.columns else f1
+    unscreened = eligible[~eligible["uniprot_id"].isin(status["uniprot_id"])]
+    unscreened[["uniprot_id", "organism_key", "length"]].to_csv(out / "unscreened_structures.csv", index=False)
     annotations = _read_many(sorted(catalogs.rglob("*_uniprot.tsv")), sep="\t", dtype=str)
     if not annotations.empty:
         annotations = annotations.drop_duplicates("uniprot_id")
@@ -437,6 +470,7 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
         "structures": {
             "screened_ok": int(len(screened)),
             "failed": int(len(failed)),
+            "unscreened": {k: int(v) for k, v in unscreened["organism_key"].value_counts().items()},
             "pockets": int(len(pockets)),
             "median_seconds_per_structure": float(status["seconds"].median()),
         },
@@ -470,6 +504,12 @@ def _digest(summary, analyses, out) -> None:
         f"{s['screened_ok']} structures screened ({s['failed']} failed), {s['pockets']} pockets, "
         f"median {s['median_seconds_per_structure']:.1f} s per structure.\n"
     )
+    if s["unscreened"]:
+        missing = ", ".join(f"{k} {v}" for k, v in sorted(s["unscreened"].items()))
+        lines.append(
+            f"**Incomplete:** QC-passing models never screened ({missing}); "
+            "rates below are over the models that were.\n"
+        )
     for analysis in analyses:
         c = analysis["criteria"]
         lines.append(f"## Hit definition: {analysis['label']}\n")

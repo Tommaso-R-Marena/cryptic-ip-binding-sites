@@ -22,9 +22,11 @@ class _StubAnalyzer:
     def __init__(self, pdb_path, **_):
         self.pdb_path = str(pdb_path)
 
-    def run_pipeline(self, include_electrostatics=False):
+    def detect_pockets(self):
         if "P00002" in self.pdb_path:
             raise RuntimeError("fpocket produced no output")
+
+    def score_all_pockets(self):
         hit = "P00000" in self.pdb_path
         return pd.DataFrame(
             [
@@ -36,6 +38,7 @@ class _StubAnalyzer:
                     "volume": 1500.0,
                     "plddt_mean": 92.0,
                     "burial_depth": 6.0,
+                    "hull_depth": 14.0,
                     "center": (1.0, 2.0, 3.0),
                     "pocket_residue_numbers": [10, 11, 12],
                 },
@@ -47,6 +50,7 @@ class _StubAnalyzer:
                     "volume": 200.0,
                     "plddt_mean": 55.0,
                     "burial_depth": 1.0,
+                    "hull_depth": 2.0,
                     "center": (0.0, 0.0, 0.0),
                     "pocket_residue_numbers": [1],
                 },
@@ -86,6 +90,12 @@ def test_catalog_screen_aggregate(tmp_path, monkeypatch):
     # Every pocket is kept, including the one that fails every gate.
     assert len(pockets) == 6
     assert {"center_x", "pocket_residues", "organism_key"} <= set(pockets.columns)
+    # The pocket's hull depth is its descriptor, not recomputed by the worker.
+    assert sorted(pockets["hull_depth"].unique()) == [2.0, 14.0]
+    assert pockets["protein_max_hull_depth"].notna().all()
+    status = pd.concat(pd.read_csv(p) for p in shards_dir.glob("*_status.csv"))
+    assert len(status) == 4
+    assert status.loc[status["uniprot_id"] != "P00002", "fpocket_seconds"].notna().all()
 
     assert proteome_screen.main(
         ["aggregate", "--shards-dir", str(shards_dir), "--catalog-dir", str(catalog_dir),
@@ -103,4 +113,75 @@ def test_catalog_screen_aggregate(tmp_path, monkeypatch):
     failed = pd.read_csv(summary_dir / "failed_structures.csv")
     assert failed["uniprot_id"].tolist() == ["P00002"]
     assert "fpocket" in failed["error"].iloc[0]
-    assert (summary_dir / "DIGEST.md").read_text().startswith("## Proteome screen")
+    digest = (summary_dir / "DIGEST.md").read_text()
+    assert digest.startswith("## Proteome screen")
+    assert summary["structures"]["unscreened"] == {}
+    assert "Incomplete" not in digest
+
+
+def test_models_a_shard_never_reached_are_counted(tmp_path, monkeypatch):
+    """A shard that timed out leaves models neither screened nor failed."""
+    import cryptic_ip.analysis as analysis
+
+    monkeypatch.setattr(analysis, "ProteinAnalyzer", _StubAnalyzer, raising=False)
+    catalog = _catalog(tmp_path, n=4)
+    shards, summary_dir = tmp_path / "shards", tmp_path / "summary"
+    # Only shard 0 of 2 runs.
+    assert proteome_screen.main(
+        ["screen", "--organism", "yeast", "--catalog", str(catalog), "--shard-index", "0",
+         "--shard-count", "2", "--workers", "1", "--output-dir", str(shards)]
+    ) == 0
+    assert proteome_screen.main(
+        ["aggregate", "--shards-dir", str(shards), "--catalog-dir", str(catalog.parent),
+         "--output-dir", str(summary_dir)]
+    ) == 0
+    summary = json.loads((summary_dir / "screen_summary.json").read_text())
+    assert summary["structures"]["unscreened"] == {"yeast": 2}
+    screened = pd.read_csv(next(shards.glob("*_status.csv")))["uniprot_id"]
+    unscreened = pd.read_csv(summary_dir / "unscreened_structures.csv")["uniprot_id"]
+    assert set(screened).isdisjoint(unscreened) and len(unscreened) == 2
+    assert "**Incomplete:**" in (summary_dir / "DIGEST.md").read_text()
+
+
+def _catalog(tmp_path, n=3):
+    models = tmp_path / "models"
+    models.mkdir()
+    for i in range(n):
+        _write(models, f"AF-P0000{i}-F1-model_v4.pdb", _model_text(300 + i))
+    catalog_dir = tmp_path / "catalog"
+    assert proteome_screen.main(
+        ["catalog", "--organism", "yeast", "--structures-dir", str(models), "--output-dir", str(catalog_dir)]
+    ) == 0
+    return catalog_dir / "yeast_catalog.csv"
+
+
+def test_slow_models_are_named_in_the_log(tmp_path, monkeypatch, capsys):
+    import cryptic_ip.analysis as analysis
+
+    monkeypatch.setattr(analysis, "ProteinAnalyzer", _StubAnalyzer, raising=False)
+    monkeypatch.setattr(proteome_screen, "SLOW_S", 0.0)
+    catalog = _catalog(tmp_path)
+    assert proteome_screen.main(
+        ["screen", "--organism", "yeast", "--catalog", str(catalog), "--workers", "1",
+         "--output-dir", str(tmp_path / "shards")]
+    ) == 0
+    log = capsys.readouterr().out
+    assert "slow model P00000" in log and "(fpocket " in log
+    assert "slow model P00002" in log and "fpocket produced no output" in log
+
+
+def test_parallel_screen_records_every_model(tmp_path, capsys):
+    """The process-pool path: every model returns a status, failures included.
+
+    Without fpocket (or with these toy models) each structure fails, which is
+    what is checked: a failed worker is a recorded error, never a lost model.
+    """
+    catalog = _catalog(tmp_path)
+    shards = tmp_path / "shards"
+    assert proteome_screen.main(
+        ["screen", "--organism", "yeast", "--catalog", str(catalog), "--workers", "2",
+         "--output-dir", str(shards)]
+    ) == 0
+    status = pd.read_csv(next(shards.glob("*_status.csv")))
+    assert sorted(status["uniprot_id"]) == ["P00000", "P00001", "P00002"]
+    assert "3/3" in capsys.readouterr().out
