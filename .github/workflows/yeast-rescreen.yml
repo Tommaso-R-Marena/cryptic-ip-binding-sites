@@ -21,6 +21,7 @@ on:
       - 'cryptic_ip/analysis/analyzer.py'
       - 'cryptic_ip/analysis/features.py'
       - 'cryptic_ip/analysis/structure_arrays.py'
+      - 'cryptic_ip/analysis/filters.py'
       - '.github/workflows/yeast-rescreen.yml'
   workflow_dispatch:
 

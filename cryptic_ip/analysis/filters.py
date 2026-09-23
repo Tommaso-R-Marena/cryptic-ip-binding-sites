@@ -6,6 +6,16 @@ import pandas as pd
 from typing import Optional
 
 from ..validation.plddt import pocket_plddt_confidence
+from .scorer import ScoringParameters
+
+#: Hard volume gate, taken from the scorer's calibrated cavity window. fpocket
+#: measures the *cavity*, which is systematically larger than the ligand: real
+#: inositol phosphate pockets on the control panel span 491-1525 A^3, and the
+#: ADAR2 InsP6 pocket is ~1525 A^3. The former 300-800 A^3 gate - the volume of
+#: the ligand itself - rejected the paradigm positive outright.
+_PARAMETERS = ScoringParameters()
+MIN_POCKET_VOLUME = _PARAMETERS.volume_optimum_low
+MAX_POCKET_VOLUME = _PARAMETERS.volume_optimum_high
 
 
 class CandidateFilter:
@@ -112,8 +122,8 @@ class CandidateFilter:
         results: pd.DataFrame,
         min_basic: int = 4,
         max_sasa: float = 10.0,
-        min_volume: float = 300,
-        max_volume: float = 800,
+        min_volume: float = MIN_POCKET_VOLUME,
+        max_volume: float = MAX_POCKET_VOLUME,
     ) -> pd.DataFrame:
         """
         Apply hard cutoffs for cryptic IP site criteria.
@@ -143,8 +153,8 @@ class CandidateFilter:
         *,
         min_basic: int = 4,
         max_sasa: float = 10.0,
-        min_volume: float = 300,
-        max_volume: float = 800,
+        min_volume: float = MIN_POCKET_VOLUME,
+        max_volume: float = MAX_POCKET_VOLUME,
         min_burial_depth: Optional[float] = None,
     ) -> pd.DataFrame:
         """Apply score, burial, volume, and pLDDT gates for proteome screening.

@@ -80,3 +80,22 @@ class TestCandidateFilter:
         filt = CandidateFilter(min_plddt=75.0)
         kept = filt.filter_by_confidence(_sample_results())
         assert set(kept["pocket_id"]) == {1, 3, 4}
+
+
+def test_volume_gate_admits_the_adar2_cavity():
+    """The real ADAR2 InsP6 pocket is ~1525 A^3 of cavity; the old 800 cap rejected it."""
+    adar2_like = pd.DataFrame(
+        [
+            {
+                "pocket_id": 1,
+                "composite_score": 0.85,
+                "basic_residues": 7,
+                "sasa": 4.0,
+                "volume": 1525.0,
+                "plddt_confidence": 92.0,
+            }
+        ]
+    )
+    filt = CandidateFilter(min_score=0.75)
+    assert list(filt.filter_by_criteria(adar2_like)["pocket_id"]) == [1]
+    assert filt.filter_by_criteria(adar2_like, max_volume=800).empty
