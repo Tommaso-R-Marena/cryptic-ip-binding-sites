@@ -232,8 +232,10 @@ def cmd_screen(args: argparse.Namespace) -> int:
             record(done, _screen_one(item))
     else:
         # Fresh worker processes periodically, so memory from one giant model
-        # is returned to the system rather than carried through the shard.
-        with ProcessPoolExecutor(max_workers=args.workers, max_tasks_per_child=25) as pool:
+        # is returned to the system rather than carried through the shard
+        # (Python 3.11+; earlier versions keep their workers).
+        recycle = {"max_tasks_per_child": 25} if sys.version_info >= (3, 11) else {}
+        with ProcessPoolExecutor(max_workers=args.workers, **recycle) as pool:
             futures = {pool.submit(_screen_one, item): item for item in items}
             pending = set(futures)
             done = 0
