@@ -27,7 +27,9 @@
 >    per copy it is 89 surface, 26 semi-cryptic, 14 cryptic, 6 crystal artefacts.
 > 4. **The ROC-AUC ≈ 0.5 was an artefact of the labels**, not evidence that the
 >    task is under-powered.
-> 5. **The tier-1 separation is 0.581**, not 0.564, under the current scorer.
+> 5. **The tier-1 separation of 0.581 was measured with the ligand bound.**
+>    Scored as a proteome target is scored - ligand removed - it is 0.081 on the
+>    crystal structures and 0.069 on the AlphaFold models (see below).
 >
 > One claim is independently confirmed: HDAC1's inositol phosphate is surface-
 > exposed. Evidence for each change is in `docs/METHODS.md`,
@@ -35,18 +37,40 @@
 
 ## Results
 
-### A burial-aware pipeline separates structural from signaling IP sites
+### The pipeline finds ADAR2's site, but scores it only narrowly above surface sites
 
 We built an end-to-end pipeline (Figure 1B) that combines AlphaFold/PDB
 structures, fpocket cavity detection, Shrake–Rupley solvent accessibility,
-per-ligand-copy burial measurement, and a screened-Coulomb electrostatic term
-into a composite cryptic-site score. On the tier-1 controls the pipeline
-separates the gold-standard buried site of ADAR2 (PDB 1ZY7) from the canonical
-surface signaling site of the PLCδ1 PH domain (PDB 1MAI), with a burial-aware
-score separation of **0.581** (Phase-1 gate threshold > 0.50; Figure 4C). ADAR2
-passes all positive-control criteria (buried IP6, ≥ 4 basic residues,
-appropriate pocket volume), while both PH-domain negative controls (PLCδ1,
-1MAI; Btk, 1BWN) score low, as required.
+per-ligand-copy burial measurement, and electrostatics into a composite
+cryptic-site score, and measured it against every Phase 1 criterion of the
+project plan on the full control panel - ADAR2, Pds5B, HDAC1 and HDAC3 as
+positives, and the PH domains of PLCδ1, Btk, DAPP1 and Grp1 as negatives - on
+both the crystal structures and their AlphaFold models. Each control was scored
+as a proteome target is: ligand, waters and all non-polymer atoms removed.
+
+ADAR2's InsP6 site is the **top-ranked pocket** in both its crystal structure
+(1 of 33) and its AlphaFold model (1 of 82), the model reproduces the binding
+region to **0.48 Å** RMSD, and the site carries eight basic residues within 5 Å
+and a strongly positive potential (APBS, +62 kT/e at the pocket centre in the
+model). Every control's model reproduces its binding region within 2 Å.
+
+The score separates ADAR2 from the negatives only narrowly: 0.575 against
+0.446-0.506 on the models (0.572 against 0.453-0.491 on the crystals). The
+earlier-reported separation of 0.581 came from scoring the deposited holo
+structures, in which the bound ligand occludes the residues lining its own
+pocket - a signal an AlphaFold model cannot show. Rank within a protein does
+not separate buried from surface sites at all: every PH-domain site ranks 1-3
+among its protein's pockets, because in a small domain the inositol phosphate
+site is the main pocket. Nor do the chemical criteria: basic residues and
+positive potential are shared by every phosphate-binding site, buried or not.
+
+What does separate them is burial measured from the protein's exterior. ADAR2's
+site lies **17.3 Å inside the convex hull** of its model (13.0 Å in the
+crystal) against 5.7-8.4 Å for every PH-domain site. The pipeline's own burial
+depth - distance to the nearest solvent-exposed atom - cannot see this on a
+ligand-free structure: the walls of the vacated cavity are themselves exposed,
+so ADAR2's enclosed site reads 3-4.5 Å. The plan's strict screening filter
+(score ≥ 0.75, lining SASA ≤ 10 Å²) rejects ADAR2's own site on both gates.
 
 ### Which burial measurements carry the signal
 

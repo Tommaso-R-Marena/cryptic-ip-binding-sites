@@ -407,7 +407,7 @@ functions of each measurement:
 | Basic residue count | 0.20 | 3.5 |
 | Enclosure | 0.13 | 0.75 |
 | Electrostatic potential | 0.10 | 3 kT/e |
-| Cavity volume | 0.10 | 300–800 Å³ plateau |
+| Cavity volume | 0.10 | 300–1600 Å³ plateau (cavity, not ligand, volume) |
 
 The components were previously step functions — 4 basic residues scored 0.8 and
 3 scored 0.4 — which made the score unstable under measurement noise for no
@@ -428,6 +428,14 @@ is a weighted average of bounded components and must not be read as one.
 
 Pass criterion: both controls pass individually **and** tier-1 separation > 0.50.
 
+**The gate scores the deposited holo structures, with the ligand present.**
+That is not how a proteome target is scored, and it matters: the bound ligand
+occludes the residues lining its own pocket. Scored as the screen scores - the
+ligand's chain alone, every non-polymer atom removed - ADAR2's site scores 0.572
+and the highest PH-domain site 0.491, a separation of **0.081**, not 0.581; on
+the AlphaFold models it is 0.069 (section 6a). The gate's 0.581 measures the
+pipeline on an input it never sees in a screen.
+
 **Site selection.** The validators select the pocket to grade by *ligand-atom
 overlap*, the same criterion used for training labels. They previously selected
 the pocket whose centre was nearest the ligand centroid, which picks the wrong
@@ -447,6 +455,75 @@ number of ligand copies in the crystal.
 | Pds5B | 5HDT | Often a surface/crystal artefact |
 | HDAC1 | 5ICN | Measures as surface (0.436); its InsP6 is solvent-exposed |
 | Btk PH | 1BWN | Surface negative (decoy mode) |
+
+### 6a. The project plan's Phase 1 criteria, measured
+
+`scripts/phase1_criteria.py` (CI: `.github/workflows/phase1-criteria.yml`)
+measures every criterion of the plan's sections 5-6 on the full panel - the
+plan's positives ADAR2, Pds5B, HDAC1 and HDAC3, and its four PH-domain
+negatives PLCδ1, Btk, DAPP1 and Grp1 - on both the crystal structure and the
+control's AlphaFold model. Each is evaluated as a proteome target: reduced to
+the ligand's chain, every non-polymer atom removed, pockets detected and scored
+as the screen scores them. The holo ligand only says which pocket is the site.
+On the AlphaFold model the ligand is placed by superposing the binding region,
+residues paired by sequence alignment rather than number.
+
+| site (AlphaFold model) | rank | score | hull depth | depth | lining SASA | basic ≤5 Å (crystal) | APBS kT/e | RMSD to crystal |
+|---|---|---|---|---|---|---|---|---|
+| ADAR2 | 1/82 | 0.575 | 17.3 Å | 4.5 Å | 30.7 | 8 | +62 | 0.48 Å |
+| Pds5B | 45/183 | 0.327 | 38.3 | 2.6 | 79.0 | 8 | +10 | 0.24 |
+| HDAC1 | 2/52 | 0.510 | 17.8 | 1.0 | 48.7 | 4 | +40 | 0.44 |
+| HDAC3 | 4/63 | 0.385 | 7.1 | 1.1 | 31.2 | 5 | +19 | 0.22 |
+| PLCδ1 PH | 3/81 | 0.478 | 8.2 | 2.7 | 82.3 | 6 | +11 | 0.91 |
+| Btk PH (1BWN) | 1/90 | 0.506 | 7.8 | 3.8 | 37.1 | 7 | +17 | 1.76 |
+| DAPP1 PH | 2/37 | 0.446 | 5.7 | 3.2 | 61.4 | 6 | +18 | 0.32 |
+| Grp1 PH | 2/53 | 0.484 | 7.9 | 3.0 | 55.5 | 7 | +21 | 0.23 |
+
+1BTK, the identifier the plan gives for Btk, contains no inositol phosphate;
+1BWN is the Btk PH domain with Ins(1,3,4,5)P4.
+
+What holds:
+
+- **ADAR2's site is the top-ranked pocket** in both the crystal structure and
+  the AlphaFold model, and the model reproduces the binding region to 0.48 Å.
+  Every control's model is within the plan's 2 Å.
+- Basic residues (≥ 6 within 5 Å) and a positive potential are met at ADAR2.
+
+What does not:
+
+- **Rank within a protein does not separate buried from surface sites.** Every
+  PH-domain site ranks 1-3 of its protein's pockets: in a small domain the
+  inositol phosphate site is simply the main pocket. The plan's "bottom half"
+  criterion fails for all four negatives.
+- **Basic residues and potential do not separate them either.** They are
+  properties of phosphate-binding sites, buried or not: the PH-domain sites
+  carry 6-7 basic residues and +11 to +21 kT/e.
+- **The composite score barely does.** 0.575 for ADAR2 against 0.446-0.506 for
+  the PH domains, so no positive-negative overlap for ADAR2, but a 0.07 margin,
+  and Pds5B and HDAC3 fall below every negative. None reaches the plan's 0.7.
+- **Lining SASA fails on apo sites.** The plan's < 5 Å² target is a property of
+  the complex (ADAR2's basic coordinating residues measure 10.6 Å² with the
+  ligand present, 42.5 without). With the ligand removed they are exposed.
+
+The separating measurement is **depth to the convex hull**: 13.0 Å (crystal)
+and 17.3 Å (model) for ADAR2 against 5.7-8.4 Å for every PH-domain site. The
+pipeline's burial depth - distance to the nearest solvent-exposed atom -
+collapses on apo structures, because the walls of the empty cavity are
+themselves exposed: ADAR2's fully enclosed site reads 3-4.5 Å. Hull depth is
+size-dependent (a small domain cannot contain a deep point; Pds5B's elongated
+HEAT-repeat model inflates it), which the screen's analysis has to account for.
+
+**Consequence for the screen.** The plan's strict filter - score ≥ 0.75 and
+lining SASA ≤ 10 Å² - rejects ADAR2's own site on two gates. The proteome
+screen therefore reports the plan's definition and a calibrated one (score ≥
+0.54, hull depth ≥ 10 Å, no SASA gate) side by side. The calibrated thresholds
+rest on one positive and four negatives.
+
+**Three APBS defects were found doing this.** The DX reader never parsed real
+APBS output (it matched a header line APBS does not write), would have read the
+map with x and z transposed, and the fixed 60 Å fine grid did not contain large
+proteins, so off-centre pockets returned the boundary value. The grid is now
+sized to the molecule and focused on the site, and sampling outside it raises.
 
 ### Offline self-check
 
