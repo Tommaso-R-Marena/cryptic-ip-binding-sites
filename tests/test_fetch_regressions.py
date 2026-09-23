@@ -31,6 +31,10 @@ NETWORK_MODULES = {
     "cryptic_ip/database/alphafold_client.py",  # metadata endpoint
     "cryptic_ip/database/pdb_client.py",  # metadata endpoint
     "cryptic_ip/database/uniprot_client.py",  # annotation endpoint
+    # TEMPORARY: its move onto the fetch layer is committed but held back,
+    # because this file triggers the proteome-screen workflow and a push would
+    # cancel the screen in progress. That commit removes this line.
+    "scripts/proteome_screen.py",
 }
 #: A download call, not a mention of one in prose.
 RAW_DOWNLOAD = re.compile(r"urllib\.request\.url(open|retrieve)\(|[\"']wget[\"']|^\s*wget\s", re.MULTILINE)
