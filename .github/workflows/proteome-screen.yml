@@ -208,7 +208,10 @@ jobs:
   aggregate:
     name: Aggregate and compare
     needs: screen
-    if: always()
+    # Aggregate whatever shards finished even if some failed, but not when the
+    # run was cancelled (superseded by a newer push): there is nothing to
+    # aggregate then, and a red check on a superseded run is noise.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
