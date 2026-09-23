@@ -26,7 +26,6 @@ output is the evidence a threshold change should cite.
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import sys
 from pathlib import Path
@@ -37,6 +36,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from cryptic_ip.analysis.analyzer import ProteinAnalyzer  # noqa: E402
+from cryptic_ip.utils.json_io import dumps_strict  # noqa: E402
 from cryptic_ip.analysis.inositol_detection import detect_inositol_residues  # noqa: E402
 from cryptic_ip.analysis.labeling import LigandSite, assign_pocket_labels  # noqa: E402
 from cryptic_ip.analysis.scorer import PocketScorer  # noqa: E402
@@ -259,34 +259,6 @@ def _format_value(value: Any, width: int = 8, precision: int = 3) -> str:
     return f"{number:{width}.{precision}f}"
 
 
-def _json_safe(value: Any) -> Any:
-    """Convert a measurement tree into strictly valid JSON.
-
-    Not-a-number is what an undefined ratio evaluates to - a phosphate SASA
-    ratio is undefined when the ligand carries no phosphate - but ``NaN`` is not
-    part of the JSON grammar. Python emits it as a bare ``NaN`` token by default,
-    which every strict parser rejects, so the measurements file could not be read
-    by jq, JavaScript, or R even though Python round-tripped it happily. Undefined
-    values become ``null``, which is both valid and the correct meaning.
-
-    Args:
-        value: Arbitrary nested measurement structure.
-
-    Returns:
-        The same structure with non-finite floats replaced by ``None`` and numpy
-        scalars converted to built-in types.
-    """
-    if isinstance(value, dict):
-        return {key: _json_safe(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_json_safe(item) for item in value]
-    if isinstance(value, np.generic):
-        value = value.item()
-    if isinstance(value, float):
-        return value if np.isfinite(value) else None
-    return value
-
-
 def _print_panel_summary(measured: Sequence[Dict[str, Any]]) -> None:
     """Restate the panel's decisive numbers as a compact block.
 
@@ -415,7 +387,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
     args.output_json.write_text(
-        json.dumps(_json_safe(results), indent=2, allow_nan=False), encoding="utf-8"
+        dumps_strict(results), encoding="utf-8"
     )
     print(f"\nWrote {args.output_json}")
 

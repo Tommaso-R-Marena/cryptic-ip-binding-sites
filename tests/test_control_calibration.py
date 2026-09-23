@@ -348,9 +348,9 @@ def test_calibration_measurements_are_strictly_valid_json():
     """
     import json
 
-    from scripts.calibrate_controls import _json_safe
+    from cryptic_ip.utils.json_io import json_safe
 
-    payload = _json_safe(
+    payload = json_safe(
         {
             "relative_sasa": 0.093,
             "relative_phosphate_sasa": float("nan"),

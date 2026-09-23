@@ -22,7 +22,6 @@ information, and the honest report says so.
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import platform
 import sys
@@ -35,6 +34,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from cryptic_ip.utils.json_io import write_json_strict  # noqa: E402
 from cryptic_ip.analysis.features import FEATURE_NAMES, feature_documentation  # noqa: E402
 from cryptic_ip.analysis.ml_classifier import (  # noqa: E402
     CrypticSiteMLClassifier,
@@ -575,9 +575,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except ImportError:
         pass
 
-    (args.model_dir / f"{args.model_name}.metadata.json").write_text(
-        json.dumps(metadata, indent=2, default=float), encoding="utf-8"
-    )
+    # Strict JSON: a metric that is undefined for some fold would otherwise be
+    # written as a bare NaN token, which other tools refuse to read.
+    write_json_strict(args.model_dir / f"{args.model_name}.metadata.json", metadata)
     LOGGER.info("Wrote model card and metadata to %s", args.model_dir)
     return 0
 
