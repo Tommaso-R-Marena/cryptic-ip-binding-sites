@@ -198,39 +198,72 @@ analogue is recognised on its structure rather than on whether anyone typed its
 code. Exact name matching remains available for callers measuring one named
 component.
 
-### Burial depth does not discriminate on real structures
+### Burial depth discriminates weakly; enclosure strongly
 
-The panel shows something the synthetic benchmark cannot: **depth is
-uninformative on deposited structures.** The values are completely interleaved,
-and the *largest* depth in the panel belongs to a surface negative:
+This section previously said depth was **uninformative** on deposited
+structures. That was an overstatement from five structures, and the population
+survey corrects it.
+
+On the five-structure panel the values do interleave, and the *largest* depth
+belongs to a surface control:
 
 | | buried | exposed |
 |---|---|---|
 | depth (Å) | ADAR2 5.76 | Btk **5.98**, PLCδ1 4.68, HDAC1 4.39, Pds5B 5.63 |
 | enclosure | ADAR2 0.941 | Btk 0.668, PLCδ1 0.598, HDAC1 0.629, Pds5B 0.738 |
 
-No threshold on depth isolates the buried control: its 5.76 Å sits strictly
-inside the 4.39-5.98 Å spread of the exposed ones, so any cutoff admitting it
-admits a surface site too. On idealised synthetic spheres
-the same measure separates them perfectly (22 Å against 5 Å).
+No threshold on depth isolates ADAR2 there. But a panel that small cannot say
+whether depth carries information, only that it does not separate these five.
+PR #40's manuscript draft had reached the opposite conclusion from an even
+smaller comparison — ADAR2 at 6.55 Å against about 2 Å for two PH domains, "a
+~3× difference". Both claims rested on three to five structures.
 
-The reason is the definition. Depth is the distance to the *nearest* solvent-
-exposed atom — a minimum over a large set. A real protein surface is irregular
-enough that some exposed atom lies within a few Å of almost any interior point,
-so the minimum saturates. An idealised sphere has no such irregularity, which is
-exactly why the synthetic benchmark could not have revealed this, and it is a
-concrete limit on what synthetic validation can establish.
+`scripts/burial_survey.py` settles it on all 129 eligible deposited entries
+(crystal artefacts excluded), scoring each descriptor against relative SASA:
 
-Enclosure separates the panel cleanly (buried 0.941 against maximum exposed
-0.738) because it integrates over directions rather than taking a
-minimum. Enclosure is therefore the reliable burial discriminator on real data,
-and depth should be read as a supporting descriptor rather than a criterion.
+| descriptor | Spearman ρ vs relative SASA | AUROC, buried vs exposed | 95 % CI |
+|---|---|---|---|
+| burial depth | **+0.02** | **0.72** | 0.58–0.84 |
+| enclosure | −0.81 | 0.99 | 0.97–1.00 |
 
-The rule-based scorer still assigns depth 22 % of its weight, which on this
-evidence buys nothing. Rebalancing toward enclosure is the indicated change, but
-it is deferred: five controls are too few to fit weights on, and the scorer is a
-baseline rather than the deployed model. The finding is pinned in
-`tests/test_control_calibration.py` so it cannot be quietly forgotten.
+Buried is relative SASA ≤ 0.12 (14 entries), exposed > 0.25 (89); the
+ambiguous middle band is left out rather than forced into either class.
+
+Both earlier claims were wrong, in opposite directions:
+
+* **Depth is not uninformative.** It separates the buried extreme from the
+  exposed one with AUROC 0.72, and the interval excludes chance.
+* **But it does not discriminate the way PR #40 described.** 0.72 is weak, and
+  ρ ≈ 0 means depth has essentially no monotone relationship with burial across
+  the continuum — it tells the extremes apart somewhat without tracking the
+  degree of burial in between. A "~3× difference" between one buried and two
+  surface structures does not generalise to a clean separation.
+
+The likely reason is the definition. Depth is the distance to the *nearest*
+solvent-exposed atom — a minimum over a large set — and a real protein surface
+is irregular enough that some exposed atom lies within a few Å of most interior
+points, so the minimum compresses. An idealised sphere has no such
+irregularity, which is why the synthetic benchmark, where depth separates
+perfectly (22 Å against 5 Å), could not have revealed this.
+
+Two caveats on reading the table:
+
+* **Enclosure's 0.99 is partly by construction.** Enclosure and relative SASA
+  both measure how completely protein surrounds the same ligand copy, so their
+  agreement is two views of one property rather than independent validation.
+  Depth is the more independent measure, which makes its weaker showing more
+  informative, not less.
+* **This tests depth measured at the ligand centroid.** PR #40's figure used
+  the fpocket *pocket centre*, a proxy for the same location. The ligand
+  centroid is the more direct measurement, but the survey does not test the
+  pocket-centre operationalisation itself.
+
+The rule-based scorer assigns depth 22 % of its weight and enclosure 13 %.
+Against these numbers that allocation is backwards, and rebalancing toward
+enclosure is the indicated change. It is left to the repository owner: the
+scorer is a baseline rather than the deployed model. The panel observation and
+the population result are both pinned in tests, so neither can be quietly
+dropped.
 
 ### Implementation details that matter
 

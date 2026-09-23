@@ -362,3 +362,51 @@ class TestDiscrimination:
         population = self._population(lambda r, rng: 1.0, n=5)
         result = measure_discrimination(population)["measures"]["burial_depth"]
         assert result["note"] == "too few measurements"
+
+
+#: Descriptor agreement with relative SASA across the deposited set, measured by
+#: scripts/burial_survey.py in GitHub Actions (run 35880320280, 2026-09-23).
+#: Buried is relative SASA <= 0.12 (14 entries), exposed > 0.25 (89); crystal
+#: artefacts are excluded, leaving 129 eligible entries.
+SURVEYED_DISCRIMINATION = {
+    "burial_depth": {"rho": 0.023, "auroc": 0.717, "ci95": (0.576, 0.841)},
+    "enclosure": {"rho": -0.805, "auroc": 0.992, "ci95": (0.971, 1.000)},
+}
+
+
+def test_depth_is_weak_but_real_at_population_scale():
+    """Recorded finding: depth carries some information, but little.
+
+    Whether depth discriminates had been argued both ways from three and five
+    structures. At population scale neither claim survives intact:
+
+    * it is not uninformative - its AUROC interval excludes chance;
+    * it does not discriminate cleanly either - 0.72 is weak, and a Spearman
+      correlation near zero means it barely tracks the *degree* of burial.
+
+    Pinned so a later change can promote depth to a primary burial criterion
+    only by producing new evidence, not by quietly citing either earlier claim.
+    """
+    depth = SURVEYED_DISCRIMINATION["burial_depth"]
+    low, high = depth["ci95"]
+
+    assert low > 0.5, "depth is not uninformative: its interval excludes chance"
+    assert depth["auroc"] < 0.8, "but its discrimination is weak"
+    assert abs(depth["rho"]) < 0.1, "and it barely tracks the degree of burial"
+
+
+def test_enclosure_discriminates_far_better_than_depth():
+    """Enclosure beats depth decisively - with a caveat on why.
+
+    Enclosure and relative SASA both measure how completely protein surrounds
+    the same ligand copy, so part of enclosure's agreement is by construction.
+    The comparison still settles the scorer question: depth carries 22% of the
+    rule-based scorer's weight and enclosure 13%, which these numbers show to be
+    backwards.
+    """
+    depth = SURVEYED_DISCRIMINATION["burial_depth"]
+    enclosure = SURVEYED_DISCRIMINATION["enclosure"]
+
+    # Non-overlapping intervals: the difference is not sampling noise.
+    assert enclosure["ci95"][0] > depth["ci95"][1]
+    assert enclosure["rho"] < -0.7

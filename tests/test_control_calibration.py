@@ -288,24 +288,26 @@ def test_gate_would_fail_on_the_pocket_the_old_rule_selected():
 
 
 def test_depth_does_not_separate_the_control_panel():
-    """Recorded finding: burial depth is uninformative on real structures.
+    """Recorded observation: on this five-structure panel, depth interleaves.
 
     On idealised synthetic spheres depth separates buried from surface sites
-    cleanly (22 A against 5 A). On the five deposited controls the values are
-    completely interleaved - and the *largest* depth in the panel belongs to a
-    surface negative:
+    cleanly (22 A against 5 A). On the five deposited controls the values
+    interleave, and the *largest* depth in the panel belongs to a surface
+    control:
 
         ADAR2 5.76 (buried)   Pds5B 5.63 (surface)
         PLCd1 4.68 (surface)  Btk   5.98 (surface)
 
-    Depth is a minimum over all solvent-exposed atoms, and a real protein
-    surface is irregular enough that some exposed atom lies within a few
-    Angstrom of almost any interior point, so the minimum saturates. An
-    idealised sphere has no such irregularity, which is exactly why the
-    synthetic benchmark could not reveal this.
+    This test once concluded from that panel that depth is *uninformative* on
+    real structures. Five structures cannot support that, and the population
+    survey refutes it: across 129 deposited entries depth separates buried from
+    exposed with AUROC 0.72 (95% CI 0.58-0.84), weak but clearly above chance.
+    See test_depth_is_weak_but_real_at_population_scale in
+    tests/test_burial_survey.py.
 
-    This test records the finding so a future change cannot quietly promote
-    depth to a primary burial criterion.
+    What this test records is narrower and still true: no depth cutoff isolates
+    the buried control *within this panel*. It is kept as a statement about
+    these five structures, not as a claim about depth in general.
     """
     buried_depths = [
         MEASURED[name]["burial_depth"]
