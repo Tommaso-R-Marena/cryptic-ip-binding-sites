@@ -16,8 +16,10 @@ python scripts/export_supplementary_tables.py --publication-dir results/publicat
 
 | Manuscript section | Source in repo |
 |--------------------|----------------|
+| Results & Discussion (draft) | `manuscript/RESULTS_DRAFT.md` |
 | Methods | `results/publication/METHODS_AUTO.md`, `docs/METHODS.md` |
 | Results — controls | `results/publication/RESULTS_SUMMARY.md` |
+| Candidate dossiers | `results/candidates/candidate_dossiers.md` |
 | Figure 1 | `results/publication/figures/Figure1_Overview.pdf` |
 | Figure 2 | `results/publication/figures/Figure2_Comparative_Proteomics.pdf` |
 | Figure 3 | `results/publication/figures/Figure3_Top_Candidates.pdf` |
@@ -37,12 +39,18 @@ python scripts/export_supplementary_tables.py --publication-dir results/publicat
 - [x] Figure generation pipeline (PDF/PNG)  
 - [x] Supplementary table export  
 
+### In progress
+
+- [x] Real strict-filter yeast pilot screen (499 structures → 1 candidate, 0.2%)  
+- [x] Candidate dossier generator (`scripts/characterize_candidates.py`) + pilot candidate P07264/LEU1  
+- [x] Results & Discussion working draft (`manuscript/RESULTS_DRAFT.md`)  
+
 ### Remaining (science + writing)
 
-- [ ] Full yeast / human / dicty proteome screens  
+- [ ] Full yeast / human / dicty proteome screens (pilot proven; compute-bound)  
 - [ ] Phase-5 comparative statistics (Wilson CI, Spearman, GO enrichment)  
-- [ ] Curated top-10 candidates with manual review  
-- [ ] Main manuscript draft (Introduction, Discussion)  
+- [ ] Manual review + experimental follow-up of candidates  
+- [ ] Introduction section + final Discussion polish  
 - [ ] Zenodo archive + DOI in `CITATION.cff`  
 - [ ] MD validation on top candidates (optional)  
 
