@@ -338,14 +338,21 @@ class ProteinAnalyzer:
         return potential
 
     def pocket_electrostatic_potential(self, pocket_center: Tuple[float, float, float]) -> Optional[float]:
-        """Sample APBS potential at a pocket center when a map is available."""
+        """Sample APBS potential (kT/e) at a pocket center when a map is available.
+
+        Returns ``None`` without a map. The previous fallback returned the
+        whole-structure APBS *energy* (kJ/mol) in place of a local potential
+        (kT/e) - a different quantity in different units, which the scorer
+        would then have read as the pocket's potential.
+        """
         if self.electrostatic_map_path is None or not self.electrostatic_map_path.exists():
-            return self.electrostatic_data
+            return None
         calculator = ElectrostaticsCalculator()
         try:
             return calculator.sample_potential_at_point(self.electrostatic_map_path, pocket_center)
-        except Exception:
-            return self.electrostatic_data
+        except Exception as exc:
+            print(f"Warning: could not sample APBS map at {pocket_center}: {exc}")
+            return None
 
     def pocket_plddt_confidence(self, pocket_residues: List[int]) -> float:
         """Mean pLDDT (B-factor) for pocket-lining residues in AlphaFold models."""
