@@ -162,28 +162,41 @@ def shrake_rupley_sasa(
     max_expanded = float(np.max(expanded))
 
     out = np.zeros(indices.size, dtype=float)
+    expanded_sq = expanded * expanded
     for slot, atom_index in enumerate(indices):
         r_i = expanded[atom_index]
         centre = coords[atom_index]
         # Any atom whose expanded sphere can reach atom i's sphere is a
         # potential occluder.
-        neighbours = tree.query_ball_point(centre, r_i + max_expanded)
-        neighbours = [j for j in neighbours if j != atom_index]
+        neighbours = np.asarray(tree.query_ball_point(centre, r_i + max_expanded), dtype=int)
+        neighbours = neighbours[neighbours != atom_index]
         area = 4.0 * np.pi * r_i * r_i
-        if not neighbours:
+        if neighbours.size == 0:
             out[slot] = area
             continue
 
         test_points = centre + r_i * sphere
         # A point is buried if it falls inside any neighbour's expanded sphere.
+        # Nearest neighbours bury the most points, so they are tested first,
+        # a few at a time in one array operation, stopping as soon as every
+        # point is buried. The buried set is a union, so the order and the
+        # chunking change the running time, not the result.
+        offsets = coords[neighbours] - centre
+        order = np.argsort(np.einsum("ij,ij->i", offsets, offsets), kind="stable")
+        neighbours = neighbours[order]
         buried = np.zeros(test_points.shape[0], dtype=bool)
-        for j in neighbours:
-            delta = test_points - coords[j]
-            buried |= np.einsum("ij,ij->i", delta, delta) < expanded[j] ** 2
+        for start in range(0, neighbours.size, _SASA_CHUNK):
+            chunk = neighbours[start : start + _SASA_CHUNK]
+            delta = test_points[None, :, :] - coords[chunk][:, None, :]
+            buried |= (np.einsum("kpj,kpj->kp", delta, delta) < expanded_sq[chunk][:, None]).any(axis=0)
             if buried.all():
                 break
         out[slot] = area * float(np.count_nonzero(~buried)) / test_points.shape[0]
     return out
+
+
+#: Neighbours tested per array operation in :func:`shrake_rupley_sasa`.
+_SASA_CHUNK = 6
 
 
 def total_sasa(

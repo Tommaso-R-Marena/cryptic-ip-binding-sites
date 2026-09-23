@@ -249,6 +249,11 @@ class PocketFeatureExtractor:
         self._protein_atom_indices = self._context_indices[self._protein_positions]
         self._residue_sasa = self._aggregate_residue_sasa()
         self._hull_equations: Optional[np.ndarray] = None
+        # Per-structure caches for per-pocket descriptors.
+        self._protein_tree = None
+        self._charged_atoms: Optional[Tuple[np.ndarray, np.ndarray]] = None
+        self._basic_nitrogen_indices: Optional[List[int]] = None
+        self._ca_bfactors: Optional[Dict[ResidueKey, List[float]]] = None
 
     def _hull_depth(self, centre: np.ndarray) -> float:
         """Distance from ``centre`` inward to the protein's convex hull (Å).
@@ -294,12 +299,15 @@ class PocketFeatureExtractor:
         Returns:
             ``(residue_key, residue_name)`` pairs, de-duplicated.
         """
-        from scipy.spatial import cKDTree
-
         if self._protein_coords.size == 0:
             return []
-        tree = cKDTree(self._protein_coords)
-        hits = tree.query_ball_point(np.asarray(centre, dtype=float), float(radius))
+        if self._protein_tree is None:
+            from scipy.spatial import cKDTree
+
+            # Built once per structure; it was rebuilt on every call - twice
+            # per pocket.
+            self._protein_tree = cKDTree(self._protein_coords)
+        hits = self._protein_tree.query_ball_point(np.asarray(centre, dtype=float), float(radius))
         arrays = self.arrays
         found: Dict[ResidueKey, str] = {}
         for local_index in hits:
@@ -335,9 +343,24 @@ class PocketFeatureExtractor:
         Returns:
             Screened potential in kT/e.
         """
-        arrays = self.arrays
         centre_arr = np.asarray(centre, dtype=float)
+        if self._charged_atoms is None:
+            self._charged_atoms = self._collect_charged_atoms()
+        charges, coords = self._charged_atoms
+        if charges.size == 0:
+            return float("nan")
+        distances = np.linalg.norm(coords - centre_arr, axis=1)
+        # Floor the distance so an atom essentially at the query point cannot
+        # produce a singular contribution.
+        distances = np.maximum(distances, 1.5)
+        screened = np.exp(-distances / DEBYE_LENGTH) / distances
+        return float(
+            COULOMB_KT_PREFACTOR_ANGSTROM / RELATIVE_PERMITTIVITY * np.sum(charges * screened)
+        )
 
+    def _collect_charged_atoms(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Formal side-chain charges and their positions, once per structure."""
+        arrays = self.arrays
         charged_atoms: List[Tuple[float, np.ndarray]] = []
         for atom_index in self._protein_atom_indices:
             resname = str(arrays.resnames[atom_index])
@@ -359,19 +382,11 @@ class PocketFeatureExtractor:
             # Split the formal charge across the atoms bearing it.
             divisor = {"ARG": 3.0, "LYS": 1.0, "HIS": 2.0, "ASP": 2.0, "GLU": 2.0}[resname]
             charged_atoms.append((charge / divisor, arrays.coords[atom_index]))
-
         if not charged_atoms:
-            return float("nan")
-
-        charges = np.asarray([q for q, _ in charged_atoms], dtype=float)
-        coords = np.asarray([c for _, c in charged_atoms], dtype=float)
-        distances = np.linalg.norm(coords - centre_arr, axis=1)
-        # Floor the distance so an atom essentially at the query point cannot
-        # produce a singular contribution.
-        distances = np.maximum(distances, 1.5)
-        screened = np.exp(-distances / DEBYE_LENGTH) / distances
-        return float(
-            COULOMB_KT_PREFACTOR_ANGSTROM / RELATIVE_PERMITTIVITY * np.sum(charges * screened)
+            return np.empty(0), np.empty((0, 3))
+        return (
+            np.asarray([q for q, _ in charged_atoms], dtype=float),
+            np.asarray([c for _, c in charged_atoms], dtype=float),
         )
 
     def extract(
@@ -563,12 +578,17 @@ class PocketFeatureExtractor:
         reflects groups that could actually coordinate a ligand at this site.
         """
         arrays = self.arrays
+        if self._basic_nitrogen_indices is None:
+            # Selected once per structure instead of scanning every protein
+            # atom for every pocket.
+            self._basic_nitrogen_indices = [
+                atom_index
+                for atom_index in self._protein_atom_indices
+                if str(arrays.resnames[atom_index]) in BASIC_RESIDUES
+                and str(arrays.atom_names[atom_index]).upper() in BASIC_NITROGEN_ATOMS
+            ]
         distances: List[float] = []
-        for atom_index in self._protein_atom_indices:
-            if str(arrays.resnames[atom_index]) not in BASIC_RESIDUES:
-                continue
-            if str(arrays.atom_names[atom_index]).upper() not in BASIC_NITROGEN_ATOMS:
-                continue
+        for atom_index in self._basic_nitrogen_indices:
             distance = float(np.linalg.norm(arrays.coords[atom_index] - centre))
             if distance <= self.shell_radius:
                 distances.append(distance)
@@ -583,19 +603,23 @@ class PocketFeatureExtractor:
         as optional and the imputer handles their absence.
         """
         arrays = self.arrays
-        wanted = set(residue_keys)
-        values: List[float] = []
-        for atom_index in self._protein_atom_indices:
-            if str(arrays.atom_names[atom_index]).upper() != "CA":
-                continue
-            key = (
-                int(arrays.model_ids[atom_index]),
-                str(arrays.chain_ids[atom_index]),
-                int(arrays.resseqs[atom_index]),
-                str(arrays.icodes[atom_index]),
-            )
-            if key in wanted:
-                values.append(float(arrays.bfactors[atom_index]))
+        if self._ca_bfactors is None:
+            # Residue key -> CA B-factors, built once per structure; it was
+            # rebuilt by scanning every protein atom for every pocket.
+            self._ca_bfactors = {}
+            for atom_index in self._protein_atom_indices:
+                if str(arrays.atom_names[atom_index]).upper() != "CA":
+                    continue
+                key = (
+                    int(arrays.model_ids[atom_index]),
+                    str(arrays.chain_ids[atom_index]),
+                    int(arrays.resseqs[atom_index]),
+                    str(arrays.icodes[atom_index]),
+                )
+                self._ca_bfactors.setdefault(key, []).append(float(arrays.bfactors[atom_index]))
+        values: List[float] = [
+            value for key in set(residue_keys) for value in self._ca_bfactors.get(key, ())
+        ]
         if not values:
             return {
                 "plddt_mean": float("nan"),
