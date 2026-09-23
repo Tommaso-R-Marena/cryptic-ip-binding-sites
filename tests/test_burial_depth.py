@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from cryptic_ip.analysis.analyzer import ProteinAnalyzer
 from cryptic_ip.analysis.filters import CandidateFilter
@@ -102,3 +103,44 @@ def test_analyze_pocket_reports_burial_depth(tmp_path: Path):
 
     assert "burial_depth" in metrics
     assert metrics["burial_depth"] >= 0.0
+
+
+def _score_with_density(tmp_path: Path, density: float) -> float:
+    """Composite score of one pocket whose hydrophobic density is ``density``."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    analyzer = _analyzer(tmp_path)
+    analyzer.pockets = pd.DataFrame(
+        [
+            {
+                "pocket_id": 1,
+                "center_x": 5.0,
+                "center_y": 5.0,
+                "center_z": 5.0,
+                "volume": 400.0,
+                "mean_local_hydrophobic_density": density,
+                "fpocket_residue_ids": "1,2,3",
+            }
+        ]
+    )
+    analyzer.calculate_sasa()
+    return float(analyzer.score_all_pockets()["composite_score"].iloc[0])
+
+
+def test_composite_score_ignores_hydrophobic_density(tmp_path: Path):
+    """The depth term must score burial depth, never fpocket's density statistic.
+
+    Earlier the analyzer filled its ``depth`` column with fpocket's mean local
+    hydrophobic density and the scorer read it as a distance, awarding full
+    credit above 15. That manufactured the yeast pilot's only candidate: P07264
+    scored 0.955 on a density of 32.1 while its pocket sat 2.84 A below the
+    surface, and correcting that one input alone dropped it to 0.711, below
+    threshold.
+
+    Density is a composition statistic with no bearing on burial, so the score
+    must not move when only the density changes - here across the range that
+    turned a shallow pocket into a "deep" one.
+    """
+    shallow_reading = _score_with_density(tmp_path / "low", 0.0)
+    deep_reading = _score_with_density(tmp_path / "high", 32.1)
+
+    assert deep_reading == pytest.approx(shallow_reading)
