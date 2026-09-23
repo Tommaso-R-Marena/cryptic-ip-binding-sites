@@ -97,11 +97,13 @@ def test_catalog_screen_aggregate(tmp_path, monkeypatch):
     assert len(status) == 4
     assert status.loc[status["uniprot_id"] != "P00002", "fpocket_seconds"].notna().all()
 
+    # The stub's scores are not derived from its descriptors, so they are kept.
     assert proteome_screen.main(
         ["aggregate", "--shards-dir", str(shards_dir), "--catalog-dir", str(catalog_dir),
-         "--output-dir", str(summary_dir)]
+         "--output-dir", str(summary_dir), "--keep-screen-scores"]
     ) == 0
     summary = json.loads((summary_dir / "screen_summary.json").read_text())
+    assert summary["scoring"] == {"rescored": False}
     rates = summary["plan"]["hit_rates"][0]
     # The failed structure is reported, and excluded from the denominator.
     assert summary["structures"]["failed"] == 1
@@ -133,7 +135,7 @@ def test_models_a_shard_never_reached_are_counted(tmp_path, monkeypatch):
     ) == 0
     assert proteome_screen.main(
         ["aggregate", "--shards-dir", str(shards), "--catalog-dir", str(catalog.parent),
-         "--output-dir", str(summary_dir)]
+         "--output-dir", str(summary_dir), "--keep-screen-scores"]
     ) == 0
     summary = json.loads((summary_dir / "screen_summary.json").read_text())
     assert summary["structures"]["unscreened"] == {"yeast": 2}
@@ -185,3 +187,36 @@ def test_parallel_screen_records_every_model(tmp_path, capsys):
     status = pd.read_csv(next(shards.glob("*_status.csv")))
     assert sorted(status["uniprot_id"]) == ["P00000", "P00001", "P00002"]
     assert "3/3" in capsys.readouterr().out
+
+
+def test_aggregate_rescores_pockets_with_the_current_scorer(tmp_path, monkeypatch):
+    """Stored scores are replaced by the current scorer's, and kept alongside."""
+    import cryptic_ip.analysis as analysis
+    from cryptic_ip.analysis.scorer import PocketScorer
+
+    monkeypatch.setattr(analysis, "ProteinAnalyzer", _StubAnalyzer, raising=False)
+    catalog = _catalog(tmp_path, n=3)
+    shards, summary_dir = tmp_path / "shards", tmp_path / "summary"
+    assert proteome_screen.main(
+        ["screen", "--organism", "yeast", "--catalog", str(catalog), "--workers", "1",
+         "--output-dir", str(shards)]
+    ) == 0
+    stored = pd.concat(pd.read_csv(p) for p in shards.glob("*_pockets_part*.csv.gz"))
+    expected = PocketScorer().score_frame(stored)
+    assert not (expected == stored["composite_score"].to_numpy()).all()  # stale by construction
+
+    assert proteome_screen.main(
+        ["aggregate", "--shards-dir", str(shards), "--catalog-dir", str(catalog.parent),
+         "--output-dir", str(summary_dir)]
+    ) == 0
+    summary = json.loads((summary_dir / "screen_summary.json").read_text())
+    assert summary["scoring"]["rescored"] is True
+    assert summary["scoring"]["parameters"]["depth_measure"] == PocketScorer().parameters.depth_measure
+    assert "recomputed at aggregation" in (summary_dir / "DIGEST.md").read_text()
+    proteins = pd.read_csv(summary_dir / "plan" / "proteins.csv.gz")
+    best = stored.assign(rescored=expected).groupby("uniprot_id")["rescored"].max()
+    # The protein table is built from the rescored pockets.
+    for uniprot_id, value in best.items():
+        row = proteins[proteins["uniprot_id"] == uniprot_id]
+        assert not row.empty
+        assert row["best_score"].iloc[0] == pytest.approx(value)

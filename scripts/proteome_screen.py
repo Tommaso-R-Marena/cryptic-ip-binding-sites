@@ -439,6 +439,18 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
     out.mkdir(parents=True, exist_ok=True)
 
     pockets = _read_many(sorted(shards.rglob("*_pockets_part*.csv.gz")), low_memory=False)
+    scorer_parameters = None
+    if not args.keep_screen_scores and not pockets.empty:
+        # Every pocket is stored with its full descriptor set, so it is scored
+        # here with the current scorer rather than trusted from the screen: a
+        # scorer change then needs a re-aggregation, never a re-screen. The
+        # screen's own score is kept alongside.
+        from cryptic_ip.analysis.scorer import PocketScorer
+
+        scorer = PocketScorer()
+        pockets["composite_score_screen"] = pockets.get("composite_score")
+        pockets["composite_score"] = scorer.score_frame(pockets)
+        scorer_parameters = dict(scorer.parameters.__dict__)
     status = _read_many(sorted(shards.rglob("*_status.csv")))
     catalog = _read_many(sorted(catalogs.rglob("*_catalog.csv")))
     if status.empty:
@@ -476,6 +488,11 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
             "pockets": int(len(pockets)),
             "median_seconds_per_structure": float(status["seconds"].median()),
         },
+        "scoring": (
+            {"rescored": True, "parameters": scorer_parameters}
+            if scorer_parameters is not None
+            else {"rescored": False}
+        ),
         "ip6_uM": ip6,
     }
     for analysis in analyses:
@@ -506,6 +523,12 @@ def _digest(summary, analyses, out) -> None:
         f"{s['screened_ok']} structures screened ({s['failed']} failed), {s['pockets']} pockets, "
         f"median {s['median_seconds_per_structure']:.1f} s per structure.\n"
     )
+    scoring = summary.get("scoring", {})
+    if scoring.get("rescored"):
+        lines.append(
+            "Pocket scores recomputed at aggregation from the stored descriptors "
+            f"(depth measure: {scoring['parameters'].get('depth_measure')}).\n"
+        )
     if s["unscreened"]:
         missing = ", ".join(f"{k} {v}" for k, v in sorted(s["unscreened"].items()))
         lines.append(
@@ -595,6 +618,11 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--catalog-dir", default="results/proteome_screen/catalog")
     p.add_argument("--output-dir", default="results/proteome_screen/summary")
     p.add_argument("--min-score", type=float, default=0.75)
+    p.add_argument(
+        "--keep-screen-scores",
+        action="store_true",
+        help="use the composite score computed during the screen instead of rescoring",
+    )
     p.set_defaults(func=cmd_aggregate)
     return parser.parse_args(argv)
 
