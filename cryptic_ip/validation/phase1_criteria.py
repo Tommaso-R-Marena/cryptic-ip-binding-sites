@@ -36,7 +36,6 @@ import json
 import logging
 import shutil
 import tempfile
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -414,44 +413,44 @@ def _mean(values) -> Optional[float]:
 
 
 # ------------------------------------------------------------------ fetching
+def _get_json(urls: Sequence[str]) -> List[Optional[Any]]:
+    from ..database.async_fetch import FetchJob, fetch_all, validate_json
+
+    results = fetch_all([FetchJob(u, u, validator=validate_json) for u in urls], concurrency=8)
+    return [json.loads(r.payload) if r.ok and r.payload else None for r in results]
+
+
 def uniprot_for_entry(pdb_id: str, chain: str) -> Optional[str]:
     """UniProt accession of the polymer entity carrying ``chain`` (RCSB API)."""
-    try:
-        url = f"https://data.rcsb.org/rest/v1/core/entry/{pdb_id}"
-        with urllib.request.urlopen(url, timeout=60) as response:
-            entry = json.loads(response.read())
-        for entity_id in entry.get("rcsb_entry_container_identifiers", {}).get("polymer_entity_ids", []):
-            url = f"https://data.rcsb.org/rest/v1/core/polymer_entity/{pdb_id}/{entity_id}"
-            with urllib.request.urlopen(url, timeout=60) as response:
-                entity = json.loads(response.read())
-            ids = entity.get("rcsb_polymer_entity_container_identifiers", {})
-            if chain in (ids.get("auth_asym_ids") or []):
-                accessions = ids.get("uniprot_ids") or []
-                return accessions[0] if accessions else None
-    except Exception as exc:
-        LOGGER.warning("RCSB lookup failed for %s: %s", pdb_id, exc)
+    (entry,) = _get_json([f"https://data.rcsb.org/rest/v1/core/entry/{pdb_id}"])
+    if not entry:
+        LOGGER.warning("RCSB entry lookup failed for %s", pdb_id)
+        return None
+    entity_ids = entry.get("rcsb_entry_container_identifiers", {}).get("polymer_entity_ids", [])
+    entities = _get_json(
+        [f"https://data.rcsb.org/rest/v1/core/polymer_entity/{pdb_id}/{e}" for e in entity_ids]
+    )
+    for entity in entities:
+        ids = (entity or {}).get("rcsb_polymer_entity_container_identifiers", {})
+        if chain in (ids.get("auth_asym_ids") or []):
+            accessions = ids.get("uniprot_ids") or []
+            return accessions[0] if accessions else None
     return None
 
 
 def fetch_alphafold_model(uniprot_id: str, out_dir: Path) -> Optional[Path]:
-    """Download the current AlphaFold model for ``uniprot_id`` (API-resolved URL)."""
-    out_dir.mkdir(parents=True, exist_ok=True)
-    existing = sorted(out_dir.glob(f"AF-{uniprot_id}-F1-model_v*.pdb"))
-    if existing:
-        return existing[-1]
-    try:
-        with urllib.request.urlopen(
-            f"https://alphafold.ebi.ac.uk/api/prediction/{uniprot_id}", timeout=60
-        ) as response:
-            entries = json.loads(response.read())
-        url = entries[0]["pdbUrl"]
-        target = out_dir / url.rsplit("/", 1)[-1]
-        with urllib.request.urlopen(url, timeout=120) as response:
-            target.write_bytes(response.read())
-        return target
-    except Exception as exc:
-        LOGGER.warning("AlphaFold model unavailable for %s: %s", uniprot_id, exc)
+    """Download the current AlphaFold model for ``uniprot_id``.
+
+    Resolved through the prediction API by accession and fragment (not the
+    first entry listed, which can be an isoform), verified and cached.
+    """
+    from ..database.async_fetch import fetch_alphafold_models
+
+    result = fetch_alphafold_models([uniprot_id], Path(out_dir), concurrency=2)[uniprot_id.upper()]
+    if not result.ok:
+        LOGGER.warning("AlphaFold model unavailable for %s: %s", uniprot_id, result.error)
         return None
+    return Path(result.path)
 
 
 # ---------------------------------------------------------------- criteria

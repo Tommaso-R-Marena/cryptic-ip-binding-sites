@@ -83,13 +83,8 @@ class ScreeningPipeline:
         uniprot_ids = downloader.fetch_proteome_uniprot_ids(proteome_id)
         if limit is not None:
             uniprot_ids = uniprot_ids[:limit]
-        paths: List[Path] = []
-        for uniprot_id in uniprot_ids:
-            try:
-                paths.append(Path(downloader.af_client.fetch_structure(uniprot_id)))
-            except Exception:
-                continue
-        return paths
+        fetched = downloader.af_client.fetch_batch(uniprot_ids)
+        return [path for path in (fetched.get(uid) for uid in uniprot_ids) if path is not None]
 
     def screen_structures(self, structure_paths: List[Union[str, Path]]) -> pd.DataFrame:
         """Screen a list of structures and return concatenated hit table."""

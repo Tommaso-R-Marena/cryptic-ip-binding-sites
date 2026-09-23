@@ -72,42 +72,14 @@ jobs:
 
       - name: Download dataset structures
         shell: bash -l {0}
-        # Entries that cannot be fetched are skipped rather than failing the run:
-        # a survey reports on what it could measure, and the summary records how
-        # many entries were unavailable.
+        # Concurrent, retried, validated and written atomically; legacy PDB
+        # preferred (the format every entry here has), mmCIF when an entry has
+        # none. An entry that cannot be fetched is reported in the manifest and
+        # the run continues: the analysis reports on what it could measure.
         run: |
-          python - <<'PY'
-          import time
-          import urllib.request
-          from pathlib import Path
-
-          import pandas as pd
-
-          out = Path("data/validation/raw/structures")
-          out.mkdir(parents=True, exist_ok=True)
-          frame = pd.read_csv(
-              "data/validation/ip_binding_validation_dataset.csv", dtype={"pdb_id": str}
-          )
-          ids = sorted({str(v).strip().upper() for v in frame["pdb_id"].dropna()})
-
-          fetched = skipped = failed = 0
-          for pdb_id in ids:
-              target = out / f"{pdb_id}.pdb"
-              if target.exists() and target.stat().st_size > 0:
-                  skipped += 1
-                  continue
-              url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
-              try:
-                  with urllib.request.urlopen(url, timeout=60) as response:
-                      target.write_bytes(response.read())
-                  fetched += 1
-              except Exception as exc:
-                  failed += 1
-                  print(f"skip {pdb_id}: {exc}")
-              time.sleep(0.1)
-
-          print(f"fetched={fetched} cached={skipped} unavailable={failed} total={len(ids)}")
-          PY
+          python scripts/fetch_structures.py rcsb \
+            --out data/validation/raw/structures \
+            --ids-csv data/validation/ip_binding_validation_dataset.csv --column pdb_id
 
       - name: Run the survey
         shell: bash -l {0}

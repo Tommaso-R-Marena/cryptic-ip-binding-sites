@@ -123,14 +123,14 @@ def stage_structures(log_path: Path) -> None:
     log("STAGE structures", log_path)
     validation_dir = ROOT / "data" / "validation"
     validation_dir.mkdir(parents=True, exist_ok=True)
-    for pdb_id in ("1ZY7", "1MAI", "1BWN"):
-        dest = validation_dir / f"{pdb_id}.pdb"
-        if dest.exists():
-            continue
-        run_cmd(
-            ["wget", "-q", "-O", str(dest), f"https://files.rcsb.org/download/{pdb_id}.pdb"],
-            log_path,
-        )
+    from cryptic_ip.database.async_fetch import fetch_rcsb_structures
+
+    # Verified, retried and written atomically; a cut-off earlier download is
+    # fetched again rather than reused.
+    results = fetch_rcsb_structures(["1ZY7", "1MAI", "1BWN"], validation_dir, prefer=("pdb",))
+    failed = [key for key, result in results.items() if not result.ok]
+    if failed:
+        raise RuntimeError(f"Could not fetch validation structures: {failed}")
     log(f"Validation structures ready in {validation_dir}", log_path)
 
 

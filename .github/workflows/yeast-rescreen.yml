@@ -59,37 +59,12 @@ jobs:
       - name: Download the pilot's 499 AlphaFold models
         shell: bash -l {0}
         # The model URL comes from the AlphaFold API rather than a hard-coded
-        # version suffix, so the current model is fetched whichever version it is.
+        # version suffix, so the current model is fetched whichever version it
+        # is; downloads run concurrently and are checked before being kept.
         run: |
-          python - <<'PY'
-          import json
-          import time
-          import urllib.request
-          from pathlib import Path
-
-          ids = json.loads(Path("results/yeast_pilot/screen_checkpoint.json").read_text())["processed"]
-          out = Path("data/structures/yeast_rescreen")
-          out.mkdir(parents=True, exist_ok=True)
-
-          fetched = cached = failed = 0
-          for uniprot_id in ids:
-              if list(out.glob(f"AF-{uniprot_id}-F1-model_v*.pdb")):
-                  cached += 1
-                  continue
-              try:
-                  api = f"https://alphafold.ebi.ac.uk/api/prediction/{uniprot_id}"
-                  with urllib.request.urlopen(api, timeout=60) as response:
-                      entries = json.loads(response.read())
-                  url = entries[0]["pdbUrl"]
-                  with urllib.request.urlopen(url, timeout=120) as response:
-                      (out / url.rsplit("/", 1)[-1]).write_bytes(response.read())
-                  fetched += 1
-              except Exception as exc:
-                  failed += 1
-                  print(f"skip {uniprot_id}: {exc}")
-              time.sleep(0.05)
-          print(f"fetched={fetched} cached={cached} unavailable={failed} total={len(ids)}")
-          PY
+          python scripts/fetch_structures.py alphafold \
+            --out data/structures/yeast_rescreen \
+            --ids-json results/yeast_pilot/screen_checkpoint.json --json-key processed
 
       - name: Run the strict screen
         shell: bash -l {0}

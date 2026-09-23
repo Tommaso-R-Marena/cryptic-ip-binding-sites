@@ -86,10 +86,8 @@ jobs:
       shell: bash -l {0}
       run: |
         mkdir -p data/validation tests/data/structures
+        python scripts/fetch_structures.py rcsb --out data/validation --require-all 1ZY7 1MAI
         for pdb in 1ZY7 1MAI; do
-          if [ ! -f "data/validation/${pdb}.pdb" ]; then
-            wget -q -O "data/validation/${pdb}.pdb" "https://files.rcsb.org/download/${pdb}.pdb"
-          fi
           cp "data/validation/${pdb}.pdb" "tests/data/structures/${pdb}.pdb"
         done
 
@@ -157,11 +155,8 @@ jobs:
         key: ci-validation-pdbs-v1
 
     - name: Download ADAR2 crystal structure
-      run: |
-        mkdir -p data/validation
-        if [ ! -f data/validation/1ZY7.pdb ]; then
-          wget -q -O data/validation/1ZY7.pdb https://files.rcsb.org/download/1ZY7.pdb
-        fi
+      shell: bash -l {0}
+      run: python scripts/fetch_structures.py rcsb --out data/validation --require-all 1ZY7
 
     - name: Run ADAR2 end-to-end test
       shell: bash -l {0}

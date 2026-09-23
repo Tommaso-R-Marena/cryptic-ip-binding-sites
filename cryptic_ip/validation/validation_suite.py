@@ -4,7 +4,6 @@ Comprehensive validation suite for pipeline testing.
 
 from __future__ import annotations
 
-import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -97,13 +96,12 @@ class ValidationSuite:
 
     def download_pdb(self, pdb_id: str) -> Path:
         """Download a PDB structure from RCSB if not already cached."""
-        pdb_path = self.data_dir / f"{pdb_id.upper()}.pdb"
-        if pdb_path.exists():
-            return pdb_path
+        from ..database.async_fetch import fetch_rcsb_structures
 
-        url = f"https://files.rcsb.org/download/{pdb_id.upper()}.pdb"
-        print(f"  Downloading {pdb_id.upper()} from RCSB...")
-        urllib.request.urlretrieve(url, pdb_path)
+        pdb_path = self.data_dir / f"{pdb_id.upper()}.pdb"
+        result = fetch_rcsb_structures([pdb_id], self.data_dir, prefer=("pdb",))[pdb_id.upper()]
+        if not result.ok:
+            raise RuntimeError(f"Could not download {pdb_id.upper()} from RCSB: {result.error}")
         return pdb_path
 
     def _select_best_pocket(

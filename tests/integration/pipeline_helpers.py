@@ -33,11 +33,9 @@ def seed_ml_structures(raw_dir: Path) -> int:
 def seed_yeast_structures(structures_dir: Path, *, n_proteins: int = 2) -> list[Path]:
     """Seed a tiny yeast pilot set from local validation caches (no network)."""
     structures_dir.mkdir(parents=True, exist_ok=True)
-    candidates = [
-        VALIDATION_DIR / "1MAI.pdb",
-        VALIDATION_DIR / "AF-P78563-F1-model_v6.pdb",
-        VALIDATION_DIR / "1ZY7.pdb",
-    ]
+    # Whatever AlphaFold release was fetched, not a fixed version suffix.
+    models = sorted(VALIDATION_DIR.glob("AF-P78563-F1-model_v*.pdb"))
+    candidates = [VALIDATION_DIR / "1MAI.pdb", *models[-1:], VALIDATION_DIR / "1ZY7.pdb"]
     sources = [path for path in candidates if path.exists()]
     if not sources:
         raise FileNotFoundError("No local structures available to seed yeast pilot")

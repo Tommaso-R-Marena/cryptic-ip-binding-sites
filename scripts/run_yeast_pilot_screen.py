@@ -83,11 +83,11 @@ def main() -> int:
     if not args.skip_download:
         uniprot_ids = downloader.fetch_proteome_uniprot_ids(YEAST_PROTEOME_ID)[: args.n_proteins]
         (args.output_dir / "pilot_uniprot_ids.txt").write_text("\n".join(uniprot_ids), encoding="utf-8")
-        for uniprot_id in uniprot_ids:
-            try:
-                downloader.af_client.fetch_structure(uniprot_id)
-            except Exception as exc:
-                print(f"Download failed for {uniprot_id}: {exc}")
+        # Concurrent, retried and verified; a manifest records every outcome.
+        fetched = downloader.af_client.fetch_batch(uniprot_ids)
+        for uniprot_id, path in fetched.items():
+            if path is None:
+                print(f"Download failed or no model for {uniprot_id}")
 
     pdb_files = sorted(args.structures_dir.glob("AF-*-F1-model_v*.pdb"))[: args.n_proteins]
     if not pdb_files:

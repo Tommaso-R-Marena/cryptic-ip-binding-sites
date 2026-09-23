@@ -4,7 +4,6 @@ ADAR2 validation - the gold standard for cryptic IP6 binding.
 
 from __future__ import annotations
 
-import urllib.request
 from pathlib import Path
 from typing import Dict, Optional, Set, Tuple
 
@@ -33,11 +32,12 @@ def download_adar2_structures(data_dir: str = "data/validation") -> Dict[str, Pa
         local_alphafold.write_bytes(alphafold_path.read_bytes())
     structures["alphafold"] = local_alphafold
 
-    pdb_path = data_path / "1ZY7.pdb"
-    if not pdb_path.exists():
-        print("Downloading PDB 1ZY7 (ADAR2 crystal structure)...")
-        urllib.request.urlretrieve("https://files.rcsb.org/download/1ZY7.pdb", pdb_path)
-    structures["crystal"] = pdb_path
+    from ..database.async_fetch import fetch_rcsb_structures
+
+    result = fetch_rcsb_structures(["1ZY7"], data_path, prefer=("pdb",))["1ZY7"]
+    if not result.ok:
+        raise RuntimeError(f"Could not download 1ZY7: {result.error}")
+    structures["crystal"] = data_path / "1ZY7.pdb"
 
     return structures
 

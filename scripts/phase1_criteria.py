@@ -20,7 +20,6 @@ import argparse
 import json
 import logging
 import sys
-import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -47,17 +46,20 @@ LOGGER = logging.getLogger("phase1_criteria")
 
 
 def _download_pdb(pdb_id: str, directory: Path) -> Optional[Path]:
-    directory.mkdir(parents=True, exist_ok=True)
-    path = directory / f"{pdb_id}.pdb"
-    if path.exists() and path.stat().st_size > 0:
-        return path
-    try:
-        with urllib.request.urlopen(f"https://files.rcsb.org/download/{pdb_id}.pdb", timeout=120) as r:
-            path.write_bytes(r.read())
-        return path
-    except Exception as exc:
-        LOGGER.warning("could not download %s: %s", pdb_id, exc)
+    from cryptic_ip.database.async_fetch import fetch_rcsb_structures
+
+    result = fetch_rcsb_structures([pdb_id], directory, prefer=("pdb",))[pdb_id.upper()]
+    if not result.ok:
+        LOGGER.warning("could not download %s: %s", pdb_id, result.error)
         return None
+    return Path(result.path)
+
+
+def prefetch(structures: Path) -> None:
+    """Fetch every control's entry up front, concurrently."""
+    from cryptic_ip.database.async_fetch import fetch_rcsb_structures
+
+    fetch_rcsb_structures([c.pdb_id for c in CONTROLS], structures, prefer=("pdb",))
 
 
 def measure(control, structures: Path, work: Path, use_apbs: bool) -> Dict[str, Any]:
@@ -192,6 +194,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     out = Path(args.output_dir)
     work = out / "structures"
+    prefetch(Path(args.structures_dir))
     results = []
     for control in CONTROLS:
         if args.only and control.name not in args.only:
