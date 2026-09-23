@@ -308,19 +308,12 @@ def binding_region_superposition(
 def hull_depth(protein_coords: np.ndarray, point: Sequence[float]) -> float:
     """Distance from ``point`` inward to the protein's convex hull (A).
 
-    Burial depth as the pipeline defines it - distance to the nearest
-    solvent-exposed atom - collapses on an *apo* structure: once the ligand is
-    removed, the walls of the vacated cavity are themselves solvent-exposed, so
-    a fully enclosed site reads as a few Angstroms "deep". The convex hull
-    ignores internal cavities, so it measures how far the site sits from the
-    protein's exterior. Negative outside the hull.
+    See :func:`cryptic_ip.analysis.geometry.hull_depths` for why this, rather
+    than distance to the nearest exposed atom, measures burial on an apo site.
     """
-    from scipy.spatial import ConvexHull
+    from ..analysis.geometry import hull_depths
 
-    hull = ConvexHull(np.asarray(protein_coords, dtype=float))
-    # Each facet: normal . x + offset <= 0 inside; distance inward = -(n.x + b).
-    signed = hull.equations[:, :3] @ np.asarray(point, dtype=float) + hull.equations[:, 3]
-    return float(-signed.max())
+    return float(hull_depths(protein_coords, np.asarray(point, dtype=float))[0])
 
 
 def site_apbs_potential(structure_path: Path, center: Sequence[float], work: Path) -> Optional[float]:

@@ -92,13 +92,13 @@ def test_catalog_screen_aggregate(tmp_path, monkeypatch):
          "--output-dir", str(summary_dir)]
     ) == 0
     summary = json.loads((summary_dir / "screen_summary.json").read_text())
-    rates = summary["hit_rates"][0]
+    rates = summary["plan"]["hit_rates"][0]
     # The failed structure is reported, and excluded from the denominator.
     assert summary["structures"]["failed"] == 1
     assert rates["screened"] == 3
     assert rates["hits"] == 1
     assert rates["hit_rate"] == pytest.approx(1 / 3)
-    candidates = pd.read_csv(summary_dir / "candidates.csv")
+    candidates = pd.read_csv(summary_dir / "plan" / "candidates.csv")
     assert candidates["uniprot_id"].tolist() == ["P00000"]
     failed = pd.read_csv(summary_dir / "failed_structures.csv")
     assert failed["uniprot_id"].tolist() == ["P00002"]

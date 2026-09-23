@@ -199,3 +199,16 @@ def test_rank_percentile():
     assert rank_percentile(proteins, "A") == pytest.approx(2 / 3)
     assert rank_percentile(proteins, "B") == pytest.approx(0.0)
     assert rank_percentile(proteins, "D") is None
+
+
+def test_plan_criteria_reject_adar2_and_calibrated_criteria_do_not():
+    """Measured on the AlphaFold models (Phase 1 report): ADAR2's site vs Btk PH."""
+    from cryptic_ip.analysis.proteome_stats import CALIBRATED_CRITERIA, PLAN_CRITERIA
+
+    adar2 = {**_pocket("P78563", score=0.575, sasa=30.7, basic=7, volume=1493.0, plddt=97.3), "hull_depth": 17.30}
+    btk = {**_pocket("Q06187", score=0.506, sasa=37.1, basic=6, volume=306.0, plddt=92.4), "hull_depth": 7.78}
+    pockets = pd.DataFrame([adar2, btk])
+    plan = PLAN_CRITERIA.gates(pockets)
+    assert not plan.all(axis=1).iloc[0]
+    assert not plan.loc[0, "score"] and not plan.loc[0, "sasa"]
+    assert CALIBRATED_CRITERIA.passes(pockets).tolist() == [True, False]

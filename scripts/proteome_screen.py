@@ -47,6 +47,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from cryptic_ip.analysis.proteome_stats import (  # noqa: E402
+    CALIBRATED_CRITERIA,
+    PLAN_CRITERIA,
     HitCriteria,
     adjusted_comparison,
     hit_rates,
@@ -119,6 +121,8 @@ def cmd_catalog(args: argparse.Namespace) -> int:
 def _screen_one(item: Dict[str, str]) -> Dict[str, object]:
     """Screen one model in an isolated working directory."""
     from cryptic_ip.analysis import ProteinAnalyzer
+    from cryptic_ip.analysis.geometry import hull_depths
+    from cryptic_ip.analysis.structure_arrays import load_structure_arrays
 
     started = time.time()
     source = Path(item["path"])
@@ -133,6 +137,22 @@ def _screen_one(item: Dict[str, str]) -> Dict[str, object]:
             shutil.copy(source, pdb_path)
         analyzer = ProteinAnalyzer(str(pdb_path), work_dir=str(work / "work"), skip_electrostatics=True)
         scored = analyzer.run_pipeline(include_electrostatics=False)
+        # Depth to the convex hull: the burial measure that survives on apo
+        # models, where depth to the nearest exposed atom collapses inside an
+        # empty cavity (see geometry.hull_depths). The deepest atom's hull
+        # depth is kept as the protein's own scale.
+        arrays = load_structure_arrays(pdb_path)
+        protein = arrays.coords[arrays.is_polymer]
+        centers = np.array(
+            [record.get("center") or (np.nan,) * 3 for record in scored.to_dict(orient="records")],
+            dtype=float,
+        ).reshape(-1, 3)
+        try:
+            pocket_hull = hull_depths(protein, centers)
+            protein_scale = float(hull_depths(protein, protein).max())
+        except Exception:  # degenerate (e.g. planar) coordinates have no 3-D hull
+            pocket_hull = np.full(len(centers), np.nan)
+            protein_scale = float("nan")
         rows = []
         for record in scored.to_dict(orient="records"):
             center = record.get("center") or (np.nan, np.nan, np.nan)
@@ -142,6 +162,8 @@ def _screen_one(item: Dict[str, str]) -> Dict[str, object]:
             record["center_x"], record["center_y"], record["center_z"] = (float(c) for c in center)
             record["pocket_residues"] = ",".join(str(r) for r in residues)
             record["uniprot_id"] = item["uniprot_id"]
+            record["hull_depth"] = float(pocket_hull[len(rows)])
+            record["protein_max_hull_depth"] = protein_scale
             rows.append(record)
         status["n_pockets"] = len(rows)
         return {"status": status, "pockets": rows}
@@ -263,48 +285,38 @@ def _read_many(paths: List[Path], **kwargs) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
 
-def cmd_aggregate(args: argparse.Namespace) -> int:
-    shards = Path(args.shards_dir)
-    catalogs = Path(args.catalog_dir)
-    out = Path(args.output_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    criteria = HitCriteria(min_score=args.min_score)
-
-    pockets = _read_many(sorted(shards.rglob("*_pockets_part*.csv.gz")), low_memory=False)
-    status = _read_many(sorted(shards.rglob("*_status.csv")))
-    catalog = _read_many(sorted(catalogs.rglob("*_catalog.csv")))
-    if status.empty:
-        print("no shard status files found")
-        return 1
-    status["error"] = status["error"].fillna("")
-    f1 = catalog[catalog["fragment"] == 1].drop_duplicates("uniprot_id")
-    screened = status[status["error"] == ""].merge(
-        f1[["uniprot_id", "organism_key", "length", "mean_plddt", "fraction_plddt_70"]],
-        on="uniprot_id",
-        how="left",
-    )
-    failed = status[status["error"] != ""]
-
+def _analyse(
+    label: str,
+    criteria: HitCriteria,
+    pockets: pd.DataFrame,
+    screened: pd.DataFrame,
+    annotations: pd.DataFrame,
+    out: Path,
+) -> Dict[str, object]:
+    """Hit calling and every downstream comparison, under one hit definition."""
     proteins = protein_table(pockets, screened, criteria)
-    annotations = _read_many(sorted(catalogs.rglob("*_uniprot.tsv")), sep="\t", dtype=str)
     if not annotations.empty:
-        annotations = annotations.drop_duplicates("uniprot_id")
         proteins = proteins.merge(
             annotations[["uniprot_id", "gene", "protein_name", "keywords"]], on="uniprot_id", how="left"
         )
         known = known_ip_annotation(annotations)
         proteins["annotated_ip_binder"] = proteins["uniprot_id"].map(known).fillna(False).astype(bool)
+    if "hull_depth" in pockets.columns and not pockets.empty:
+        confident = pockets[pockets["plddt_mean"].astype(float).fillna(0) >= criteria.min_plddt]
+        proteins["max_confident_hull_depth"] = (
+            proteins["uniprot_id"].map(confident.groupby("uniprot_id")["hull_depth"].max())
+        )
 
+    multi = proteins["organism_key"].nunique() > 1
     rates = hit_rates(proteins)
     sweep = threshold_sweep(pockets, screened, np.round(np.arange(0.50, 0.951, 0.05), 2), criteria)
-    fisher = pairwise_fisher(proteins) if proteins["organism_key"].nunique() > 1 else pd.DataFrame()
-    adjusted = adjusted_comparison(proteins) if proteins["organism_key"].nunique() > 1 else {}
+    fisher = pairwise_fisher(proteins) if multi else pd.DataFrame()
+    adjusted = adjusted_comparison(proteins) if multi else {}
 
-    # Candidates: every passing pocket, best first.
     passing = pockets[criteria.passes(pockets)] if not pockets.empty else pockets
     keep = [c for c in (
         "organism_key", "uniprot_id", "pocket_id", "composite_score", "volume", "sasa",
-        "basic_residues", "burial_depth", "enclosure", "mean_relative_sasa",
+        "basic_residues", "burial_depth", "hull_depth", "enclosure", "mean_relative_sasa",
         "coulomb_potential_kt", "plddt_mean", "plddt_min", "center_x", "center_y",
         "center_z", "pocket_residues",
     ) if c in pockets.columns]
@@ -315,37 +327,33 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
             on="uniprot_id",
             how="left",
         )
-    candidates.to_csv(out / "candidates.csv", index=False)
 
     # Top 50 per proteome by best confident pocket, for manual inspection
-    # whether or not anything clears the strict filter.
+    # whether or not anything clears the filter.
     top = (
         proteins.dropna(subset=["best_confident_score"])
         .sort_values("best_confident_score", ascending=False)
         .groupby("organism_key")
         .head(50)
     )
-    top.to_csv(out / "top50_per_proteome.csv", index=False)
 
     enrichment = []
     if not annotations.empty:
         for organism, group in proteins.groupby("organism_key"):
-            group = group.reset_index(drop=True)
             eligible = group[group["eligible"]].reset_index(drop=True)
             if eligible.empty:
                 continue
-            # Hits are likely too few to test; the top 1 % of eligible proteins
-            # by best confident pocket score is a ranking-based set that always
-            # exists, and is reported alongside.
+            # Hits may be too few to test; the top 1 % of eligible proteins by
+            # best confident pocket score always exists and is reported beside.
             cutoff = eligible["best_confident_score"].quantile(0.99)
-            for label, mask, base in (
-                ("strict hits", eligible["is_hit"], eligible),
-                ("top 1% by score", eligible["best_confident_score"] >= cutoff, eligible),
+            for set_label, mask in (
+                ("hits", eligible["is_hit"]),
+                ("top 1% by score", eligible["best_confident_score"] >= cutoff),
             ):
                 if int(mask.sum()) == 0:
                     continue
-                table = keyword_enrichment(base, annotations, mask, ENRICHMENT_KEYWORDS)
-                table.insert(0, "set", label)
+                table = keyword_enrichment(eligible, annotations, mask, ENRICHMENT_KEYWORDS)
+                table.insert(0, "set", set_label)
                 table.insert(0, "organism_key", organism)
                 enrichment.append(table)
     enrichment_df = pd.concat(enrichment, ignore_index=True) if enrichment else pd.DataFrame()
@@ -364,41 +372,92 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
                 "screened": True,
                 "best_confident_score": r["best_confident_score"],
                 "rank_percentile": rank_percentile(proteins, uniprot_id),
+                "max_confident_hull_depth": r.get("max_confident_hull_depth"),
                 "is_hit": bool(r["is_hit"]),
                 "blocking_gate": r["blocking_gate"],
             }
         )
     known_df = pd.DataFrame(known_rows)
 
-    proteins.to_csv(out / "proteins.csv.gz", index=False)
-    rates.to_csv(out / "hit_rates.csv", index=False)
-    sweep.to_csv(out / "threshold_sweep.csv", index=False)
-    fisher.to_csv(out / "pairwise_fisher.csv", index=False)
-    enrichment_df.to_csv(out / "keyword_enrichment.csv", index=False)
-    known_df.to_csv(out / "known_binders.csv", index=False)
+    target = out / label
+    target.mkdir(parents=True, exist_ok=True)
+    proteins.to_csv(target / "proteins.csv.gz", index=False)
+    rates.to_csv(target / "hit_rates.csv", index=False)
+    sweep.to_csv(target / "threshold_sweep.csv", index=False)
+    fisher.to_csv(target / "pairwise_fisher.csv", index=False)
+    enrichment_df.to_csv(target / "keyword_enrichment.csv", index=False)
+    known_df.to_csv(target / "known_binders.csv", index=False)
+    candidates.to_csv(target / "candidates.csv", index=False)
+    top.to_csv(target / "top50_per_proteome.csv", index=False)
+
+    return {
+        "label": label,
+        "criteria": dict(criteria.__dict__),
+        "proteins": proteins,
+        "rates": rates,
+        "sweep": sweep,
+        "fisher": fisher,
+        "adjusted": adjusted,
+        "candidates": candidates,
+        "top": top,
+        "known": known_df,
+        "enrichment": enrichment_df,
+    }
+
+
+def cmd_aggregate(args: argparse.Namespace) -> int:
+    shards = Path(args.shards_dir)
+    catalogs = Path(args.catalog_dir)
+    out = Path(args.output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+
+    pockets = _read_many(sorted(shards.rglob("*_pockets_part*.csv.gz")), low_memory=False)
+    status = _read_many(sorted(shards.rglob("*_status.csv")))
+    catalog = _read_many(sorted(catalogs.rglob("*_catalog.csv")))
+    if status.empty:
+        print("no shard status files found")
+        return 1
+    status["error"] = status["error"].fillna("")
+    f1 = catalog[catalog["fragment"] == 1].drop_duplicates("uniprot_id")
+    screened = status[status["error"] == ""].merge(
+        f1[["uniprot_id", "organism_key", "length", "mean_plddt", "fraction_plddt_70"]],
+        on="uniprot_id",
+        how="left",
+    )
+    failed = status[status["error"] != ""]
     failed.to_csv(out / "failed_structures.csv", index=False)
+    annotations = _read_many(sorted(catalogs.rglob("*_uniprot.tsv")), sep="\t", dtype=str)
+    if not annotations.empty:
+        annotations = annotations.drop_duplicates("uniprot_id")
+
+    analyses = [_analyse("plan", PLAN_CRITERIA.replace(min_score=args.min_score), pockets, screened, annotations, out)]
+    if "hull_depth" in pockets.columns:
+        analyses.append(_analyse("calibrated", CALIBRATED_CRITERIA, pockets, screened, annotations, out))
 
     ip6 = {k: v["ip6_uM"] for k, v in PROTEOMES.items()}
     summary = {
-        "criteria": criteria.__dict__,
         "structures": {
             "screened_ok": int(len(screened)),
             "failed": int(len(failed)),
             "pockets": int(len(pockets)),
             "median_seconds_per_structure": float(status["seconds"].median()),
         },
-        "hit_rates": rates.to_dict(orient="records"),
         "ip6_uM": ip6,
-        "pairwise_fisher": fisher.to_dict(orient="records"),
-        "adjusted_comparison": adjusted,
-        "blocking_gate_counts": {
-            organism: group["blocking_gate"].value_counts().to_dict()
-            for organism, group in proteins.groupby("organism_key")
-        },
-        "known_binders": known_df.to_dict(orient="records"),
     }
+    for analysis in analyses:
+        summary[analysis["label"]] = {
+            "criteria": analysis["criteria"],
+            "hit_rates": analysis["rates"].to_dict(orient="records"),
+            "pairwise_fisher": analysis["fisher"].to_dict(orient="records"),
+            "adjusted_comparison": analysis["adjusted"],
+            "blocking_gate_counts": {
+                organism: group["blocking_gate"].value_counts().to_dict()
+                for organism, group in analysis["proteins"].groupby("organism_key")
+            },
+            "known_binders": analysis["known"].to_dict(orient="records"),
+        }
     write_json_strict(out / "screen_summary.json", summary, indent=2)
-    _digest(summary, rates, sweep, fisher, adjusted, candidates, top, known_df, enrichment_df, out)
+    _digest(summary, analyses, out)
     return 0
 
 
@@ -406,46 +465,59 @@ def _pct(x) -> str:
     return "n/a" if x is None or pd.isna(x) else f"{100 * float(x):.2f}%"
 
 
-def _digest(summary, rates, sweep, fisher, adjusted, candidates, top, known_df, enrichment_df, out) -> None:
+def _digest(summary, analyses, out) -> None:
     lines = ["## Proteome screen\n"]
     s = summary["structures"]
     lines.append(
         f"{s['screened_ok']} structures screened ({s['failed']} failed), {s['pockets']} pockets, "
         f"median {s['median_seconds_per_structure']:.1f} s per structure.\n"
     )
-    lines.append("### Hit rates (strict criteria)\n")
-    lines.append("| proteome | IP6 (uM) | screened | hits | rate [95% CI] | eligible | rate among eligible [95% CI] |")
-    lines.append("| --- | --- | --- | --- | --- | --- | --- |")
-    for r in rates.to_dict(orient="records"):
+    for analysis in analyses:
+        c = analysis["criteria"]
+        lines.append(f"## Hit definition: {analysis['label']}\n")
         lines.append(
-            f"| {r['organism_key']} | {summary['ip6_uM'].get(r['organism_key'], '?')} | {r['screened']} | "
-            f"{r['hits']} | {_pct(r['hit_rate'])} [{_pct(r['ci_low'])}-{_pct(r['ci_high'])}] | "
-            f"{r['eligible']} | {_pct(r['hit_rate_eligible'])} "
-            f"[{_pct(r['ci_low_eligible'])}-{_pct(r['ci_high_eligible'])}] |"
+            f"score >= {c['min_score']}, lining SASA <= {c['max_sasa']}, basic >= {c['min_basic']}, "
+            f"volume {c['min_volume']:.0f}-{c['max_volume']:.0f}, pLDDT >= {c['min_plddt']}, "
+            f"hull depth >= {c['min_hull_depth']}\n"
         )
-    if not sweep.empty:
-        lines.append("\n### Hits across score thresholds (other gates fixed)\n")
-        pivot = sweep.pivot(index="min_score", columns="organism_key", values="hits")
-        lines.append(pivot.to_markdown())
-    if not fisher.empty:
-        lines.append("\n### Dictyostelium vs the others (Fisher exact)\n")
-        lines.append(fisher.to_markdown(index=False, floatfmt=".3g"))
-    if adjusted:
-        lines.append("\n### Adjusted for length and model confidence\n")
-        lines.append("```\n" + json.dumps(adjusted, indent=2, default=str)[:4000] + "\n```")
-    lines.append("\n### Why proteins were not hits (closest pocket's first failing gate)\n")
-    lines.append("```\n" + json.dumps(summary["blocking_gate_counts"], indent=2) + "\n```")
-    lines.append("\n### Known inositol phosphate binders\n")
-    lines.append(known_df.to_markdown(index=False, floatfmt=".3f") if not known_df.empty else "none")
-    lines.append("\n### Strict candidates\n")
-    lines.append(candidates.head(40).to_markdown(index=False, floatfmt=".3f") if not candidates.empty else "none")
-    lines.append("\n### Top 10 per proteome by best confident pocket (for inspection)\n")
-    cols = [c for c in ("organism_key", "uniprot_id", "gene", "best_confident_score", "is_hit",
-                        "blocking_gate", "length", "annotated_ip_binder") if c in top.columns]
-    lines.append(top.groupby("organism_key").head(10)[cols].to_markdown(index=False, floatfmt=".3f"))
-    if not enrichment_df.empty:
-        lines.append("\n### Keyword enrichment\n")
-        lines.append(enrichment_df.to_markdown(index=False, floatfmt=".3g"))
+        lines.append("| proteome | IP6 (uM) | screened | hits | rate [95% CI] | eligible | rate among eligible [95% CI] |")
+        lines.append("| --- | --- | --- | --- | --- | --- | --- |")
+        for r in analysis["rates"].to_dict(orient="records"):
+            lines.append(
+                f"| {r['organism_key']} | {summary['ip6_uM'].get(r['organism_key'], '?')} | {r['screened']} | "
+                f"{r['hits']} | {_pct(r['hit_rate'])} [{_pct(r['ci_low'])}-{_pct(r['ci_high'])}] | "
+                f"{r['eligible']} | {_pct(r['hit_rate_eligible'])} "
+                f"[{_pct(r['ci_low_eligible'])}-{_pct(r['ci_high_eligible'])}] |"
+            )
+        sweep = analysis["sweep"]
+        if not sweep.empty:
+            lines.append("\n#### Hits across score thresholds (other gates fixed)\n")
+            lines.append(sweep.pivot(index="min_score", columns="organism_key", values="hits").to_markdown())
+        if not analysis["fisher"].empty:
+            lines.append("\n#### Dictyostelium vs the others (Fisher exact)\n")
+            lines.append(analysis["fisher"].to_markdown(index=False, floatfmt=".3g"))
+        if analysis["adjusted"]:
+            lines.append("\n#### Adjusted for length and model confidence\n")
+            lines.append("```\n" + json.dumps(analysis["adjusted"], indent=2, default=str)[:4000] + "\n```")
+        gates = summary[analysis["label"]]["blocking_gate_counts"]
+        lines.append("\n#### Why proteins were not hits (closest pocket's first failing gate)\n")
+        lines.append("```\n" + json.dumps(gates, indent=2) + "\n```")
+        lines.append("\n#### Known inositol phosphate binders\n")
+        known = analysis["known"]
+        lines.append(known.to_markdown(index=False, floatfmt=".3f") if not known.empty else "none")
+        lines.append("\n#### Candidates (best 40)\n")
+        candidates = analysis["candidates"]
+        lines.append(candidates.head(40).to_markdown(index=False, floatfmt=".3f") if not candidates.empty else "none")
+        top = analysis["top"]
+        cols = [col for col in ("organism_key", "uniprot_id", "gene", "best_confident_score",
+                                "max_confident_hull_depth", "is_hit", "blocking_gate", "length",
+                                "annotated_ip_binder") if col in top.columns]
+        lines.append("\n#### Top 10 per proteome by best confident pocket\n")
+        lines.append(top.groupby("organism_key").head(10)[cols].to_markdown(index=False, floatfmt=".3f"))
+        if not analysis["enrichment"].empty:
+            lines.append("\n#### Keyword enrichment\n")
+            lines.append(analysis["enrichment"].to_markdown(index=False, floatfmt=".3g"))
+        lines.append("")
     text = "\n".join(lines) + "\n"
     (out / "DIGEST.md").write_text(text, encoding="utf-8")
     print(text)

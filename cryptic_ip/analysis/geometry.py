@@ -422,3 +422,25 @@ def count_within(
     hits = tree.query_ball_point(query, float(cutoff))
     matched = sorted({index for group in hits for index in group})
     return len(matched), np.asarray(matched, dtype=int)
+
+
+def hull_depths(protein_coords: np.ndarray, points: np.ndarray) -> np.ndarray:
+    """Distance from each point inward to the convex hull of ``protein_coords`` (A).
+
+    :func:`burial_depth` measures the distance to the nearest solvent-exposed
+    atom. On an *apo* structure that collapses for exactly the sites of
+    interest: with the ligand removed, the walls of the vacated cavity are
+    themselves solvent-exposed, so a fully enclosed site reads as a few
+    Angstroms deep. The convex hull ignores internal cavities, so this measures
+    how far a site sits from the protein's exterior. Negative outside the hull.
+
+    It grows with protein size - a small domain cannot contain a point far from
+    its hull - so it is a burial measure, not a size-independent one.
+    """
+    from scipy.spatial import ConvexHull
+
+    points = np.atleast_2d(np.asarray(points, dtype=float))
+    hull = ConvexHull(np.asarray(protein_coords, dtype=float))
+    # Each facet satisfies normal . x + offset <= 0 inside the hull.
+    signed = points @ hull.equations[:, :3].T + hull.equations[:, 3]
+    return -signed.max(axis=1)

@@ -20,12 +20,14 @@ from cryptic_ip.database.proteome_catalog import (
 
 def _model_text(n_residues: int, *, spacing: float = 3.8, plddt: float = 90.0, end: bool = True) -> str:
     lines = []
+    # An alpha helix (radius 2.3 A, rise 1.5 A, 100 degrees per residue) puts
+    # consecutive C-alpha atoms 3.83 A apart; ``spacing`` rescales it.
+    scale = spacing / 3.83
     for i in range(n_residues):
-        # A zig-zag keeps consecutive C-alpha atoms at ``spacing`` apart.
-        x = i * spacing * np.cos(np.radians(20))
-        y = (i % 2) * spacing * np.sin(np.radians(20))
+        angle = np.radians(100.0 * i)
+        x, y, z = 2.3 * np.cos(angle) * scale, 2.3 * np.sin(angle) * scale, 1.5 * i * scale
         lines.append(
-            f"ATOM  {i + 1:5d}  CA  ALA A{i + 1:4d}    {x:8.3f}{y:8.3f}{0.0:8.3f}"
+            f"ATOM  {i + 1:5d}  CA  ALA A{i + 1:4d}    {x:8.3f}{y:8.3f}{z:8.3f}"
             f"  1.00{plddt:6.2f}           C"
         )
     if end:
@@ -148,9 +150,8 @@ def test_local_distortion_is_flagged_not_excluded(tmp_path):
     stretched = []
     for i, line in enumerate(lines[:-1]):
         if i >= 320:
-            z = float(line[46:54]) + 0.0
-            x = float(line[30:38]) + (i - 319) * 1.2
-            line = f"{line[:30]}{x:8.3f}{line[38:46]}{z:8.3f}{line[54:]}"
+            z = float(line[46:54]) + (i - 319) * 1.2
+            line = f"{line[:46]}{z:8.3f}{line[54:]}"
         stretched.append(line)
     stretched.append("END")
     path = _write(tmp_path, "AF-P77777-F1-model_v6.pdb", "\n".join(stretched) + "\n")

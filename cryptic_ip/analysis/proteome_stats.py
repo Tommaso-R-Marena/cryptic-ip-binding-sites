@@ -54,26 +54,56 @@ class HitCriteria:
     min_volume: float = ScoringParameters().volume_optimum_low
     max_volume: float = ScoringParameters().volume_optimum_high
     min_plddt: float = 70.0
+    #: Minimum depth to the convex hull (A); no hull gate when ``None``.
+    min_hull_depth: Optional[float] = None
 
     def gates(self, pockets: pd.DataFrame) -> pd.DataFrame:
-        """Boolean pass/fail for each criterion, one column per gate."""
+        """Boolean pass/fail for each criterion, one column per gate.
+
+        A gate whose threshold is ``None`` (or infinite, for SASA) always passes.
+        """
         volume = pockets["volume"].astype(float)
-        return pd.DataFrame(
-            {
-                "score": pockets["composite_score"].astype(float) >= self.min_score,
-                "sasa": pockets["sasa"].astype(float) <= self.max_sasa,
-                "basic": pockets["basic_residues"].astype(float) >= self.min_basic,
-                "volume": (volume >= self.min_volume) & (volume <= self.max_volume),
-                "plddt": pockets["plddt_mean"].astype(float).fillna(0.0) >= self.min_plddt,
-            },
-            index=pockets.index,
-        )
+        gates = {
+            "score": pockets["composite_score"].astype(float) >= self.min_score,
+            "sasa": (
+                pockets["sasa"].astype(float) <= self.max_sasa
+                if self.max_sasa is not None and np.isfinite(self.max_sasa)
+                else pd.Series(True, index=pockets.index)
+            ),
+            "basic": pockets["basic_residues"].astype(float) >= self.min_basic,
+            "volume": (volume >= self.min_volume) & (volume <= self.max_volume),
+            "plddt": pockets["plddt_mean"].astype(float).fillna(0.0) >= self.min_plddt,
+        }
+        if self.min_hull_depth is not None:
+            gates["hull"] = pockets["hull_depth"].astype(float).fillna(-np.inf) >= self.min_hull_depth
+        else:
+            gates["hull"] = pd.Series(True, index=pockets.index)
+        return pd.DataFrame(gates, index=pockets.index)
+
+    def replace(self, **changes) -> "HitCriteria":
+        values = dict(self.__dict__)
+        values.update(changes)
+        return HitCriteria(**values)
 
     def passes(self, pockets: pd.DataFrame) -> pd.Series:
         return self.gates(pockets).all(axis=1)
 
 
-GATE_ORDER = ("plddt", "volume", "basic", "sasa", "score")
+#: The plan's strict candidate definition (sections 2 and 11): as the pilot
+#: screen applied it, with the cavity volume window corrected.
+PLAN_CRITERIA = HitCriteria()
+
+#: Criteria recalibrated on the Phase 1 controls **as the screen sees them** -
+#: AlphaFold models, no ligand. There, ADAR2's InsP6 site scores 0.575 against
+#: 0.45-0.51 for the four PH-domain sites, sits 17.3 A inside the convex hull
+#: against 5.7-8.2 A, and has a lining SASA of 31 A^2, so the plan's 0.75 score
+#: and 10 A^2 SASA gates reject the paradigm positive itself. The thresholds
+#: sit between ADAR2 and the highest negative; they rest on one positive and
+#: four negatives, and are reported beside the plan's criteria, not instead.
+CALIBRATED_CRITERIA = HitCriteria(min_score=0.54, max_sasa=float("inf"), min_hull_depth=10.0)
+
+
+GATE_ORDER = ("plddt", "volume", "basic", "sasa", "hull", "score")
 
 
 def clopper_pearson(k: int, n: int, confidence: float = 0.95) -> tuple:
@@ -191,14 +221,7 @@ def threshold_sweep(
     """Hit rate per organism across score thresholds, other gates fixed."""
     frames = []
     for threshold in thresholds:
-        swept = HitCriteria(
-            min_score=float(threshold),
-            max_sasa=criteria.max_sasa,
-            min_basic=criteria.min_basic,
-            min_volume=criteria.min_volume,
-            max_volume=criteria.max_volume,
-            min_plddt=criteria.min_plddt,
-        )
+        swept = criteria.replace(min_score=float(threshold))
         rates = hit_rates(protein_table(pockets, screened, swept))
         rates.insert(0, "min_score", float(threshold))
         frames.append(rates)
