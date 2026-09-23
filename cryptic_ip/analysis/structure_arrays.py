@@ -40,6 +40,49 @@ STANDARD_AMINO_ACIDS = frozenset(
     }
 )
 
+#: The canonical amino acids and ambiguity codes. Written as ``HETATM`` these
+#: are normally *free* amino-acid ligands, so they count as polymer only when
+#: recorded as ordinary ``ATOM`` records.
+CANONICAL_AMINO_ACIDS = frozenset(
+    {
+        "ALA", "ARG", "ASN", "ASP", "CYS", "GLN", "GLU", "GLY", "HIS", "ILE",
+        "LEU", "LYS", "MET", "PHE", "PRO", "SER", "THR", "TRP", "TYR", "VAL",
+        "ASX", "GLX", "UNK",
+    }
+)
+
+#: Modified residues. These occur only inside a chain, but the PDB records them
+#: as ``HETATM`` - selenomethionine (MSE) most often, since it is used for
+#: phasing - so the record type cannot be used to decide whether they belong to
+#: the polymer.
+MODIFIED_AMINO_ACIDS = STANDARD_AMINO_ACIDS - CANONICAL_AMINO_ACIDS
+
+
+def is_polymer_residue(het_flag: str, resname: str) -> bool:
+    """Decide whether a residue is part of the protein chain.
+
+    A modified residue belongs to the chain whatever its record type. A
+    canonical residue belongs to it only as an ``ATOM`` record; as ``HETATM`` it
+    is a free amino acid bound as a ligand.
+
+    Requiring an ``ATOM`` record for every residue - the previous rule - dropped
+    selenomethionine from the protein, leaving a hole in the chain everywhere it
+    occurred and treating its atoms as ligand.
+
+    Args:
+        het_flag: Biopython hetero flag (``" "`` for standard records,
+            ``"H_<name>"`` for ``HETATM``, ``"W"`` for water).
+        resname: Residue name.
+
+    Returns:
+        ``True`` when the residue is part of the polymer.
+    """
+    name = str(resname).strip().upper()
+    if name in MODIFIED_AMINO_ACIDS:
+        return True
+    return str(het_flag).strip() == "" and name in CANONICAL_AMINO_ACIDS
+
+
 #: Basic side chains capable of coordinating a phosphate group. Histidine is
 #: included because it is protonated and phosphate-coordinating in several
 #: inositol phosphate sites, but it is also tracked separately so its weaker,
@@ -319,7 +362,7 @@ def load_structure_arrays(
             solvent = resname in SOLVENT_RESNAMES
             if solvent and not keep_solvent:
                 continue
-            polymer = het_flag == " " and resname in STANDARD_AMINO_ACIDS
+            polymer = is_polymer_residue(het_flag, resname)
 
             key: ResidueKey = (model_id, chain_id, int(resseq), str(icode).strip())
             selected = _select_altloc_atoms(residue)
@@ -462,3 +505,51 @@ def phosphate_group_indices(
             ):
                 selected.add(int(candidate_indices[o_local[hit]]))
     return np.asarray(sorted(selected), dtype=int)
+
+
+def write_apo_structure(path: Path, out_path: Path, *, model_index: int = 0) -> Path:
+    """Write a copy of a structure with everything but the protein removed.
+
+    Pocket descriptors must be computed on the apo structure whenever the model
+    that consumes them will be applied to apo structures - and the target here,
+    AlphaFold models, never carry a ligand. On a deposited holo structure the
+    bound inositol phosphate occludes the residues lining its own pocket, so
+    solvent accessibility, and burial depth through it, would describe the
+    pocket as buried *because the ligand is in it*. A classifier trained on that
+    learns "this pocket is occupied", which says nothing about an empty one.
+
+    Only the polymer is kept, by :func:`is_polymer_residue`, so a modified
+    residue such as selenomethionine stays in the chain while ligands, ions and
+    water are removed. Ligand coordinates for labelling must be read from the
+    original file; this copy deliberately has none.
+
+    Args:
+        path: Holo structure file (PDB or mmCIF).
+        out_path: Destination for the apo copy, written in PDB format.
+        model_index: Model to keep; the others are dropped.
+
+    Returns:
+        ``out_path``.
+    """
+    from Bio.PDB import PDBIO, Select
+
+    structure = _parse_structure(Path(path))
+    models = list(structure)
+    if not models:
+        raise ValueError(f"no models in {path}")
+    keep_model_id = models[min(model_index, len(models) - 1)].id
+
+    class _PolymerOnly(Select):
+        def accept_model(self, model) -> bool:
+            return model.id == keep_model_id
+
+        def accept_residue(self, residue) -> bool:
+            het_flag = residue.id[0]
+            return is_polymer_residue(het_flag, residue.get_resname())
+
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    writer = PDBIO()
+    writer.set_structure(structure)
+    writer.save(str(out_path), _PolymerOnly())
+    return out_path

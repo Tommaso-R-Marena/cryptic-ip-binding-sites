@@ -27,7 +27,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import shutil
 import sys
+import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -44,7 +46,10 @@ from cryptic_ip.analysis.labeling import (  # noqa: E402
     assign_pocket_labels,
     summarise_labels,
 )
-from cryptic_ip.analysis.structure_arrays import load_structure_arrays  # noqa: E402
+from cryptic_ip.analysis.structure_arrays import (  # noqa: E402
+    load_structure_arrays,
+    write_apo_structure,
+)
 from cryptic_ip.validation.burial_metrics import (  # noqa: E402
     compute_ligand_burial,
     find_ligand_instances,
@@ -100,6 +105,17 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help=(
             "Only cryptic ligand copies produce positives; surface copies become "
             "ambiguous and are excluded rather than treated as negatives."
+        ),
+    )
+    parser.add_argument(
+        "--holo-descriptors",
+        dest="apo",
+        action="store_false",
+        help=(
+            "Compute pocket descriptors on the deposited structure, ligand "
+            "included, instead of on a ligand-free copy. Only for measuring how "
+            "much the bound ligand inflates them: a model trained this way learns "
+            "to recognise an occupied pocket, which an apo target never has."
         ),
     )
     parser.add_argument("--jobs", type=int, default=4, help="Parallel worker processes")
@@ -187,11 +203,26 @@ def process_structure(
     diagnostics: Dict[str, Any] = {"structure_id": structure_id, "error": None}
 
     try:
+        # Labels always come from the deposited (holo) structure: they need to
+        # know where the ligand sits.
         sites = _ligand_sites(path, comp_ids, int(options.get("sasa_points", 256)))
         diagnostics["n_ligand_instances"] = len(sites)
 
+        # Descriptors come from an apo copy unless told otherwise. On the holo
+        # structure the bound ligand covers the residues lining its own pocket,
+        # so solvent accessibility - and burial depth through it - read as
+        # "buried" because the ligand is present. A model trained on that learns
+        # to recognise an occupied pocket, which an AlphaFold model never has.
+        describe_path = path
+        apo_dir = None
+        if options.get("apo", True):
+            apo_dir = Path(tempfile.mkdtemp(prefix=f"apo_{structure_id}_"))
+            describe_path = write_apo_structure(path, apo_dir / f"{structure_id}.pdb")
+        diagnostics["descriptors_from"] = "apo" if apo_dir is not None else "holo"
+
         analyzer = ProteinAnalyzer(
-            str(path), skip_electrostatics=bool(options.get("skip_electrostatics", True))
+            str(describe_path),
+            skip_electrostatics=bool(options.get("skip_electrostatics", True)),
         )
         analyzer.detect_pockets(min_alpha_sphere=int(options.get("min_alpha_spheres", 3)))
         if not options.get("skip_electrostatics", True):
@@ -235,11 +266,49 @@ def process_structure(
         diagnostics["n_pockets"] = len(rows)
         diagnostics["n_positive"] = sum(1 for row in rows if row.get("label") == 1)
         analyzer.cleanup()
+        if apo_dir is not None:
+            shutil.rmtree(apo_dir, ignore_errors=True)
         return structure_id, rows, diagnostics
 
     except Exception as exc:  # noqa: BLE001 - one structure must not abort the run
         diagnostics["error"] = f"{type(exc).__name__}: {exc}"
         return structure_id, [], diagnostics
+
+
+#: Options that change the rows a structure produces. A cached result is reused
+#: only when all of them match; otherwise it is recomputed.
+CACHE_KEY_OPTIONS = (
+    "apo",
+    "require_cryptic",
+    "sasa_points",
+    "min_alpha_spheres",
+    "skip_electrostatics",
+)
+
+
+def cache_fingerprint(options: Dict[str, Any], comp_ids: Optional[Sequence[str]]) -> str:
+    """Identify the settings a cached structure's rows were computed under.
+
+    The per-structure cache used to be keyed on the structure identifier alone,
+    so a run could silently reuse rows computed under different settings: an apo
+    run picking up holo descriptors, or a cryptic-only run picking up labels
+    assigned without that restriction. Recording this fingerprint alongside each
+    cached result, and recomputing on a mismatch, makes that impossible.
+
+    Args:
+        options: Worker options passed to :func:`process_structure`.
+        comp_ids: Explicit component identifiers, or ``None`` for structural
+            identification.
+
+    Returns:
+        A short hex digest of the settings that affect the output.
+    """
+    import hashlib
+
+    relevant = {key: options.get(key) for key in CACHE_KEY_OPTIONS}
+    relevant["comp_ids"] = sorted(comp_ids) if comp_ids is not None else None
+    encoded = json.dumps(relevant, sort_keys=True, default=str).encode("utf-8")
+    return hashlib.sha1(encoded).hexdigest()[:16]
 
 
 def load_entry_metadata(entry_csv: Path) -> Dict[str, Dict[str, Any]]:
@@ -317,24 +386,33 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "skip_electrostatics": args.skip_electrostatics,
         "min_alpha_spheres": args.min_alpha_spheres,
         "require_cryptic": args.require_cryptic,
+        "apo": args.apo,
     }
 
     tasks: List[Tuple[str, str, Sequence[str], Dict[str, Any]]] = []
     cached_rows: Dict[str, List[Dict[str, Any]]] = {}
     diagnostics: List[Dict[str, Any]] = []
 
+    fingerprint = cache_fingerprint(options, comp_ids)
+    n_stale = 0
     for path in structures:
         structure_id = path.stem.upper()
         cache_path = args.cache_dir / f"{structure_id}.json"
         if cache_path.exists():
             try:
                 payload = json.loads(cache_path.read_text(encoding="utf-8"))
-                cached_rows[structure_id] = payload["rows"]
-                diagnostics.append(payload["diagnostics"])
-                continue
+                if payload.get("fingerprint") == fingerprint:
+                    cached_rows[structure_id] = payload["rows"]
+                    diagnostics.append(payload["diagnostics"])
+                    continue
+                n_stale += 1
             except (json.JSONDecodeError, KeyError, OSError):
                 cache_path.unlink(missing_ok=True)
         tasks.append((structure_id, str(path), comp_ids, options))
+    if n_stale:
+        LOGGER.info(
+            "Recomputing %d cached structure(s) computed under different settings", n_stale
+        )
 
     LOGGER.info(
         "Processing %d structures (%d already cached)", len(tasks), len(cached_rows)
@@ -344,7 +422,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         cached_rows[structure_id] = rows
         diagnostics.append(diag)
         (args.cache_dir / f"{structure_id}.json").write_text(
-            json.dumps({"rows": rows, "diagnostics": diag}, default=float), encoding="utf-8"
+            json.dumps(
+                {"rows": rows, "diagnostics": diag, "fingerprint": fingerprint},
+                default=float,
+            ),
+            encoding="utf-8",
         )
 
     if args.jobs > 1 and tasks:
