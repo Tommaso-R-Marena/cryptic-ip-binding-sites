@@ -67,7 +67,7 @@ jobs:
     name: Phase 2 - ${{ matrix.organism }}
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 300
     strategy:
       fail-fast: false
       matrix:
@@ -86,12 +86,10 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install -e .
 
-      - name: Download the AlphaFold proteome archive
-        id: download
-        # Streamed straight into tar, keeping only the PDB-format models, so the
-        # multi-gigabyte archive never has to fit on the runner's disk. The
-        # archive name is read from the directory listing rather than
-        # hard-coded, so a new AlphaFold DB release is picked up as it is.
+      - name: Locate the AlphaFold proteome archive
+        id: locate
+        # Read from the directory listing rather than hard-coded, so a new
+        # AlphaFold DB release is picked up as it is.
         run: |
           set -euo pipefail
           case "${{ matrix.organism }}" in
@@ -102,18 +100,34 @@ jobs:
           BASE=https://ftp.ebi.ac.uk/pub/databases/alphafold/latest
           NAME=$(curl -fsSL --retry 5 "$BASE/" | grep -oE "${PID}_[0-9]+_[A-Z]+_v[0-9]+\.tar" | sort -uV | tail -1)
           echo "archive: $NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "source=$BASE/$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Cache extracted models
+        id: cache
+        uses: actions/cache@v5
+        with:
+          path: data/proteomes/${{ matrix.organism }}
+          key: af-proteome-pdb-${{ steps.locate.outputs.name }}
+
+      - name: Download and extract the archive
+        if: steps.cache.outputs.cache-hit != 'true'
+        # A single stream from the EBI FTP server ran at well under 1 MB/s and
+        # the human archive did not finish in two hours. Segmented parallel
+        # download (aria2c) is used instead, onto the runner's large scratch
+        # disk, and only the PDB-format models are extracted.
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq aria2
+          sudo mkdir -p /mnt/af && sudo chown "$USER" /mnt/af
+          df -h /mnt | tail -1
+          aria2c --console-log-level=warn --summary-interval=120 \
+            -x 16 -s 16 -k 64M --max-tries=20 --retry-wait=15 --file-allocation=none \
+            -d /mnt/af -o archive.tar "${{ steps.locate.outputs.source }}"
           OUT="data/proteomes/${{ matrix.organism }}"
           mkdir -p "$OUT"
-          for attempt in 1 2 3; do
-            if curl -fsSL --retry 5 --retry-delay 10 "$BASE/$NAME" \
-                 | tar -xf - -C "$OUT" --wildcards '*.pdb.gz'; then
-              break
-            fi
-            echo "attempt $attempt failed; retrying"
-            rm -rf "$OUT"; mkdir -p "$OUT"
-            sleep $((attempt * 30))
-          done
+          tar -xf /mnt/af/archive.tar -C "$OUT" --wildcards '*.pdb.gz'
+          rm -f /mnt/af/archive.tar
           echo "extracted $(ls "$OUT" | wc -l) PDB models"
           du -sh "$OUT"
 
@@ -123,7 +137,7 @@ jobs:
             --organism "${{ matrix.organism }}" \
             --structures-dir "data/proteomes/${{ matrix.organism }}" \
             --output-dir results/proteome_screen/catalog \
-            --source "${{ steps.download.outputs.source }}"
+            --source "${{ steps.locate.outputs.source }}"
 
       - name: UniProt annotations
         continue-on-error: true
@@ -150,6 +164,10 @@ jobs:
   screen:
     name: Screen ${{ matrix.organism }} ${{ matrix.shard_index }}/${{ matrix.shard_count }}
     needs: [plan, prepare]
+    # Each organism's shards need only that organism's preparation. Without
+    # this, one organism's failed download skipped every shard of the others;
+    # a shard whose organism failed to prepare fails at its artifact download.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 350
     strategy:
