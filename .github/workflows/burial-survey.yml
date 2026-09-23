@@ -187,4 +187,24 @@ jobs:
                       f"| {row['boundary']:.2f} | {row['n_positive']} "
                       f"| {row['fraction_positive']:.1%} |"
                   )
+
+          disc = summary.get("discrimination") or {}
+          measures = disc.get("measures") or {}
+          if measures:
+              print("\n### Does each descriptor track burial?\n")
+              print(
+                  "| descriptor | n | Spearman rho vs relSASA | AUROC buried vs exposed "
+                  "| 95% CI | buried / exposed |"
+              )
+              print("| --- | --- | --- | --- | --- | --- |")
+              for name, m in measures.items():
+                  if "auroc_buried_vs_exposed" not in m:
+                      print(f"| {name} | {m.get('n')} | - | {m.get('note', '-')} | - | - |")
+                      continue
+                  ci = m.get("auroc_ci95") or [float("nan"), float("nan")]
+                  print(
+                      f"| {name} | {m['n']} | {m['spearman_rho_vs_relative_sasa']:+.3f} "
+                      f"| {m['auroc_buried_vs_exposed']:.3f} | {ci[0]:.3f}-{ci[1]:.3f} "
+                      f"| {m['n_buried']} / {m['n_exposed']} |"
+                  )
           PY

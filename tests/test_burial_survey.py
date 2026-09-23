@@ -298,3 +298,67 @@ def test_the_original_literature_boundary_would_have_emptied_the_positive_class(
     a class with no members.
     """
     assert SURVEYED_BOUNDARY_SWEEP[0.05] == 0
+
+
+class TestDiscrimination:
+    """The depth question must be answerable honestly in either direction."""
+
+    @staticmethod
+    def _population(descriptor_of, n=200, seed=0):
+        rng = np.random.default_rng(seed)
+        rsasa = rng.uniform(0.02, 0.9, n)
+        return [
+            EntryMeasurement(
+                pdb_id=f"{i:04d}",
+                relative_sasa=float(r),
+                burial_depth=float(descriptor_of(r, rng)),
+                enclosure=float(1.0 - r),
+                burial_class="surface",
+            )
+            for i, r in enumerate(rsasa)
+        ]
+
+    def test_a_descriptor_that_tracks_burial_is_recognised(self):
+        from scripts.burial_survey import measure_discrimination
+
+        population = self._population(lambda r, rng: 20.0 * (1.0 - r))
+        result = measure_discrimination(population, n_bootstrap=200)["measures"]["burial_depth"]
+
+        assert result["spearman_rho_vs_relative_sasa"] < -0.95
+        assert result["auroc_buried_vs_exposed"] > 0.95
+        assert result["auroc_ci95"][0] > 0.9
+
+    def test_an_uninformative_descriptor_is_reported_as_such(self):
+        """Noise must come back as noise, with an interval spanning chance."""
+        from scripts.burial_survey import measure_discrimination
+
+        population = self._population(lambda r, rng: rng.uniform(2.0, 8.0))
+        result = measure_discrimination(population, n_bootstrap=500)["measures"]["burial_depth"]
+
+        assert abs(result["spearman_rho_vs_relative_sasa"]) < 0.2
+        low, high = result["auroc_ci95"]
+        assert low < 0.5 < high
+
+    def test_crystal_artefacts_and_the_ambiguous_band_are_excluded(self):
+        from scripts.burial_survey import measure_discrimination
+
+        population = self._population(lambda r, rng: 20.0 * (1.0 - r))
+        population.append(
+            EntryMeasurement(
+                pdb_id="ARTF", relative_sasa=0.05, burial_depth=0.0,
+                enclosure=0.0, burial_class="crystal_artifact",
+            )
+        )
+        result = measure_discrimination(population, n_bootstrap=50)
+        assert result["n_eligible"] == 200
+
+        measure = result["measures"]["burial_depth"]
+        # Entries between the two boundaries belong to neither class.
+        assert measure["n_buried"] + measure["n_exposed"] < measure["n"]
+
+    def test_too_little_data_says_so_rather_than_guessing(self):
+        from scripts.burial_survey import measure_discrimination
+
+        population = self._population(lambda r, rng: 1.0, n=5)
+        result = measure_discrimination(population)["measures"]["burial_depth"]
+        assert result["note"] == "too few measurements"

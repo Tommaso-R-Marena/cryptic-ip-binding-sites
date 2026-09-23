@@ -379,7 +379,111 @@ def summarise(measurements: Sequence[EntryMeasurement]) -> Dict[str, Any]:
             }
         )
     summary["boundary_sweep"] = sweep
+    summary["discrimination"] = measure_discrimination(usable)
     return summary
+
+
+#: Descriptors whose agreement with relative SASA is tested. Each is oriented
+#: so that a larger value should mean *more* buried.
+DISCRIMINATION_MEASURES = ("burial_depth", "enclosure")
+
+#: Bootstrap resamples for the AUROC confidence interval.
+N_DISCRIMINATION_BOOTSTRAP = 2000
+
+
+def measure_discrimination(
+    measurements: Sequence[EntryMeasurement],
+    *,
+    n_bootstrap: int = N_DISCRIMINATION_BOOTSTRAP,
+    seed: int = 0,
+) -> Dict[str, Any]:
+    """Test whether each burial descriptor agrees with relative SASA.
+
+    Whether burial depth discriminates buried from exposed inositol phosphate
+    sites had been argued from panels of three and five structures, which
+    reached opposite conclusions. A question like that should be settled at
+    population scale, so each descriptor is scored against the survey:
+
+    * **Spearman rho with relative SASA.** A descriptor that measures burial
+      should fall as relative SASA rises, so rho should be clearly negative.
+    * **AUROC for buried against exposed.** Buried is relative SASA at or below
+      the cryptic boundary; exposed is above the semi-cryptic boundary, so the
+      ambiguous middle band is left out rather than forced into either class.
+      Crystal artefacts are excluded. 0.5 means the descriptor carries no
+      information about the split.
+
+    Both descriptors and relative SASA are measured on the same ligand copy, so
+    they are not independent; the point is to ask which descriptors *agree* with
+    the solvent-accessibility definition of burial, and by how much.
+
+    Args:
+        measurements: Usable per-entry measurements.
+        n_bootstrap: Bootstrap resamples for the AUROC interval.
+        seed: Seed for the bootstrap.
+
+    Returns:
+        Per-descriptor statistics, or an explanatory note when there is too
+        little data.
+    """
+    from scipy.stats import spearmanr
+    from sklearn.metrics import roc_auc_score
+
+    eligible = [
+        m for m in measurements
+        if m.relative_sasa is not None and m.burial_class != "crystal_artifact"
+    ]
+    out: Dict[str, Any] = {
+        "n_eligible": len(eligible),
+        "buried_max_relative_sasa": float(CRYPTIC_RELATIVE_SASA_MAX),
+        "exposed_min_relative_sasa": float(SEMI_CRYPTIC_RELATIVE_SASA_MAX),
+        "measures": {},
+    }
+    rng = np.random.default_rng(seed)
+
+    for name in DISCRIMINATION_MEASURES:
+        pairs = [
+            (getattr(m, name), m.relative_sasa)
+            for m in eligible
+            if getattr(m, name) is not None
+        ]
+        record: Dict[str, Any] = {"n": len(pairs)}
+        if len(pairs) < 10:
+            record["note"] = "too few measurements"
+            out["measures"][name] = record
+            continue
+
+        descriptor = np.asarray([p[0] for p in pairs], dtype=float)
+        rsasa = np.asarray([p[1] for p in pairs], dtype=float)
+        rho, p_value = spearmanr(descriptor, rsasa)
+        record["spearman_rho_vs_relative_sasa"] = _finite(rho)
+        record["spearman_p"] = _finite(p_value)
+
+        split = (rsasa <= CRYPTIC_RELATIVE_SASA_MAX) | (rsasa > SEMI_CRYPTIC_RELATIVE_SASA_MAX)
+        labels = (rsasa[split] <= CRYPTIC_RELATIVE_SASA_MAX).astype(int)
+        scores = descriptor[split]
+        record["n_buried"] = int(labels.sum())
+        record["n_exposed"] = int((labels == 0).sum())
+
+        if labels.min() == labels.max():
+            record["note"] = "only one class present; AUROC undefined"
+            out["measures"][name] = record
+            continue
+
+        record["auroc_buried_vs_exposed"] = float(roc_auc_score(labels, scores))
+        resampled = []
+        for _ in range(n_bootstrap):
+            index = rng.integers(0, labels.size, labels.size)
+            if labels[index].min() == labels[index].max():
+                continue
+            resampled.append(roc_auc_score(labels[index], scores[index]))
+        if resampled:
+            record["auroc_ci95"] = [
+                float(np.percentile(resampled, 2.5)),
+                float(np.percentile(resampled, 97.5)),
+            ]
+        out["measures"][name] = record
+
+    return out
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
