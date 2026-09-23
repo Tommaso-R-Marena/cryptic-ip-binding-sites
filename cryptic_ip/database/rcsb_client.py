@@ -781,7 +781,9 @@ def _looks_like_structure(content: bytes, fmt: str) -> bool:
     head = content[:4096].lstrip()
     if fmt == "cif":
         return head.startswith(b"data_")
-    return b"ATOM" in content[:200_000] or b"HETATM" in content[:200_000]
+    # The whole file: a large entry's header can precede the first coordinate
+    # record by several hundred kilobytes.
+    return b"ATOM" in content or b"HETATM" in content
 
 
 def _extract_identifiers(data: Mapping[str, Any]) -> List[str]:

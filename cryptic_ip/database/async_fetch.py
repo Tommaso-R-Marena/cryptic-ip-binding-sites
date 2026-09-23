@@ -56,9 +56,12 @@ Validator = Callable[[bytes], None]
 
 # ---------------------------------------------------------------- validators
 def validate_pdb(payload: bytes) -> None:
-    """A PDB-format coordinate file: has coordinates and an END record."""
-    head = payload[:200_000]
-    if b"ATOM  " not in head and b"HETATM" not in head:
+    """A PDB-format coordinate file: has coordinates and an END record.
+
+    The whole file is searched: a large entry's header (REMARK, SEQRES, ...)
+    can run to several hundred kilobytes before the first coordinate record.
+    """
+    if b"\nATOM  " not in payload and b"\nHETATM" not in payload and not payload.startswith((b"ATOM  ", b"HETATM")):
         raise ValidationError("no ATOM/HETATM records")
     if b"\nEND" not in payload[-4096:] and not payload.rstrip().endswith(b"END"):
         raise ValidationError("no END record: truncated PDB file")

@@ -324,3 +324,14 @@ def test_pdb_client_validates_and_refetches_a_cut_file(server, tmp_path, monkeyp
     with pytest.raises(ValueError):
         client.fetch_structure("MISSING")
 
+
+
+def test_pdb_with_a_long_header_is_valid():
+    """7SNQ's header runs past 200 KB before its first ATOM record."""
+    from cryptic_ip.database.async_fetch import validate_pdb
+
+    header = b"".join(b"REMARK 999 %-60d\n" % i for i in range(5000))  # ~370 KB
+    assert len(header) > 300_000
+    validate_pdb(header + PDB)  # must not raise
+    with pytest.raises(async_fetch.ValidationError):
+        validate_pdb(header + b"END\n")

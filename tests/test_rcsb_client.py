@@ -295,3 +295,14 @@ def test_error_page_is_not_stored_as_a_structure(tmp_path: Path, monkeypatch):
         client, "_request", lambda *a, **k: FakeResponse(content=b"<html>maintenance</html>")
     )
     assert client.download_structure("1ZY7", tmp_path) is None
+
+
+def test_pdb_with_a_long_header_is_accepted(tmp_path: Path, monkeypatch):
+    client = RcsbClient(cache_dir=None, min_interval_s=0.0)
+    payload = b"REMARK 999 filler\n" * 20000 + b"ATOM      1  CA  ALA A   1       0.000   0.000   0.000\nEND\n"
+
+    def fake_request(method, url, allow_404=False, **kwargs):
+        return None if url.endswith(".cif.gz") else FakeResponse(content=__import__("gzip").compress(payload))
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    assert client.download_structure("7SNQ", tmp_path, prefer_format="cif") is not None
