@@ -206,11 +206,13 @@ def measure_control(
         basic_count=analysis.get("n_basic_residues"),
         potential=analysis.get("coulomb_potential_kt"),
         enclosure=analysis.get("enclosure"),
+        hull_depth=analysis.get("hull_depth"),
     )
     record["site_pocket"]["measurements"] = {
         "pocket_volume": analysis.get("pocket_volume"),
         "burial_depth": analysis.get("burial_depth"),
         "enclosure": analysis.get("enclosure"),
+        "hull_depth": analysis.get("hull_depth"),
         "sasa_mean": analysis.get("sasa_mean"),
         "n_basic_residues": analysis.get("n_basic_residues"),
         "coulomb_potential_kt": analysis.get("coulomb_potential_kt"),
@@ -224,6 +226,7 @@ def measure_control(
         basic_count=analysis.get("n_basic_residues"),
         potential=analysis.get("coulomb_potential_kt"),
         enclosure=analysis.get("enclosure"),
+        hull_depth=analysis.get("hull_depth"),
     )
 
     # The highest-scoring pocket overall, for comparison with the true site.
@@ -236,6 +239,7 @@ def measure_control(
             basic_count=r.get("n_basic_residues"),
             potential=r.get("coulomb_potential_kt"),
             enclosure=r.get("enclosure"),
+            hull_depth=r.get("hull_depth"),
         ),
     )
     record["top_scoring_pocket_id"] = int(best_scoring["pocket_id"])

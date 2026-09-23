@@ -590,6 +590,7 @@ class ProteinAnalyzer:
                         else row.get("coulomb_potential_kt")
                     ),
                     enclosure=row.get("enclosure"),
+                    hull_depth=row.get("hull_depth"),
                 )
 
         return pd.DataFrame(results).sort_values("composite_score", ascending=False)

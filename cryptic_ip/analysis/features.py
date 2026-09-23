@@ -156,6 +156,9 @@ FEATURE_NAMES: Tuple[str, ...] = (
     "plddt_mean",
     "plddt_min",
     "plddt_fraction_above_cutoff",
+    # --- burial measured from the exterior (appended: order is part of the
+    # serialised-model contract, so new descriptors go at the end)
+    "hull_depth",
 )
 
 #: Legacy six-feature schema kept so that models serialised by earlier versions
@@ -245,6 +248,25 @@ class PocketFeatureExtractor:
         self._protein_sasa = self._atom_sasa[self._protein_positions]
         self._protein_atom_indices = self._context_indices[self._protein_positions]
         self._residue_sasa = self._aggregate_residue_sasa()
+        self._hull_equations: Optional[np.ndarray] = None
+
+    def _hull_depth(self, centre: np.ndarray) -> float:
+        """Distance from ``centre`` inward to the protein's convex hull (Å).
+
+        See :func:`cryptic_ip.analysis.geometry.hull_depths`. The hull is built
+        once per structure and reused for every pocket.
+        """
+        if self._hull_equations is None:
+            from scipy.spatial import ConvexHull, QhullError
+
+            try:
+                self._hull_equations = ConvexHull(self._protein_coords).equations
+            except (QhullError, ValueError):  # fewer than 4 or coplanar atoms
+                self._hull_equations = np.empty((0, 4))
+        if self._hull_equations.size == 0:
+            return float("nan")
+        signed = self._hull_equations[:, :3] @ np.asarray(centre, dtype=float) + self._hull_equations[:, 3]
+        return float(-signed.max())
 
     def _aggregate_residue_sasa(self) -> Dict[ResidueKey, float]:
         """Sum per-atom SASA into chain-aware per-residue totals."""
@@ -413,6 +435,7 @@ class PocketFeatureExtractor:
         features["enclosure"] = enclosure_fraction(
             centre_arr, self._protein_coords, self._protein_radii
         )
+        features["hull_depth"] = self._hull_depth(centre_arr)
 
         # ------------------------------------- accessibility and composition
         shell = self.shell_residues(centre_arr, self.shell_radius)
@@ -624,7 +647,8 @@ def feature_documentation() -> Dict[str, str]:
         "radius_of_gyration": "Spread of alpha spheres; compact sites match the compact ligand.",
         "asphericity": "Anisotropy of the cavity; 0 is globular, 1 is a slot.",
         "max_extent": "Longest cavity dimension; must accommodate an ~11 A ligand.",
-        "burial_depth": "Distance from centre to nearest solvent-exposed atom; the depth criterion.",
+        "burial_depth": "Distance from centre to nearest solvent-exposed atom; collapses inside an empty cavity.",
+        "hull_depth": "Distance from centre inward to the protein's convex hull; burial from the exterior.",
         "enclosure": "Fraction of directions blocked by protein; distinguishes buried from grooved.",
         "buried_residue_fraction": "Share of lining residues with relative accessibility < 0.20.",
         "mean_relative_sasa": "Mean residue accessibility normalised by residue type.",

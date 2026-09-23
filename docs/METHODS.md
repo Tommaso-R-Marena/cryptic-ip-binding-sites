@@ -436,11 +436,25 @@ functions of each measurement:
 | Component | Weight | Midpoint |
 |---|---|---|
 | Mean lining SASA | 0.25 | 20 Å² |
-| Burial depth | 0.22 | 12 Å |
+| Depth (hull depth; burial depth when unavailable) | 0.22 | 11.5 Å (hull) / 12 Å (burial) |
 | Basic residue count | 0.20 | 3.5 |
 | Enclosure | 0.13 | 0.75 |
 | Electrostatic potential | 0.10 | 3 kT/e |
 | Cavity volume | 0.10 | 300–1600 Å³ plateau (cavity, not ligand, volume) |
+
+**Depth is measured to the convex hull.** The depth component previously read
+the distance to the nearest solvent-exposed atom. On an apo structure - every
+AlphaFold model - that collapses at exactly the sites the screen looks for: the
+walls of an empty cavity are themselves exposed, so ADAR2's enclosed InsP6 site
+reads 4.5 Å deep on its model, no deeper than the PH-domain surface sites
+(section 6a). Depth to the convex hull ignores internal cavities (ADAR2 17.3 Å;
+PH domains 5.7-8.2 Å). Its midpoint and slope come from the project plan's own
+thresholds - deeper than 15 Å buried, shallower than 8 Å surface - not from
+fitting any control. Whether it improves the score on data it was not chosen
+on is measured on the 136-entry benchmark: the training workflow scores the
+same out-of-fold pockets with both depth measures and reports a DeLong test
+between them. `ScoringParameters(depth_measure="burial")` restores the old
+input.
 
 The components were previously step functions — 4 basic residues scored 0.8 and
 3 scored 0.4 — which made the score unstable under measurement noise for no

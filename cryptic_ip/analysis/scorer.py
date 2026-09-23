@@ -118,6 +118,21 @@ class ScoringParameters:
     enclosure_midpoint: float = 0.75
     enclosure_slope: float = 12.0
     missing_component_score: float = 0.5
+    #: What the depth component measures. ``"hull"``: distance from the pocket
+    #: centre inward to the protein's convex hull. ``"burial"``: distance to
+    #: the nearest solvent-exposed atom. On an apo structure - every AlphaFold
+    #: model - the second collapses at exactly the sites of interest, because
+    #: the walls of an empty cavity are themselves exposed: ADAR2's enclosed
+    #: InsP6 site reads 4.5 A deep on its model, no deeper than the PH-domain
+    #: surface sites. Hull depth is 17.3 A against at most 8.2 A for those.
+    #: Burial depth is used when hull depth is unavailable.
+    depth_measure: str = "hull"
+    #: Hull depth scoring 0.5, and the ramp's steepness. Set from the project
+    #: plan's own thresholds - deeper than 15 A for a buried site, shallower
+    #: than 8 A for a surface one - as their midpoint, with the slope putting
+    #: 15 A at ~0.9 and 8 A at ~0.1. Not fitted to any control or benchmark.
+    hull_depth_midpoint: float = 11.5
+    hull_depth_slope: float = 0.63
 
     def to_dict(self) -> Dict[str, Any]:
         """Return a JSON-serialisable representation."""
@@ -202,19 +217,32 @@ class PocketScorer:
             return float(max(0.0, volume / low) ** 1.5)
         return float(np.exp(-(volume - high) / self.parameters.volume_tolerance))
 
-    def score_depth(self, depth: Optional[float]) -> float:
-        """Score geometric burial depth.
+    def score_depth(self, depth: Optional[float], hull_depth: Optional[float] = None) -> float:
+        """Score how deeply the pocket is buried.
+
+        Uses depth to the convex hull when ``depth_measure`` is ``"hull"`` and
+        it is available (see :class:`ScoringParameters`), otherwise distance to
+        the nearest solvent-exposed atom.
 
         Args:
             depth: Distance from the pocket centre to the nearest solvent-exposed
                 atom, in Å.
+            hull_depth: Distance from the pocket centre inward to the convex
+                hull, in Å.
 
         Returns:
             A score in ``[0, 1]``.
         """
+        params = self.parameters
+        if (
+            params.depth_measure == "hull"
+            and hull_depth is not None
+            and np.isfinite(hull_depth)
+        ):
+            return _logistic(float(hull_depth), params.hull_depth_midpoint, params.hull_depth_slope)
         if depth is None or not np.isfinite(depth):
-            return self.parameters.missing_component_score
-        return _logistic(float(depth), self.parameters.depth_midpoint, self.parameters.depth_slope)
+            return params.missing_component_score
+        return _logistic(float(depth), params.depth_midpoint, params.depth_slope)
 
     def score_sasa(self, sasa: Optional[float]) -> float:
         """Score solvent accessibility; lower is better.
@@ -288,6 +316,7 @@ class PocketScorer:
         basic_count: Optional[float] = None,
         potential: Optional[float] = None,
         enclosure: Optional[float] = None,
+        hull_depth: Optional[float] = None,
     ) -> Dict[str, float]:
         """Return every component score, for explanation and diagnostics.
 
@@ -304,7 +333,7 @@ class PocketScorer:
         """
         return {
             "volume": self.score_volume(volume),
-            "depth": self.score_depth(depth),
+            "depth": self.score_depth(depth, hull_depth),
             "sasa": self.score_sasa(sasa),
             "basic_residues": self.score_basic_residues(basic_count),
             "electrostatics": self.score_electrostatics(potential),
@@ -319,6 +348,7 @@ class PocketScorer:
         basic_count: Optional[float] = None,
         potential: Optional[float] = None,
         enclosure: Optional[float] = None,
+        hull_depth: Optional[float] = None,
         **_ignored: Any,
     ) -> float:
         """Weighted combination of the component scores.
@@ -334,6 +364,8 @@ class PocketScorer:
             basic_count: Basic residues lining the pocket.
             potential: Electrostatic potential (kT/e).
             enclosure: Enclosure fraction.
+            hull_depth: Depth to the convex hull (Å); preferred for the depth
+                component when available (``ScoringParameters.depth_measure``).
             **_ignored: Extra descriptors, accepted and ignored so callers can
                 pass a full feature row.
 
@@ -347,6 +379,7 @@ class PocketScorer:
             basic_count=basic_count,
             potential=potential,
             enclosure=enclosure,
+            hull_depth=hull_depth,
         )
         active = {name: weight for name, weight in self.weights.items() if name in components}
         total_weight = sum(active.values())
@@ -387,6 +420,7 @@ class PocketScorer:
                     basic_count=pick(row, "n_basic_residues", "basic_residues"),
                     potential=pick(row, "electrostatic_potential", "coulomb_potential_kt"),
                     enclosure=pick(row, "enclosure"),
+                    hull_depth=pick(row, "hull_depth"),
                 )
             )
         return np.asarray(scores, dtype=float)

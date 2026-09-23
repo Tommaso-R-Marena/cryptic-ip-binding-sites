@@ -47,7 +47,7 @@ from cryptic_ip.analysis.ml_classifier import (  # noqa: E402
     pairwise_delong,
     select_threshold,
 )
-from cryptic_ip.analysis.scorer import PocketScorer  # noqa: E402
+from cryptic_ip.analysis.scorer import PocketScorer, ScoringParameters  # noqa: E402
 
 LOGGER = logging.getLogger("train_ml_classifier")
 
@@ -203,9 +203,16 @@ def load_training_frame(
     return frame
 
 
-def rule_baseline_scores(frame: pd.DataFrame) -> np.ndarray:
-    """Score every pocket with the interpretable rule-based scorer."""
-    return PocketScorer().score_frame(frame)
+def rule_baseline_scores(frame: pd.DataFrame, depth_measure: str = "hull") -> np.ndarray:
+    """Score every pocket with the interpretable rule-based scorer.
+
+    Args:
+        frame: Pocket descriptor table.
+        depth_measure: ``"hull"`` (depth to the convex hull, the default) or
+            ``"burial"`` (distance to the nearest exposed atom, the previous
+            depth input), so the two can be compared on the same rows.
+    """
+    return PocketScorer(parameters=ScoringParameters(depth_measure=depth_measure)).score_frame(frame)
 
 
 def plot_diagnostics(
@@ -474,6 +481,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ml_vs_rule_difference, ml_vs_rule_p = delong_roc_test(
         best.oof_labels, best.oof_probabilities, baseline_all[: best.oof_labels.size]
     )
+
+    # The same scorer with the previous depth input (nearest exposed atom), on
+    # the same rows: the direct test of whether hull depth improves the score.
+    has_hull = "hull_depth" in frame.columns and frame["hull_depth"].notna().any()
+    burial_metrics: Dict[str, float] = {}
+    hull_vs_burial = (float("nan"), float("nan"))
+    if has_hull:
+        burial_all = rule_baseline_scores(frame, depth_measure="burial")
+        burial_metrics = classification_metrics(
+            y, burial_all, threshold=select_threshold(y, burial_all, objective=args.threshold_objective)
+        )
+        hull_vs_burial = delong_roc_test(y, baseline_all, burial_all)
     comparison_rows = pd.DataFrame(
         [
             {
@@ -485,7 +504,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "evaluation": "nested CV, out-of-fold",
             },
             {
-                "method": "Rule-based scorer",
+                "method": "Rule-based scorer" + (" (hull depth)" if has_hull else ""),
                 "roc_auc": baseline_metrics.get("roc_auc", np.nan),
                 "pr_auc": baseline_metrics.get("pr_auc", np.nan),
                 "mcc": baseline_metrics.get("mcc", np.nan),
@@ -493,11 +512,31 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "evaluation": "no fitting; applied directly",
             },
         ]
+        + (
+            [
+                {
+                    "method": "Rule-based scorer (nearest-exposed-atom depth)",
+                    "roc_auc": burial_metrics.get("roc_auc", np.nan),
+                    "pr_auc": burial_metrics.get("pr_auc", np.nan),
+                    "mcc": burial_metrics.get("mcc", np.nan),
+                    "enrichment_at_1pct": burial_metrics.get("enrichment_at_1pct", np.nan),
+                    "evaluation": "no fitting; previous depth input",
+                }
+            ]
+            if has_hull
+            else []
+        )
     )
     comparison_rows.to_csv(args.work_dir / "ml_vs_threshold_comparison.csv", index=False)
     (args.work_dir / "ml_vs_threshold_comparison.md").write_text(
         dataframe_to_markdown(comparison_rows)
-        + f"\n\nDeLong AUROC difference {ml_vs_rule_difference:+.4f}, p = {ml_vs_rule_p:.3g}\n",
+        + f"\n\nDeLong AUROC difference {ml_vs_rule_difference:+.4f}, p = {ml_vs_rule_p:.3g}\n"
+        + (
+            f"\nRule-based, hull depth vs nearest-exposed-atom depth: DeLong AUROC difference "
+            f"{hull_vs_burial[0]:+.4f}, p = {hull_vs_burial[1]:.3g}\n"
+            if has_hull
+            else ""
+        ),
         encoding="utf-8",
     )
 
@@ -566,6 +605,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "ml_vs_rule_delong": {
             "auc_difference": ml_vs_rule_difference,
             "p_value": ml_vs_rule_p,
+        },
+        "rule_based_burial_depth_baseline": burial_metrics,
+        "rule_hull_vs_burial_delong": {
+            "auc_difference": hull_vs_burial[0],
+            "p_value": hull_vs_burial[1],
         },
     }
     try:
