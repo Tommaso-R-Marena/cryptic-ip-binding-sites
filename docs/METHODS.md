@@ -561,10 +561,15 @@ size-dependent (a small domain cannot contain a deep point; Pds5B's elongated
 HEAT-repeat model inflates it), which the screen's analysis has to account for.
 
 **Consequence for the screen.** The plan's strict filter - score ≥ 0.75 and
-lining SASA ≤ 10 Å² - rejects ADAR2's own site on two gates. The proteome
-screen therefore reports the plan's definition and a calibrated one (score ≥
-0.54, hull depth ≥ 10 Å, no SASA gate) side by side. The calibrated thresholds
-rest on one positive and four negatives.
+lining SASA ≤ 10 Å² - rejects ADAR2's own site: on both gates under the
+nearest-exposed-atom depth (score 0.575), and on SASA alone once depth is
+scored from the hull (score 0.78; section 5). The proteome screen therefore
+reports the plan's definition and a calibrated one (score ≥ 0.65, hull depth ≥
+10 Å, no SASA gate) side by side. The score threshold is the midpoint between
+ADAR2 (0.78) and the highest PH-domain site (0.52) under the hull-depth score;
+it was 0.54 under the old depth measure. The calibrated thresholds rest on one
+positive and four negatives, and a test fails if a scorer change stops them
+separating the controls.
 
 **Three APBS defects were found doing this.** The DX reader never parsed real
 APBS output (it matched a header line APBS does not write), would have read the

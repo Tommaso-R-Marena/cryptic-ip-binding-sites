@@ -79,6 +79,32 @@ def test_hull_depth_separates_adar2_from_the_ph_domains_more_widely():
     assert margin(hull) > margin(burial) + 0.1
 
 
+def test_calibrated_hit_criteria_separate_the_controls_under_the_current_scorer():
+    """The calibrated gates must pass ADAR2's site and reject every PH domain.
+
+    They were set on these scores; a scorer change that moves them must move
+    the thresholds too, or the screen's calibrated hit calls silently change.
+    """
+    from cryptic_ip.analysis.proteome_stats import CALIBRATED_CRITERIA
+
+    scorer = PocketScorer()
+    rows = []
+    for name, site in AF_SITES.items():
+        volume, _, hull, _, sasa, basic, _ = site
+        rows.append({
+            "name": name, "composite_score": _score(scorer, site), "sasa": sasa,
+            "basic_residues": basic, "volume": volume, "plddt_mean": 90.0, "hull_depth": hull,
+        })
+    frame = pd.DataFrame(rows).set_index("name")
+    passes = CALIBRATED_CRITERIA.passes(frame)
+    assert passes["ADAR2"]
+    assert not passes.drop("ADAR2").any()
+    # Each gate that decides it sits strictly between the positive and the negatives.
+    negatives = frame.drop("ADAR2")
+    assert negatives["composite_score"].max() < CALIBRATED_CRITERIA.min_score < frame.loc["ADAR2", "composite_score"]
+    assert negatives["hull_depth"].max() < CALIBRATED_CRITERIA.min_hull_depth < frame.loc["ADAR2", "hull_depth"]
+
+
 class TestHullDepthDescriptor:
     def test_is_a_feature(self):
         assert "hull_depth" in FEATURE_NAMES
