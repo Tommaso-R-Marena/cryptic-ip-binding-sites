@@ -5,7 +5,6 @@ Protein structure analysis and pocket detection.
 import os
 import subprocess
 import tempfile
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -67,6 +66,7 @@ class ProteinAnalyzer:
         self.model_path = self._resolve_model_path(model_path)
         self.scorer = scorer or self._build_default_scorer(use_ml_model)
         self.skip_electrostatics = skip_electrostatics
+        self.fpocket_timeout_s = 900.0
         if memory_limit_gb:
             set_memory_limit(memory_limit_gb)
 
@@ -95,18 +95,15 @@ class ProteinAnalyzer:
 
     @timed()
     def run_pipeline(self, include_electrostatics: Optional[bool] = None) -> pd.DataFrame:
-        """Run the full single-protein pipeline with intra-protein parallelization."""
+        """Detect pockets, optionally run APBS, and score every pocket."""
         self.detect_pockets()
         use_electrostatics = (not self.skip_electrostatics) if include_electrostatics is None else include_electrostatics
 
-        jobs = [self.calculate_sasa]
+        # The descriptors compute their own per-atom SASA (chain-aware, shared
+        # by every pocket), so Biopython's per-residue SASA - which this used to
+        # compute on every structure and nothing then read - is not run here.
         if use_electrostatics:
-            jobs.append(self.calculate_electrostatics)
-
-        with ThreadPoolExecutor(max_workers=len(jobs)) as executor:
-            futures = [executor.submit(job) for job in jobs]
-            for future in futures:
-                future.result()
+            self.calculate_electrostatics()
 
         return self.score_all_pockets()
 
@@ -202,7 +199,15 @@ class ProteinAnalyzer:
         output_dir = self.pdb_path.parent / f"{self.pdb_path.stem}_out"
         cmd = ["fpocket", "-f", str(self.pdb_path), "-m", str(min_alpha_sphere)]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        # Bounded, so one pathological model cannot stall a proteome-screen
+        # worker for the rest of its shard; the timeout is reported as an error
+        # for that structure.
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=self.fpocket_timeout_s
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"fpocket exceeded {self.fpocket_timeout_s:.0f} s") from exc
 
         if result.returncode != 0:
             raise RuntimeError(f"fpocket failed: {result.stderr}")
@@ -485,9 +490,6 @@ class ProteinAnalyzer:
         if self.pockets is None:
             self.detect_pockets()
 
-        if self.sasa_data is None:
-            self.calculate_sasa()
-
         pocket = self.pockets[self.pockets["pocket_id"] == pocket_id].iloc[0]
         pocket_residues = self.get_pocket_residues(pocket_id)
         pocket_center = (
@@ -544,9 +546,6 @@ class ProteinAnalyzer:
         """
         if self.pockets is None:
             self.detect_pockets()
-
-        if self.sasa_data is None:
-            self.calculate_sasa()
 
         results = []
         for pocket_id in self.pockets["pocket_id"]:

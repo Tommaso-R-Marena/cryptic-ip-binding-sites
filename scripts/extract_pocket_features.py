@@ -227,7 +227,6 @@ def process_structure(
         analyzer.detect_pockets(min_alpha_sphere=int(options.get("min_alpha_spheres", 3)))
         if not options.get("skip_electrostatics", True):
             analyzer.calculate_electrostatics()
-        analyzer.calculate_sasa()
 
         pocket_records: List[Dict[str, Any]] = []
         pocket_geometry: List[Tuple[int, np.ndarray, np.ndarray]] = []

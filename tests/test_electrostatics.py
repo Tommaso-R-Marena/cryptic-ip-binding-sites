@@ -148,3 +148,37 @@ def test_grid_contains_the_molecule_and_focuses_on_the_point(tmp_path):
     assert coarse[0] >= 120.0 + fine[0]
     assert fgcent == "50.000 0.000 0.000"
     assert cgcent.startswith("0.000")
+
+
+def test_apbs_without_energy_line_still_returns_the_map(tmp_path, monkeypatch):
+    """The energy is a by-product; a written map is what matters."""
+    import math
+    import subprocess
+
+    from cryptic_ip.analysis.electrostatics import ElectrostaticsCalculator
+
+    pqr = tmp_path / "x.pqr"
+    pqr.write_text("ATOM      1  CA  ALA A   1       0.000   0.000   0.000  0.0000 1.8500\n")
+
+    def fake_run(cmd, **kwargs):
+        (tmp_path / "out" / "x.dx").write_text("map")
+        return subprocess.CompletedProcess(cmd, 0, "no energy printed here", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    energy, dx = ElectrostaticsCalculator().run_apbs_with_map(pqr, tmp_path / "out")
+    assert math.isnan(energy)
+    assert dx.name == "x.dx"
+
+
+def test_apbs_with_neither_energy_nor_map_raises(tmp_path, monkeypatch):
+    import subprocess
+
+    from cryptic_ip.analysis.electrostatics import ElectrostaticsCalculator
+
+    pqr = tmp_path / "x.pqr"
+    pqr.write_text("ATOM      1  CA  ALA A   1       0.000   0.000   0.000  0.0000 1.8500\n")
+    monkeypatch.setattr(
+        subprocess, "run", lambda cmd, **k: subprocess.CompletedProcess(cmd, 0, "error: grid", "")
+    )
+    with pytest.raises(RuntimeError, match="neither an energy nor a potential map"):
+        ElectrostaticsCalculator().run_apbs(pqr, tmp_path / "out")

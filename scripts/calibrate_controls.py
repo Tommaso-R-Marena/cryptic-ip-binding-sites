@@ -173,7 +173,6 @@ def measure_control(
 
     analyzer = ProteinAnalyzer(str(path), skip_electrostatics=True)
     analyzer.detect_pockets()
-    analyzer.calculate_sasa()
     record["n_pockets"] = int(len(analyzer.pockets))
     if record["n_pockets"] == 0:
         record["error"] = "fpocket detected no pockets"
