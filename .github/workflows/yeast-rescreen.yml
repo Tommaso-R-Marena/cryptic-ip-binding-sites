@@ -18,6 +18,9 @@ on:
     paths:
       - 'scripts/run_yeast_pilot_screen.py'
       - 'cryptic_ip/analysis/scorer.py'
+      - 'cryptic_ip/analysis/analyzer.py'
+      - 'cryptic_ip/analysis/features.py'
+      - 'cryptic_ip/analysis/structure_arrays.py'
       - '.github/workflows/yeast-rescreen.yml'
   workflow_dispatch:
 

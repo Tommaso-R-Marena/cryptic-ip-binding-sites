@@ -29,6 +29,8 @@ on:
       - 'cryptic_ip/analysis/features.py'
       - 'cryptic_ip/analysis/labeling.py'
       - 'cryptic_ip/analysis/inositol_detection.py'
+      - 'cryptic_ip/analysis/structure_arrays.py'
+      - 'cryptic_ip/analysis/analyzer.py'
       - 'data/validation/ip_binding_validation_dataset.csv'
       - '.github/workflows/train-real-data.yml'
   workflow_dispatch:
@@ -56,9 +58,16 @@ jobs:
       matrix:
         include:
           - task: ip_site
-            cryptic_flag: ''
+            extract_flags: ''
           - task: cryptic_ip_site
-            cryptic_flag: '--require-cryptic'
+            extract_flags: '--require-cryptic'
+          # Same task, descriptors computed with the ligand still bound. It
+          # exists only to measure the leak: on a holo structure the ligand
+          # covers its own pocket, so the model can learn "occupied" - a signal
+          # no apo AlphaFold model has. The gap between this and ip_site is how
+          # much that inflated the earlier result.
+          - task: ip_site_holo
+            extract_flags: '--holo-descriptors'
 
     steps:
       - uses: actions/checkout@v5
@@ -134,7 +143,7 @@ jobs:
             --summary-json results/training/${{ matrix.task }}/labeling_summary.json \
             --sasa-points 256 \
             --jobs 4 \
-            ${{ matrix.cryptic_flag }}
+            ${{ matrix.extract_flags }}
 
       - name: Train and evaluate
         shell: bash -l {0}

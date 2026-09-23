@@ -20,6 +20,7 @@ on:
       - 'scripts/burial_survey.py'
       - 'cryptic_ip/validation/burial_metrics.py'
       - 'cryptic_ip/analysis/inositol_detection.py'
+      - 'cryptic_ip/analysis/structure_arrays.py'
       - 'data/validation/ip_binding_validation_dataset.csv'
       - '.github/workflows/burial-survey.yml'
   workflow_dispatch:
