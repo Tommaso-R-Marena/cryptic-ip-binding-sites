@@ -393,6 +393,39 @@ rows, with a DeLong test. If the transparent weighted score matches the learned
 model, the learned model adds complexity without adding information, and the
 report says so.
 
+### Results on the deposited set
+
+Trained in CI (`.github/workflows/train-real-data.yml`) on the 136 measurable
+RCSB entries; nested 5×3 grouped CV, intervals bootstrapped over proteins.
+Descriptors are computed on **apo** structures - the ligand and every
+non-polymer atom removed - because a descriptor computed with the ligand
+present lets the ligand occlude its own pocket, a signal no AlphaFold target
+can show. `ip_site_holo` repeats the first task with the ligand left in place,
+on the same code, to measure that leak.
+
+| task | positives (structures) | best model | ROC-AUC [95 % CI] | PR-AUC [95 % CI] | rule-based ROC / PR | DeLong ML − rule |
+|---|---|---|---|---|---|---|
+| ip_site (apo) | 307 (118) | extra trees | 0.975 [0.960–0.986] | 0.786 [0.724–0.840] | 0.934 / 0.497 | +0.040, p = 3.9×10⁻⁸ |
+| ip_site (holo) | 309 (118) | extra trees | 0.982 [0.969–0.991] | 0.832 [0.777–0.876] | 0.950 / 0.634 | +0.032, p = 1.2×10⁻⁶ |
+| cryptic_ip_site (apo) | 32 (13) | extra trees | 0.937 [0.869–0.992] | 0.864 [0.747–0.957] | 0.953 / 0.528 | −0.016, p = 0.47 |
+
+- **The leak was real but small for the learned model** (ROC-AUC 0.982 → 0.975,
+  PR-AUC 0.832 → 0.786) and larger for the rule-based score (PR-AUC 0.634 →
+  0.497), whose SASA and depth terms read the ligand's occlusion directly.
+- **On `ip_site` the learned model beats the rule-based score** decisively.
+- **On `cryptic_ip_site` it does not**: 32 positive pockets from 13 structures
+  give an interval 0.12 wide, and the difference from the rule-based score is
+  not significant. Across the five candidate models on the same folds the
+  AUROC runs from 0.937 to 0.991, itself a sign of how little data there is.
+- **What these tasks measure.** `ip_site` asks which pocket in an inositol
+  phosphate-binding protein holds the ligand; it does not ask whether the site
+  is buried. `cryptic_ip_site` labels only buried sites positive, but surface
+  inositol phosphate pockets become *ambiguous* (481 of them) rather than
+  negatives, so the model is never asked to tell a buried site from a surface
+  one - the distinction the screen depends on. Both tasks are measured inside
+  proteins already known to bind an inositol phosphate, so neither number is a
+  proteome-screen precision.
+
 ---
 
 ## 5. Rule-based score

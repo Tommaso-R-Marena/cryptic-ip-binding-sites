@@ -126,11 +126,21 @@ produced by the labels, not by the task: burial had been assigned from SASA
 summed over all ligand copies, which placed nearly every entry in the surface
 class and labelled its pockets — including the true inositol phosphate sites —
 as negatives, leaving 5 positives among 12,190 pockets. It measured the
-labelling defect and says nothing about how learnable the problem is. A
-classifier trained on the corrected labels is evaluated by
-`.github/workflows/train-real-data.yml`. Until those results are reported here,
-the interpretable composite score remains the primary method, on the grounds of
-interpretability rather than of any measured classifier failure.
+labelling defect and says nothing about how learnable the problem is.
+
+Trained on the corrected labels, with descriptors computed on ligand-free
+structures and nested cross-validation grouped by protein, an extremely
+randomised trees classifier identifies the pocket that holds the inositol
+phosphate with ROC-AUC **0.975** (95 % CI 0.960–0.986) and PR-AUC **0.786**
+(0.724–0.840) across 136 entries, against 0.934 and 0.497 for the rule-based
+score (DeLong p = 4 × 10⁻⁸). Leaving the ligand in place while computing
+descriptors inflates both (0.982 / 0.832), because the ligand occludes its own
+pocket; the effect is small for the learned model and larger for the rule-based
+score. For the narrower task of finding *cryptic* sites the data are thin - 32
+positive pockets in 13 structures - and the learned model (0.937, 0.869–0.992)
+is not distinguishable from the rule-based score (0.953; p = 0.47). Neither
+task is a proteome-screen precision: both are measured within proteins already
+known to bind an inositol phosphate.
 
 ### The yeast pilot does not yet yield a candidate
 
