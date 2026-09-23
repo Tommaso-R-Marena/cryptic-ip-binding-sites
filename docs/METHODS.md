@@ -436,25 +436,40 @@ functions of each measurement:
 | Component | Weight | Midpoint |
 |---|---|---|
 | Mean lining SASA | 0.25 | 20 Å² |
-| Depth (hull depth; burial depth when unavailable) | 0.22 | 11.5 Å (hull) / 12 Å (burial) |
+| Depth (distance to the nearest solvent-exposed atom) | 0.22 | 12 Å |
 | Basic residue count | 0.20 | 3.5 |
 | Enclosure | 0.13 | 0.75 |
 | Electrostatic potential | 0.10 | 3 kT/e |
 | Cavity volume | 0.10 | 300–1600 Å³ plateau (cavity, not ligand, volume) |
 
-**Depth is measured to the convex hull.** The depth component previously read
-the distance to the nearest solvent-exposed atom. On an apo structure - every
-AlphaFold model - that collapses at exactly the sites the screen looks for: the
-walls of an empty cavity are themselves exposed, so ADAR2's enclosed InsP6 site
-reads 4.5 Å deep on its model, no deeper than the PH-domain surface sites
-(section 6a). Depth to the convex hull ignores internal cavities (ADAR2 17.3 Å;
-PH domains 5.7-8.2 Å). Its midpoint and slope come from the project plan's own
-thresholds - deeper than 15 Å buried, shallower than 8 Å surface - not from
-fitting any control. Whether it improves the score on data it was not chosen
-on is measured on the 136-entry benchmark: the training workflow scores the
-same out-of-fold pockets with both depth measures and reports a DeLong test
-between them. `ScoringParameters(depth_measure="burial")` restores the old
-input.
+**Depth to the convex hull was tested as the depth input, and rejected.**
+The depth component reads the distance to the nearest solvent-exposed atom. On
+an apo structure - every AlphaFold model - that collapses at enclosed sites: the
+walls of an empty cavity are themselves exposed, so ADAR2's InsP6 site reads
+4.5 Å deep on its model, no deeper than the PH-domain surface sites (section
+6a). Depth to the convex hull ignores internal cavities (ADAR2 17.3 Å; PH
+domains 5.7-8.2 Å), and scoring depth from it, with a ramp set from the plan's
+own thresholds (midpoint 11.5 Å between "deeper than 15 Å" and "shallower than
+8 Å"), widens ADAR2's margin over the PH domains from 0.07 to 0.26 on the
+calibration panel. On the deposited benchmark, which that choice never saw, it
+made the score worse. The training workflow scores the same out-of-fold
+pockets with both depth measures (run on commit 7012ff3):
+
+| task | rule-based ROC-AUC, burial / hull depth | PR-AUC, burial / hull | DeLong hull − burial |
+|---|---|---|---|
+| ip_site (apo) | 0.934 / 0.890 | 0.496 / 0.389 | −0.044, p = 1×10⁻¹³ |
+| ip_site (holo) | 0.951 / 0.910 | 0.634 / 0.507 | −0.041, p = 4×10⁻¹⁶ |
+| cryptic_ip_site (apo) | 0.953 / 0.954 | 0.537 / 0.385 | +0.001, p = 0.89 |
+
+A fixed ramp on hull depth penalises the many genuine sites that sit shallow in
+a large protein, and a protein's size, not only its site's burial, sets how
+deep a point can be. Burial depth therefore remains the default;
+`ScoringParameters(depth_measure="hull")` selects the alternative. Hull depth is
+kept where it earns its place: as a learned descriptor (with it, the best
+cryptic-site model reaches ROC-AUC 0.991, 0.972-1.000, against 0.937 before -
+32 positives in 13 structures, so this is suggestive rather than settled), and
+as a gate in the screen's calibrated hit definition, which applies it as a
+threshold rather than as a ramp inside the score.
 
 The components were previously step functions — 4 basic residues scored 0.8 and
 3 scored 0.4 — which made the score unstable under measurement noise for no
@@ -561,15 +576,14 @@ size-dependent (a small domain cannot contain a deep point; Pds5B's elongated
 HEAT-repeat model inflates it), which the screen's analysis has to account for.
 
 **Consequence for the screen.** The plan's strict filter - score ≥ 0.75 and
-lining SASA ≤ 10 Å² - rejects ADAR2's own site: on both gates under the
-nearest-exposed-atom depth (score 0.575), and on SASA alone once depth is
-scored from the hull (score 0.78; section 5). The proteome screen therefore
-reports the plan's definition and a calibrated one (score ≥ 0.65, hull depth ≥
-10 Å, no SASA gate) side by side. The score threshold is the midpoint between
-ADAR2 (0.78) and the highest PH-domain site (0.52) under the hull-depth score;
-it was 0.54 under the old depth measure. The calibrated thresholds rest on one
-positive and four negatives, and a test fails if a scorer change stops them
-separating the controls.
+lining SASA ≤ 10 Å² - rejects ADAR2's own site on two gates. The proteome
+screen therefore reports the plan's definition and a calibrated one (score ≥
+0.54, hull depth ≥ 10 Å, no SASA gate) side by side. The score threshold is the
+midpoint between ADAR2 (0.575) and the highest PH-domain site (0.506). The
+calibrated thresholds rest on one positive and four negatives, and a test fails
+if a scorer change stops them separating the controls. The screen stores every
+pocket's descriptors and rescores them at aggregation, so a change to the
+scorer or the criteria is applied to a finished screen without re-screening.
 
 **Three APBS defects were found doing this.** The DX reader never parsed real
 APBS output (it matched a header line APBS does not write), would have read the

@@ -203,16 +203,23 @@ def load_training_frame(
     return frame
 
 
-def rule_baseline_scores(frame: pd.DataFrame, depth_measure: str = "hull") -> np.ndarray:
+#: Label of the rule-based scorer for each depth measure.
+DEPTH_MEASURE_LABELS = {"burial": "nearest-exposed-atom depth", "hull": "hull depth"}
+
+
+def rule_baseline_scores(frame: pd.DataFrame, depth_measure: Optional[str] = None) -> np.ndarray:
     """Score every pocket with the interpretable rule-based scorer.
 
     Args:
         frame: Pocket descriptor table.
-        depth_measure: ``"hull"`` (depth to the convex hull, the default) or
-            ``"burial"`` (distance to the nearest exposed atom, the previous
-            depth input), so the two can be compared on the same rows.
+        depth_measure: ``"burial"`` (distance to the nearest exposed atom) or
+            ``"hull"`` (depth to the convex hull); ``None`` uses the scorer's
+            default. Both are reported, so they are compared on the same rows.
     """
-    return PocketScorer(parameters=ScoringParameters(depth_measure=depth_measure)).score_frame(frame)
+    parameters = ScoringParameters()
+    if depth_measure is not None:
+        parameters.depth_measure = depth_measure
+    return PocketScorer(parameters=parameters).score_frame(frame)
 
 
 def plot_diagnostics(
@@ -482,17 +489,31 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         best.oof_labels, best.oof_probabilities, baseline_all[: best.oof_labels.size]
     )
 
-    # The same scorer with the previous depth input (nearest exposed atom), on
-    # the same rows: the direct test of whether hull depth improves the score.
+    # The same scorer with the other depth measure, on the same rows: the
+    # direct test of which depth input serves the score better.
+    default_measure = ScoringParameters().depth_measure
+    other_measure = "hull" if default_measure == "burial" else "burial"
     has_hull = "hull_depth" in frame.columns and frame["hull_depth"].notna().any()
-    burial_metrics: Dict[str, float] = {}
+    other_metrics: Dict[str, float] = {}
     hull_vs_burial = (float("nan"), float("nan"))
     if has_hull:
-        burial_all = rule_baseline_scores(frame, depth_measure="burial")
-        burial_metrics = classification_metrics(
-            y, burial_all, threshold=select_threshold(y, burial_all, objective=args.threshold_objective)
+        other_all = rule_baseline_scores(frame, depth_measure=other_measure)
+        other_metrics = classification_metrics(
+            y, other_all, threshold=select_threshold(y, other_all, objective=args.threshold_objective)
         )
-        hull_vs_burial = delong_roc_test(y, baseline_all, burial_all)
+        by_measure = {default_measure: baseline_all, other_measure: other_all}
+        hull_vs_burial = delong_roc_test(y, by_measure["hull"], by_measure["burial"])
+
+    def rule_row(label: str, metrics: Dict[str, float], evaluation: str) -> Dict[str, object]:
+        return {
+            "method": label,
+            "roc_auc": metrics.get("roc_auc", np.nan),
+            "pr_auc": metrics.get("pr_auc", np.nan),
+            "mcc": metrics.get("mcc", np.nan),
+            "enrichment_at_1pct": metrics.get("enrichment_at_1pct", np.nan),
+            "evaluation": evaluation,
+        }
+
     comparison_rows = pd.DataFrame(
         [
             {
@@ -503,25 +524,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "enrichment_at_1pct": best.metrics.get("enrichment_at_1pct", np.nan),
                 "evaluation": "nested CV, out-of-fold",
             },
-            {
-                "method": "Rule-based scorer" + (" (hull depth)" if has_hull else ""),
-                "roc_auc": baseline_metrics.get("roc_auc", np.nan),
-                "pr_auc": baseline_metrics.get("pr_auc", np.nan),
-                "mcc": baseline_metrics.get("mcc", np.nan),
-                "enrichment_at_1pct": baseline_metrics.get("enrichment_at_1pct", np.nan),
-                "evaluation": "no fitting; applied directly",
-            },
+            rule_row(
+                f"Rule-based scorer ({DEPTH_MEASURE_LABELS[default_measure]})",
+                baseline_metrics,
+                "no fitting; applied directly (default)",
+            ),
         ]
         + (
             [
-                {
-                    "method": "Rule-based scorer (nearest-exposed-atom depth)",
-                    "roc_auc": burial_metrics.get("roc_auc", np.nan),
-                    "pr_auc": burial_metrics.get("pr_auc", np.nan),
-                    "mcc": burial_metrics.get("mcc", np.nan),
-                    "enrichment_at_1pct": burial_metrics.get("enrichment_at_1pct", np.nan),
-                    "evaluation": "no fitting; previous depth input",
-                }
+                rule_row(
+                    f"Rule-based scorer ({DEPTH_MEASURE_LABELS[other_measure]})",
+                    other_metrics,
+                    "no fitting; alternative depth input",
+                )
             ]
             if has_hull
             else []
@@ -606,7 +621,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "auc_difference": ml_vs_rule_difference,
             "p_value": ml_vs_rule_p,
         },
-        "rule_based_burial_depth_baseline": burial_metrics,
+        "rule_based_depth_measure": default_measure,
+        "rule_based_alternative_depth_baseline": {"depth_measure": other_measure, **other_metrics},
         "rule_hull_vs_burial_delong": {
             "auc_difference": hull_vs_burial[0],
             "p_value": hull_vs_burial[1],

@@ -94,15 +94,14 @@ class HitCriteria:
 PLAN_CRITERIA = HitCriteria()
 
 #: Criteria recalibrated on the Phase 1 controls **as the screen sees them** -
-#: AlphaFold models, no ligand. There, ADAR2's InsP6 site sits 17.3 A inside the
-#: convex hull against 5.7-8.2 A for the four PH-domain sites and has a lining
-#: SASA of 31 A^2, so the plan's 10 A^2 SASA gate rejects the paradigm positive
-#: itself. With depth scored from the hull, ADAR2's site scores 0.78 against
-#: 0.45-0.52; the score threshold is the midpoint (it was 0.54 under the
-#: nearest-exposed-atom depth, where the scores were 0.575 against 0.45-0.51).
-#: The thresholds rest on one positive and four negatives, and are reported
-#: beside the plan's criteria, not instead.
-CALIBRATED_CRITERIA = HitCriteria(min_score=0.65, max_sasa=float("inf"), min_hull_depth=10.0)
+#: AlphaFold models, no ligand. There, ADAR2's InsP6 site scores 0.575 against
+#: 0.45-0.51 for the four PH-domain sites, sits 17.3 A inside the convex hull
+#: against 5.7-8.2 A, and has a lining SASA of 31 A^2, so the plan's 0.75 score
+#: and 10 A^2 SASA gates reject the paradigm positive itself. The thresholds
+#: sit between ADAR2 and the highest negative; they rest on one positive and
+#: four negatives, and are reported beside the plan's criteria, not instead.
+#: A test fails if a scorer change stops them separating the controls.
+CALIBRATED_CRITERIA = HitCriteria(min_score=0.54, max_sasa=float("inf"), min_hull_depth=10.0)
 
 
 GATE_ORDER = ("plddt", "volume", "basic", "sasa", "hull", "score")

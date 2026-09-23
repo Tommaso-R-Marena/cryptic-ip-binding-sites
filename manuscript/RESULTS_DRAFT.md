@@ -142,6 +142,22 @@ is not distinguishable from the rule-based score (0.953; p = 0.47). Neither
 task is a proteome-screen precision: both are measured within proteins already
 known to bind an inositol phosphate.
 
+### A depth measure that fits the controls does not generalise
+
+On apo structures the rule-based score's depth term - distance to the nearest
+solvent-exposed atom - collapses inside an empty cavity: ADAR2's InsP6 site
+reads 4.5 Å on its AlphaFold model, no deeper than the PH-domain surface sites.
+Depth to the protein's convex hull does not (17.3 Å against 5.7-8.2 Å), and
+scoring depth from it widened ADAR2's margin over the PH domains from 0.07 to
+0.26. On the 136-entry benchmark, which that choice never saw, it lowered the
+rule-based score's ROC-AUC from 0.934 to 0.890 (apo `ip_site`; DeLong
+p = 1 × 10⁻¹³) and left the cryptic-site task unchanged (0.953 vs 0.954,
+p = 0.89) at a lower PR-AUC. The rule-based score therefore keeps burial depth.
+Hull depth is retained as a descriptor the classifier can weigh, and as a
+threshold in the screen's calibrated hit definition. A five-protein control
+panel can show that a measurement separates the controls; it cannot show that
+the measurement generalises, and here it did not.
+
 ### The yeast pilot does not yet yield a candidate
 
 Applying the pipeline with strict filters (composite score ≥ 0.75, pocket SASA

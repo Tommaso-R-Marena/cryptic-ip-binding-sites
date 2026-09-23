@@ -118,15 +118,23 @@ class ScoringParameters:
     enclosure_midpoint: float = 0.75
     enclosure_slope: float = 12.0
     missing_component_score: float = 0.5
-    #: What the depth component measures. ``"hull"``: distance from the pocket
-    #: centre inward to the protein's convex hull. ``"burial"``: distance to
-    #: the nearest solvent-exposed atom. On an apo structure - every AlphaFold
-    #: model - the second collapses at exactly the sites of interest, because
-    #: the walls of an empty cavity are themselves exposed: ADAR2's enclosed
-    #: InsP6 site reads 4.5 A deep on its model, no deeper than the PH-domain
-    #: surface sites. Hull depth is 17.3 A against at most 8.2 A for those.
-    #: Burial depth is used when hull depth is unavailable.
-    depth_measure: str = "hull"
+    #: What the depth component measures. ``"burial"``: distance to the
+    #: nearest solvent-exposed atom. ``"hull"``: distance from the pocket
+    #: centre inward to the protein's convex hull.
+    #:
+    #: On an apo structure the first collapses at enclosed sites, because the
+    #: walls of an empty cavity are themselves exposed: ADAR2's InsP6 site reads
+    #: 4.5 A on its AlphaFold model, no deeper than the PH-domain surface sites,
+    #: while its hull depth is 17.3 A against at most 8.2 A. Hull depth was
+    #: therefore tested as the default - and on the deposited benchmark, held
+    #: out from that choice, it made the rule-based score worse: AUROC 0.890 vs
+    #: 0.934 on apo ip_site (DeLong p = 1e-13), 0.910 vs 0.951 with the ligand
+    #: in place, and no better on cryptic_ip_site (0.954 vs 0.953, p = 0.89)
+    #: with a lower PR-AUC. A hand-set ramp on hull depth penalises the many
+    #: genuine sites that sit shallow in a large protein. Burial depth stays the
+    #: default; hull depth is a learned descriptor and a gate in the screen's
+    #: calibrated hit definition, where it separates the controls.
+    depth_measure: str = "burial"
     #: Hull depth scoring 0.5, and the ramp's steepness. Set from the project
     #: plan's own thresholds - deeper than 15 A for a buried site, shallower
     #: than 8 A for a surface one - as their midpoint, with the slope putting

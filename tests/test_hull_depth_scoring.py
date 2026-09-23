@@ -1,10 +1,11 @@
-"""Tests for hull depth as the rule-based scorer's depth measure.
+"""Tests for hull depth as an optional depth measure of the rule-based scorer.
 
 The numbers pinned here are the Phase 1 report's measurements of each control's
-site pocket on its AlphaFold model, scored as the proteome screen scores it.
-They are the calibration panel, so these tests pin behaviour; whether hull depth
-improves the score on data it was not chosen on is measured on the deposited
-benchmark by the training workflow, which reports both depth measures.
+site pocket on its AlphaFold model. They are the calibration panel, on which
+hull depth separates ADAR2 from the PH domains more widely. On the deposited
+benchmark, held out from that choice, it made the rule-based score worse (see
+ScoringParameters.depth_measure), so burial depth is the default and hull depth
+remains available by name, as a descriptor, and as a gate in the screen.
 """
 
 from __future__ import annotations
@@ -36,15 +37,24 @@ def _score(scorer, site):
     )
 
 
+HULL = ScoringParameters(depth_measure="hull")
+
+
 class TestDepthMeasure:
-    def test_hull_depth_is_used_when_available(self):
+    def test_burial_depth_is_the_default(self):
+        """Chosen on held-out data: hull depth lowered the benchmark AUROC."""
+        assert ScoringParameters().depth_measure == "burial"
         scorer = PocketScorer()
+        assert scorer.score_depth(depth=6.0, hull_depth=30.0) == pytest.approx(scorer.score_depth(depth=6.0))
+
+    def test_hull_depth_is_used_when_available(self):
+        scorer = PocketScorer(parameters=HULL)
         assert scorer.score_depth(depth=2.0, hull_depth=11.5) == pytest.approx(0.5)
         assert scorer.score_depth(depth=2.0, hull_depth=15.0) > 0.88
         assert scorer.score_depth(depth=2.0, hull_depth=8.0) < 0.12
 
     def test_falls_back_to_burial_depth(self):
-        scorer = PocketScorer()
+        scorer = PocketScorer(parameters=ScoringParameters(depth_measure="hull"))
         params = ScoringParameters()
         expected = 1.0 / (1.0 + np.exp(-params.depth_slope * (6.0 - params.depth_midpoint)))
         assert scorer.score_depth(depth=6.0, hull_depth=None) == pytest.approx(expected)
@@ -61,15 +71,15 @@ class TestDepthMeasure:
             [{"pocket_volume": 800, "burial_depth": 3.0, "hull_depth": 18.0, "enclosure": 0.95,
               "sasa_mean": 20.0, "n_basic_residues": 6, "coulomb_potential_kt": 8.0}]
         )
-        hull = PocketScorer().score_frame(frame)[0]
-        burial = PocketScorer(parameters=ScoringParameters(depth_measure="burial")).score_frame(frame)[0]
+        hull = PocketScorer(parameters=ScoringParameters(depth_measure="hull")).score_frame(frame)[0]
+        burial = PocketScorer().score_frame(frame)[0]
         assert hull > burial
 
 
 def test_hull_depth_separates_adar2_from_the_ph_domains_more_widely():
     """On the AlphaFold models: ADAR2 above every PH domain, by a wider margin."""
-    hull = PocketScorer()
-    burial = PocketScorer(parameters=ScoringParameters(depth_measure="burial"))
+    hull = PocketScorer(parameters=ScoringParameters(depth_measure="hull"))
+    burial = PocketScorer()
 
     def margin(scorer):
         adar2 = _score(scorer, AF_SITES["ADAR2"])
