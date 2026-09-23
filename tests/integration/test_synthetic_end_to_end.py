@@ -127,8 +127,11 @@ def test_training_writes_model_card_and_metadata(synthetic_run):
 
 
 def test_model_comparison_includes_the_rule_based_baseline(synthetic_run):
+    """Both rule-based baselines: depth from the hull, and the old depth measure."""
     comparison = pd.read_csv(synthetic_run["work"] / "ml" / "ml_vs_threshold_comparison.csv")
-    assert set(comparison["method"]).issuperset({"Rule-based scorer"})
+    assert set(comparison["method"]).issuperset(
+        {"Rule-based scorer (hull depth)", "Rule-based scorer (nearest-exposed-atom depth)"}
+    )
     assert comparison["roc_auc"].notna().all()
 
 
