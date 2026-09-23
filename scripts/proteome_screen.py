@@ -34,7 +34,6 @@ import sys
 import tempfile
 import time
 import urllib.parse
-import urllib.request
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -65,6 +64,7 @@ from cryptic_ip.database.proteome_catalog import (  # noqa: E402
     qc_report,
     shard,
 )
+from cryptic_ip.database.async_fetch import FetchJob, fetch_all  # noqa: E402
 from cryptic_ip.utils.json_io import write_json_strict  # noqa: E402
 
 #: Proteins known to bind an inositol phosphate, used to test whether a
@@ -237,6 +237,7 @@ UNIPROT_FIELDS = (
     "ft_binding",
     "cc_function",
 )
+UNIPROT_STREAM = "https://rest.uniprot.org/uniprotkb/stream"
 ANNOTATION_COLUMNS = (
     "uniprot_id",
     "gene",
@@ -255,21 +256,18 @@ def cmd_annotate(args: argparse.Namespace) -> int:
             "query": f"proteome:{info['proteome_id']}",
             "fields": ",".join(UNIPROT_FIELDS),
             "format": "tsv",
+            # Gzip in transit: the human annotation table is ~100 MB as text.
+            "compressed": "true",
         }
     )
-    url = f"https://rest.uniprot.org/uniprotkb/stream?{query}"
+    url = f"{UNIPROT_STREAM}?{query}"
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
     target = out / f"{args.organism}_uniprot.tsv"
-    for attempt in range(4):
-        try:
-            with urllib.request.urlopen(url, timeout=600) as response:
-                target.write_bytes(response.read())
-            break
-        except Exception as exc:
-            print(f"UniProt attempt {attempt + 1} failed: {exc}")
-            time.sleep(2 ** (attempt + 1))
-    else:
+    # Retried with backoff, decompressed and checked before being written.
+    (result,) = fetch_all([FetchJob(args.organism, url, target)], concurrency=1, timeout=900)
+    if not result.ok:
+        print(f"UniProt download failed: {result.error}")
         return 1
     frame = pd.read_csv(target, sep="\t", dtype=str)
     frame.columns = list(ANNOTATION_COLUMNS[: len(frame.columns)])
