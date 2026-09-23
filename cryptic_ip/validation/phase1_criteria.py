@@ -305,6 +305,42 @@ def binding_region_superposition(
 
 
 # ------------------------------------------------------------------ pockets
+def hull_depth(protein_coords: np.ndarray, point: Sequence[float]) -> float:
+    """Distance from ``point`` inward to the protein's convex hull (A).
+
+    Burial depth as the pipeline defines it - distance to the nearest
+    solvent-exposed atom - collapses on an *apo* structure: once the ligand is
+    removed, the walls of the vacated cavity are themselves solvent-exposed, so
+    a fully enclosed site reads as a few Angstroms "deep". The convex hull
+    ignores internal cavities, so it measures how far the site sits from the
+    protein's exterior. Negative outside the hull.
+    """
+    from scipy.spatial import ConvexHull
+
+    hull = ConvexHull(np.asarray(protein_coords, dtype=float))
+    # Each facet: normal . x + offset <= 0 inside; distance inward = -(n.x + b).
+    signed = hull.equations[:, :3] @ np.asarray(point, dtype=float) + hull.equations[:, 3]
+    return float(-signed.max())
+
+
+def site_apbs_potential(structure_path: Path, center: Sequence[float], work: Path) -> Optional[float]:
+    """APBS potential (kT/e) at ``center``, fine grid focused there.
+
+    pdb2pqr at pH 7.0 with the AMBER force field, as the project plan
+    specifies. ``None`` when APBS or pdb2pqr is unavailable or fails.
+    """
+    from ..analysis.electrostatics import ElectrostaticsCalculator
+
+    calculator = ElectrostaticsCalculator()
+    try:
+        pqr = calculator.generate_pqr(structure_path, ph=7.0, output_dir=work, forcefield="AMBER")
+        _, dx = calculator.run_apbs_with_map(pqr, work, focus_center=center)
+        return float(calculator.sample_potential_at_point(dx, center))
+    except Exception as exc:
+        LOGGER.warning("APBS at %s failed: %s", structure_path.name, exc)
+        return None
+
+
 def evaluate_site(
     structure_path: Path,
     ligand: np.ndarray,
@@ -332,15 +368,10 @@ def evaluate_site(
         rank = int(scored.index[scored["pocket_id"] == row["pocket_id"]][0]) + 1
         n = int(len(scored))
 
-        apbs = None
-        if use_apbs:
-            try:
-                analyzer.calculate_electrostatics()
-                if analyzer.electrostatic_map_path is not None and analyzer.electrostatic_map_path.exists():
-                    value = analyzer.pocket_electrostatic_potential(tuple(float(c) for c in row["center"]))
-                    apbs = float(value) if value is not None and np.isfinite(float(value)) else None
-            except Exception as exc:  # APBS absent or failed: reported as unmeasured
-                LOGGER.warning("APBS failed: %s", exc)
+        center = tuple(float(c) for c in row["center"])
+        apbs = site_apbs_potential(local, center, work / "apbs") if use_apbs else None
+        arrays = load_structure_arrays(local)
+        depth_to_hull = hull_depth(arrays.coords[arrays.is_polymer], center)
         return {
             "ok": True,
             "n_pockets": n,
@@ -354,6 +385,7 @@ def evaluate_site(
             "coulomb_potential_kT": float(row.get("coulomb_potential_kt", np.nan)),
             "pocket_volume": float(row.get("volume", np.nan)),
             "burial_depth": float(row.get("burial_depth", np.nan)),
+            "hull_depth": depth_to_hull,
             "enclosure": float(row.get("enclosure", np.nan)),
             "sasa_mean": float(row.get("sasa_mean", np.nan)),
             "n_basic_residues_pocket": int(row.get("n_basic_residues", 0)),

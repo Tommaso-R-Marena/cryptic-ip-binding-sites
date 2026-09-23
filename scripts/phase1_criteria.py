@@ -145,10 +145,10 @@ def digest(results: List[Dict[str, Any]], tests: List[Dict[str, Any]]) -> str:
         )
     lines.append("\n### What the site pocket measures (apo), crystal and AlphaFold\n")
     lines.append(
-        "| control | source | volume | depth | enclosure | lining SASA | basic (pocket) | "
+        "| control | source | volume | depth | hull depth | enclosure | lining SASA | basic (pocket) | "
         "Coulomb kT/e | APBS kT/e | pLDDT | score |"
     )
-    lines.append("|" + " --- |" * 11)
+    lines.append("|" + " --- |" * 12)
     for r in results:
         for source in ("crystal", "alphafold"):
             site = ((r.get(source) or {}).get("site")) or {}
@@ -156,7 +156,8 @@ def digest(results: List[Dict[str, Any]], tests: List[Dict[str, Any]]) -> str:
                 continue
             lines.append(
                 f"| {r['control']['name']} | {source} | {_fmt(site.get('pocket_volume'), 0)} "
-                f"| {_fmt(site.get('burial_depth'))} | {_fmt(site.get('enclosure'))} "
+                f"| {_fmt(site.get('burial_depth'))} | {_fmt(site.get('hull_depth'))} "
+                f"| {_fmt(site.get('enclosure'))} "
                 f"| {_fmt(site.get('sasa_mean'), 1)} | {_fmt(site.get('n_basic_residues_pocket'))} "
                 f"| {_fmt(site.get('coulomb_potential_kT'))} | {_fmt(site.get('apbs_potential_kT'))} "
                 f"| {_fmt(site.get('plddt_mean'), 1)} | {_fmt(site.get('site_score'), 3)} |"

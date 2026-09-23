@@ -146,3 +146,18 @@ def test_critical_test():
     results[1]["crystal"]["site"]["site_score"] = 0.40
     assert critical_test(results)["no_overlap_all_positives_vs_negatives"] is False
     assert critical_test(results)["no_overlap_adar2_vs_negatives"] is True
+
+
+def test_hull_depth_ignores_internal_cavities():
+    """A point at the centre of a hollow ball is deep; one near its skin is not."""
+    from cryptic_ip.validation.phase1_criteria import hull_depth
+
+    rng = np.random.default_rng(3)
+    directions = rng.normal(size=(4000, 3))
+    directions /= np.linalg.norm(directions, axis=1, keepdims=True)
+    radii = rng.uniform(12.0, 20.0, size=(4000, 1))  # a shell with an empty core
+    shell = directions * radii
+    # The hull's flat facets sit just inside the 20 A outer radius.
+    assert 18.0 < hull_depth(shell, (0.0, 0.0, 0.0)) <= 20.0
+    assert 0.0 < hull_depth(shell, (0.0, 0.0, 18.0)) < 2.0
+    assert hull_depth(shell, (0.0, 0.0, 25.0)) < 0

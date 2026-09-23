@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -120,3 +121,30 @@ def test_dx_sampling_reads_the_right_point(tmp_path, counts):
     point = (-0.9, 2.3, 5.4)
     sampled = ElectrostaticsCalculator.__new__(ElectrostaticsCalculator).sample_potential_at_point(dx, point)
     assert sampled == pytest.approx(field(*point), rel=1e-6)
+
+
+def test_sampling_outside_the_map_is_refused(tmp_path):
+    from cryptic_ip.analysis.electrostatics import ElectrostaticsCalculator
+
+    dx = tmp_path / "pot.dx"
+    _write_apbs_dx(dx, origin=(0.0, 0.0, 0.0), delta=(1.0, 1.0, 1.0), counts=(4, 4, 4), func=lambda x, y, z: x)
+    calculator = ElectrostaticsCalculator.__new__(ElectrostaticsCalculator)
+    with pytest.raises(ValueError, match="outside the potential map"):
+        calculator.sample_potential_at_point(dx, (10.0, 1.0, 1.0))
+
+
+def test_grid_contains_the_molecule_and_focuses_on_the_point(tmp_path):
+    from cryptic_ip.analysis.electrostatics import ElectrostaticsCalculator
+
+    pqr = tmp_path / "big.pqr"
+    lines = []
+    for i, x in enumerate(np.linspace(-60.0, 60.0, 50)):
+        lines.append(f"ATOM  {i + 1:5d}  CA  ALA A{i + 1:4d}    {x:8.3f}{0.0:8.3f}{0.0:8.3f}  0.0000 1.8500")
+    pqr.write_text("\n".join(lines) + "\n")
+    cglen, cgcent, fglen, fgcent = ElectrostaticsCalculator._grid_geometry(pqr, (50.0, 0.0, 0.0))
+    coarse = [float(v) for v in cglen.split()]
+    fine = [float(v) for v in fglen.split()]
+    # The coarse box spans the 120 A molecule and holds a fine box centred at its end.
+    assert coarse[0] >= 120.0 + fine[0]
+    assert fgcent == "50.000 0.000 0.000"
+    assert cgcent.startswith("0.000")
