@@ -42,10 +42,10 @@ jobs:
     timeout-minutes: 120
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           # The post-job package cleanup prints a line per package - well over a
           # hundred - which buries the diagnostic output these jobs exist to
@@ -64,7 +64,7 @@ jobs:
           python -m pip install -e .
 
       - name: Cache survey structures
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: data/validation/raw/structures
           key: burial-survey-structures-v1
@@ -121,7 +121,7 @@ jobs:
             --jobs 4
 
       - name: Upload survey results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: burial-survey

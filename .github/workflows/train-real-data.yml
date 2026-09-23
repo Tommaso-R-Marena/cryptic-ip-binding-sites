@@ -61,10 +61,10 @@ jobs:
             cryptic_flag: '--require-cryptic'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           # The post-job cleanup prints a line per package and buries the
           # diagnostic output this job exists to produce.
@@ -82,7 +82,7 @@ jobs:
           python -m pip install -e .
 
       - name: Cache structures
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           # Shared with the burial survey, which downloads the same entries.
           path: data/validation/raw/structures
@@ -150,7 +150,7 @@ jobs:
             --n-bootstrap "${{ github.event.inputs.n_bootstrap || '1000' }}"
 
       - name: Upload training results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: training-${{ matrix.task }}
