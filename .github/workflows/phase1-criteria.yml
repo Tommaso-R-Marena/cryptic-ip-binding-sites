@@ -1,0 +1,63 @@
+name: Phase 1 Criteria
+
+# Measures the project plan's Phase 1 success criteria (sections 5-6) on the
+# full control panel - ADAR2, Pds5B, HDAC1, HDAC3 and four PH-domain negatives -
+# on both the crystal structures and their AlphaFold models: site pocket rank,
+# coordinating-residue SASA, APBS potential at the site, basic residues within
+# 5 A, AlphaFold-versus-crystal RMSD over the binding region, and the plan's
+# three-part critical test. It reports; it does not gate.
+
+on:
+  push:
+    paths:
+      - 'scripts/phase1_criteria.py'
+      - 'cryptic_ip/validation/phase1_criteria.py'
+      - 'cryptic_ip/validation/site_selection.py'
+      - 'cryptic_ip/analysis/scorer.py'
+      - 'cryptic_ip/analysis/analyzer.py'
+      - 'cryptic_ip/analysis/features.py'
+      - 'cryptic_ip/analysis/structure_arrays.py'
+      - '.github/workflows/phase1-criteria.yml'
+  workflow_dispatch:
+
+jobs:
+  criteria:
+    name: Phase 1 criteria on the control panel
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda,defaults
+
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge fpocket freesasa apbs pdb2pqr pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+
+      - name: Measure the criteria
+        shell: bash -l {0}
+        run: python scripts/phase1_criteria.py --output-dir results/phase1
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: phase1-criteria
+          path: results/phase1/*.*
+          if-no-files-found: warn
+
+      - name: Digest
+        if: always()
+        continue-on-error: true
+        run: cat results/phase1/PHASE1.md >> "$GITHUB_STEP_SUMMARY"
