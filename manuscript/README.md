@@ -42,7 +42,7 @@ python scripts/export_supplementary_tables.py --publication-dir results/publicat
 ### In progress
 
 - [x] Real strict-filter yeast pilot screen (499 structures → 1 candidate, 0.2%)  
-- [x] Candidate dossier generator (`scripts/characterize_candidates.py`) + pilot candidate P07264/LEU1  
+- [x] Candidate dossier generator (`scripts/characterize_candidates.py`); pilot candidate P07264/LEU1 **withdrawn** — its score rested on a mislabelled depth input (see `RESULTS_DRAFT.md`)  
 - [x] Results & Discussion working draft (`manuscript/RESULTS_DRAFT.md`)  
 
 ### Remaining (science + writing)

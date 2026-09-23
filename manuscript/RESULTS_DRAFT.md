@@ -7,89 +7,177 @@
 > Bracketed **[TODO]** items require the full proteome screens before they can
 > be stated as findings.
 
+> **Revision note (reconciliation with PR #41).** This draft was written from
+> outputs of the pipeline before several defects in it were corrected. Each
+> claim below was re-checked against a measurement, and five were changed:
+>
+> 1. **The yeast candidate is withdrawn.** LEU1's composite of 0.955 depended on
+>    a mislabelled input: the scorer's "depth" term was reading fpocket's *mean
+>    local hydrophobic density* (32.1 for this pocket) as a distance, and awarding
+>    full credit for anything over 15. Re-running the scorer this draft used,
+>    changing only that input to the true burial depth (2.84 Å), gives **0.711** —
+>    below the 0.75 threshold. Re-screening the identical 499 proteins under the
+>    corrected scorer yields no candidates.
+> 2. **Burial depth discriminates weakly, not cleanly.** The "~3× difference"
+>    came from three structures. Across 129 deposited entries depth separates
+>    buried from exposed sites with AUROC 0.72 (95 % CI 0.58–0.84); enclosure
+>    does so with 0.99.
+> 3. **The benchmark is not 133 / 2 / 1.** Those counts came from ligand SASA
+>    summed over every copy in an entry, which scales with copy number. Measured
+>    per copy it is 89 surface, 26 semi-cryptic, 14 cryptic, 6 crystal artefacts.
+> 4. **The ROC-AUC ≈ 0.5 was an artefact of the labels**, not evidence that the
+>    task is under-powered.
+> 5. **The tier-1 separation is 0.581**, not 0.564, under the current scorer.
+>
+> One claim is independently confirmed: HDAC1's inositol phosphate is surface-
+> exposed. Evidence for each change is in `docs/METHODS.md`,
+> `scripts/burial_survey.py` and the `yeast-rescreen` workflow.
+
 ## Results
 
 ### A burial-aware pipeline separates structural from signaling IP sites
 
 We built an end-to-end pipeline (Figure 1B) that combines AlphaFold/PDB
-structures, fpocket cavity detection, Shrake–Rupley solvent accessibility, a
-geometric pocket burial-depth measurement, and APBS electrostatics into a
-composite cryptic-site score. On the tier-1 controls the pipeline cleanly
+structures, fpocket cavity detection, Shrake–Rupley solvent accessibility,
+per-ligand-copy burial measurement, and a screened-Coulomb electrostatic term
+into a composite cryptic-site score. On the tier-1 controls the pipeline
 separates the gold-standard buried site of ADAR2 (PDB 1ZY7) from the canonical
 surface signaling site of the PLCδ1 PH domain (PDB 1MAI), with a burial-aware
-score separation of **0.564** (Phase-1 gate threshold > 0.50; Figure 4C). ADAR2
+score separation of **0.581** (Phase-1 gate threshold > 0.50; Figure 4C). ADAR2
 passes all positive-control criteria (buried IP6, ≥ 4 basic residues,
 appropriate pocket volume), while both PH-domain negative controls (PLCδ1,
 1MAI; Btk, 1BWN) score low, as required.
 
-Notably, the geometric burial depth discriminates buried from surface sites even
-where average solvent accessibility does not: the ADAR2 IP6 pocket lies
-**6.55 Å** below the nearest solvent-exposed atom versus **~2.0–2.1 Å** for the
-PH-domain surface sites (a ~3× difference), consistent with the crystallographic
-observation that the ADAR2 IP6 has only an 8.4 × 4.6 Å window to the exterior.
+### Which burial measurements carry the signal
+
+The ADAR2 InsP6 is sequestered: measured per ligand copy and normalised by the
+ligand's own isolated surface, only **9.3 %** of its surface remains
+solvent-accessible, against 25–47 % for the four exposed controls. That is the
+measurement the burial classes are defined on, and it agrees with the
+crystallographic observation that the ADAR2 IP6 has only an 8.4 × 4.6 Å window
+to the exterior.
+
+Geometric burial depth is a weaker signal than it first appeared. On three
+structures it looked decisive — ADAR2's pocket 6.55 Å below the nearest exposed
+atom against ~2 Å for two PH domains — but across all 129 eligible deposited
+entries it separates buried from exposed sites with an AUROC of only
+**0.72** (95 % CI 0.58–0.84), and its correlation with the degree of burial is
+essentially zero (Spearman ρ = +0.02). Depth distinguishes the extremes
+somewhat without tracking how buried a site is. **Enclosure** — the fraction of
+directions out of the site blocked by protein — separates the same entries with
+AUROC **0.99** (0.97–1.00). Part of that margin is by construction, since
+enclosure and relative SASA both measure how completely protein surrounds the
+same ligand, but the gap between the two descriptors is far outside sampling
+error.
 
 Tier-2 crystallographic examples (Pds5B, 5HDT; HDAC1, 5ICN) are excluded from
 positive-panel claims: in these deposited structures the inositol phosphate is
 surface-exposed (a crystallization/interface artifact for a monomeric screen),
-so they are correctly not scored as buried monomeric sites.
+so they are correctly not scored as buried monomeric sites. For HDAC1 this was
+confirmed independently: its most buried phosphorylated copy measures 44 %
+solvent-accessible. An earlier measurement that placed it among the buried
+sites had been taken on component 6A0, which carries no phosphate.
 
 ### Benchmarking on a curated RCSB IP-binding dataset
 
 We assembled a curated benchmark of **136** RCSB structures containing inositol
-phosphate ligands (Figure 4A–B). The set is strongly surface-dominated
-(133 surface, 2 semi-cryptic, 1 cryptic by ligand SASA), reflecting the rarity
-of buried structural IP sites in the crystallographic record and motivating a
-structure-prediction-based proteome screen rather than a purely
-crystallographic survey. Because buried positives are so scarce in this set, a
-supervised classifier trained on it is under-powered (held-out ROC-AUC ≈ 0.5);
-we therefore deploy the interpretable threshold/composite score as the primary
-method and treat the ML classifier as exploratory.
+phosphate ligands (Figure 4A–B), of which 135 were measurable. Classified by
+per-copy relative SASA, **89** are surface, **26** semi-cryptic and **14**
+cryptic, with **6** flagged as probable crystal artefacts (fewer than 8 protein
+contacts). Buried structural IP sites are a minority of the crystallographic
+record — about one entry in ten — which motivates a structure-prediction-based
+proteome screen rather than a purely crystallographic survey.
 
-### A proteome-scale yeast pilot recovers a candidate at the expected rate
+Relative burial across the set is continuous rather than bimodal: two
+independent boundary estimators disagree (density minimum 0.138, Otsu 0.463),
+and the quantiles run smoothly from 0.07 to 0.90. The cryptic class is therefore
+defined by a cutoff rather than discovered as a natural group. The configured
+cutoff of 0.12 sits on the flattest part of the class-size curve — moving it
+across 0.10–0.15 changes the positive count by five entries — which is what
+makes a threshold on a continuum defensible.
 
-Applying the validated pipeline with strict publication filters
-(composite score ≥ 0.75, pocket SASA ≤ 10 Å², ≥ 4 basic residues,
-AlphaFold pLDDT ≥ 70) to **499** *S. cerevisiae* AlphaFold structures yielded
-**one** high-confidence cryptic IP-site candidate — a **0.2%** hit rate that
-falls within the 0.2–0.8% range anticipated from the sparse literature
-precedent.
+An earlier version of this analysis reported a held-out ROC-AUC of ≈ 0.5 for a
+supervised classifier and concluded the task was under-powered. That figure was
+produced by the labels, not by the task: burial had been assigned from SASA
+summed over all ligand copies, which placed nearly every entry in the surface
+class and labelled its pockets — including the true inositol phosphate sites —
+as negatives, leaving 5 positives among 12,190 pockets. It measured the
+labelling defect and says nothing about how learnable the problem is. A
+classifier trained on the corrected labels is evaluated by
+`.github/workflows/train-real-data.yml`. Until those results are reported here,
+the interpretable composite score remains the primary method, on the grounds of
+interpretability rather than of any measured classifier failure.
 
-The candidate, **P07264 (LEU1, 3-isopropylmalate dehydratase)**, presents a
-deeply buried basic pocket (composite score 0.955; pocket SASA 7.3 Å²;
-volume 481 Å³; pocket pLDDT 93.5) lined by seven basic residues
-(H40, H70, H122, H143, R449, R631, H633) geometrically poised to coordinate the
-phosphate groups of an inositol phosphate. Full per-candidate dossiers are
-generated by `scripts/characterize_candidates.py` (`results/candidates/`).
+### The yeast pilot does not yet yield a candidate
+
+Applying the pipeline with strict filters (composite score ≥ 0.75, pocket SASA
+≤ 10 Å², ≥ 4 basic residues, AlphaFold pLDDT ≥ 70) to **499** *S. cerevisiae*
+AlphaFold structures yields **no** candidates under the corrected scorer.
+
+An earlier version of this draft reported one: **P07264 (LEU1,
+3-isopropylmalate dehydratase)**, pocket 2, with a composite of 0.955. That score
+did not survive the correction of a mislabelled scoring input. The scorer's
+depth term was being fed fpocket's mean local hydrophobic density — 32.1 for
+this pocket — and treated it as a distance, awarding full credit for any value
+above 15. The pocket's true burial depth is 2.84 Å. Re-scoring with the same
+scorer and only that input corrected gives **0.711**, below threshold; the
+depth term alone falls from 0.250 to 0.007 of the composite.
+
+The pocket is not uninteresting. It is fully enclosed (enclosure 1.0), has low
+solvent accessibility (8.2 Å²), is lined by seven basic residues (H40, H70,
+H122, H143, R449, R631, H633) and sits in a confident region of the model
+(pLDDT 93). But it lies within 3 Å of the protein surface, and it passes the
+0.75 threshold only if depth is given almost no weight (0.786 with depth at 5 %
+and enclosure at 30 %); under the current weights, equal weights, or weights
+swapped toward enclosure it scores 0.63–0.71. It should not be presented as a
+predicted cryptic site on the present evidence.
+
+Neither the original single hit nor the absence of one bears on the expected
+yeast hit rate. At n = 499 the 95 % Clopper–Pearson interval is 0.005–1.1 % for
+one hit and 0–0.74 % for none; both span essentially the whole 0.2–0.8 % range
+anticipated from the literature, so a pilot of this size can neither confirm
+nor refute that expectation.
 
 > **[TODO — full screens]** Extend from the 499-structure pilot to the complete
 > ~6,000-protein yeast proteome, then the human (~23,000) and *Dictyostelium*
-> (~12,600) proteomes, to (i) stabilize the yeast hit-rate estimate with Wilson
-> confidence intervals, (ii) test the IP6-concentration co-evolution hypothesis
+> (~12,600) proteomes, to (i) obtain a hit-rate estimate precise enough to test
+> the expected range, (ii) test the IP6-concentration co-evolution hypothesis
 > across organisms, and (iii) assemble the ranked candidate list.
 
 ## Discussion
 
 The controls establish that the pipeline measures the property it targets:
-burial. Adding an explicit geometric burial-depth term improves discrimination
-in exactly the regime that matters — pockets that are chemically basic and
-low-SASA but merely surface clefts — which are the dominant false positives when
-scoring on accessibility alone.
+burial. They also show which measurements carry it. Per-copy relative SASA and
+enclosure separate sequestered from exposed inositol phosphates cleanly across
+the deposited set; geometric burial depth does so only weakly, because depth is
+the distance to the *nearest* exposed atom and an irregular protein surface
+places some exposed atom within a few Å of most interior points. The composite
+score still gives depth 22 % of its weight and enclosure 13 %, an allocation
+these measurements indicate is backwards; rebalancing it is the most direct
+improvement available to the rule-based score.
 
-Two honest limitations frame the current claims. First, the curated RCSB set is
-surface-dominated, so quantitative classifier metrics are not yet meaningful;
-the interpretable composite score, calibrated on the ADAR2/PH-domain controls,
-is the defensible deployment mode. Second, the yeast result is a **pilot**: a
-single candidate at 0.2% is consistent with expectation but cannot yet support
-enrichment or comparative-evolution conclusions. Those require the full
-three-proteome screens, at which point the comparative panels (Figure 2) can be
-repopulated from real per-organism hit rates rather than ligand-class proxies.
+Three limitations frame the current claims. First, the cryptic class is a
+threshold on a continuum, so every classification metric is conditioned on the
+choice of cutoff; reporting performance across a range of cutoffs is more
+informative than at one. Second, the benchmark is essentially one chemistry
+(134 of 135 measurable entries are InsP6), so it calibrates InsP6 sequestration
+and says nothing about whether InsP3/InsP4 sites distribute the same way.
+Third, the yeast result is a pilot: 499 structures cannot estimate a hit rate
+in the anticipated range, and the full three-proteome screens are required
+before the comparative panels (Figure 2) can be repopulated from real
+per-organism hit rates rather than ligand-class proxies.
 
-The LEU1 candidate is a concrete, testable prediction: DSF should show IP6-
-dependent thermal stabilization, mutation of the predicted coordinating residues
-should destabilize the fold, and mass spectrometry should confirm IP occupancy.
+The withdrawn LEU1 candidate is itself a useful result. It shows that a single
+mislabelled input can manufacture a high-confidence prediction that survives
+every downstream filter, and it motivates reporting each prediction's component
+breakdown alongside its composite, so that a score resting on one term is
+visible as such.
 
 ## Reproducibility
 
 - Controls, benchmark, figures, provenance: `python scripts/run_publication_package.py --output-dir results/publication --skip-dataset-build`
+- Burial survey and descriptor discrimination: `python scripts/burial_survey.py` (CI: `.github/workflows/burial-survey.yml`)
+- Classifier training on corrected labels: `.github/workflows/train-real-data.yml`
 - Yeast pilot: `python scripts/run_yeast_pilot_screen.py --n-proteins 499`
+- Re-screen of the pilot's 499 proteins under the current scorer: `.github/workflows/yeast-rescreen.yml`
 - Candidate dossiers: `python scripts/characterize_candidates.py --hits-csv results/yeast_pilot/yeast_pilot_hits.csv`
