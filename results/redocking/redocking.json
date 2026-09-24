@@ -1,0 +1,844 @@
+{
+  "plan": "docs/REDOCKING_PLAN.md",
+  "accounting": {
+    "entries_with_copies": 367,
+    "copies_found": 662,
+    "copies_by_status": {
+      "eligible": 462,
+      "excluded: configuration differs from the CCD": 167,
+      "excluded: crystal artefact": 32,
+      "excluded: crystal copy does not match the CCD template: Explicit valence for atom # 26 O, 3, is greater than permitted": 1
+    },
+    "copies_eligible": 462,
+    "copies_selected": 272,
+    "copies_unselected_eligible": 190,
+    "primary_set": 269,
+    "incomplete_selected": 3,
+    "arms": {
+      "alphafold": {
+        "records": 269,
+        "docked": 269,
+        "failed_or_not_reached": {}
+      },
+      "pockets": {
+        "records": 269,
+        "docked": 249,
+        "failed_or_not_reached": {
+          "ReceptorError: pdb2pqr failed:   File \"/usr/share/miniconda/": 10,
+          "ReceptorError: pdb2pqr failed:     coords = [bondatom.coords": 2,
+          "ReceptorError: pdb2pqr failed:     newcoords = hatom.coords ": 2,
+          "RuntimeError: fpocket exceeded 2700 s": 1,
+          "ReceptorError: PDB2PQR outputs disagree: 137887 atoms, 13750": 1,
+          "ReceptorError: PDB2PQR outputs disagree: 141887 atoms, 14136": 1,
+          "ReceptorError: PDB2PQR outputs disagree: 141708 atoms, 14114": 1,
+          "ReceptorError: PDB2PQR outputs disagree: 133912 atoms, 13353": 1,
+          "ReceptorError: PDB2PQR outputs disagree: 136188 atoms, 13580": 1
+        }
+      },
+      "primary": {
+        "records": 272,
+        "docked": 253,
+        "failed_or_not_reached": {
+          "ReceptorError: pdb2pqr failed:   File \"/usr/share/miniconda/": 10,
+          "ReceptorError: pdb2pqr failed:     coords = [bondatom.coords": 2,
+          "ReceptorError: pdb2pqr failed:     newcoords = hatom.coords ": 2,
+          "ReceptorError: PDB2PQR outputs disagree: 136188 atoms, 13580": 1,
+          "ReceptorError: PDB2PQR outputs disagree: 137887 atoms, 13750": 1,
+          "ReceptorError: PDB2PQR outputs disagree: 141887 atoms, 14136": 1,
+          "ReceptorError: PDB2PQR outputs disagree: 141708 atoms, 14114": 1,
+          "ReceptorError: PDB2PQR outputs disagree: 133912 atoms, 13353": 1
+        }
+      },
+      "secondary": {
+        "records": 272,
+        "docked": 253,
+        "failed_or_not_reached": {
+          "ReceptorError: pdb2pqr failed:   File \"/usr/share/miniconda/": 10,
+          "ReceptorError: pdb2pqr failed:     coords = [bondatom.coords": 2,
+          "ReceptorError: pdb2pqr failed:     newcoords = hatom.coords ": 2,
+          "ReceptorError: PDB2PQR outputs disagree: 136188 atoms, 13580": 1,
+          "ReceptorError: PDB2PQR outputs disagree: 137887 atoms, 13750": 1,
+          "ReceptorError: PDB2PQR outputs disagree: 141887 atoms, 14136": 1,
+          "ReceptorError: PDB2PQR outputs disagree: 141708 atoms, 14114": 1,
+          "ReceptorError: PDB2PQR outputs disagree: 133912 atoms, 13353": 1
+        }
+      }
+    }
+  },
+  "outcomes": {
+    "success": {
+      "copies": 250,
+      "groups": 31,
+      "evidence": true,
+      "per_copy": {
+        "point": 0.096,
+        "low": 0.055862325980949486,
+        "high": 0.141025641025641,
+        "p_value": 0.0
+      },
+      "per_group": {
+        "point": 0.11000235200171324,
+        "low": 0.045565757420596126,
+        "high": 0.19338567766146803,
+        "p_value": 0.0
+      }
+    },
+    "best20_success": {
+      "copies": 250,
+      "groups": 31,
+      "evidence": true,
+      "per_copy": {
+        "point": 0.2946666666666667,
+        "low": 0.23592111859456397,
+        "high": 0.41896024464831805,
+        "p_value": 0.0
+      },
+      "per_group": {
+        "point": 0.3241691563210718,
+        "low": 0.2213247463944009,
+        "high": 0.44081873126998244,
+        "p_value": 0.001
+      }
+    },
+    "success_1A": {
+      "copies": 250,
+      "groups": 31,
+      "evidence": true,
+      "per_copy": {
+        "point": 0.012,
+        "low": 0.002267190660047803,
+        "high": 0.02484600912347619,
+        "p_value": 0.0
+      },
+      "per_group": {
+        "point": 0.01559908679039947,
+        "low": 0.0008516980730331097,
+        "high": 0.03913552645587139,
+        "p_value": 0.0
+      }
+    },
+    "success_3A": {
+      "copies": 250,
+      "groups": 31,
+      "evidence": true,
+      "per_copy": {
+        "point": 0.19866666666666666,
+        "low": 0.13534119824196159,
+        "high": 0.3172059204560176,
+        "p_value": 0.0
+      },
+      "per_group": {
+        "point": 0.2015341852247934,
+        "low": 0.11533307600209736,
+        "high": 0.30195483931243045,
+        "p_value": 0.0
+      }
+    },
+    "p_success": {
+      "copies": 250,
+      "groups": 31,
+      "evidence": true,
+      "per_copy": {
+        "point": 0.1,
+        "low": 0.05882074420677362,
+        "high": 0.14251207729468598,
+        "p_value": 0.0
+      },
+      "per_group": {
+        "point": 0.11084778758891521,
+        "low": 0.046194622060019314,
+        "high": 0.19387676790630168,
+        "p_value": 0.0
+      }
+    },
+    "spearman": {
+      "copies": 250,
+      "groups": 31,
+      "evidence": true,
+      "per_copy": {
+        "point": 0.07191911528171072,
+        "low": 0.012984182373262074,
+        "high": 0.13365410428922198,
+        "p_value": 0.018
+      },
+      "per_group": {
+        "point": 0.05772950965919311,
+        "low": -0.024758651284852374,
+        "high": 0.1455536136511836,
+        "p_value": 0.152
+      }
+    }
+  },
+  "strata": {
+    "burial class": {
+      "cryptic": {
+        "copies": 13,
+        "groups": 4,
+        "evidence": false,
+        "per_copy": {
+          "point": 0.3333333333333333,
+          "low": 0.0,
+          "high": 0.6,
+          "p_value": 0.122
+        },
+        "per_group": {
+          "point": 0.3425925925925925,
+          "low": 0.0,
+          "high": 0.75,
+          "p_value": 0.516
+        }
+      },
+      "semi_cryptic": {
+        "copies": 51,
+        "groups": 14,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.1503267973856209,
+          "low": 0.10100677830940988,
+          "high": 0.21568627450980388,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.17505668934240362,
+          "low": 0.08501700680272108,
+          "high": 0.2850340136054421,
+          "p_value": 0.0
+        }
+      },
+      "surface": {
+        "copies": 186,
+        "groups": 25,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.06451612903225806,
+          "low": 0.008027403732577367,
+          "high": 0.08818149210903874,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.04372759856630824,
+          "low": 0.01039426523297491,
+          "high": 0.08374731182795689,
+          "p_value": 0.0
+        }
+      }
+    },
+    "metal": {
+      "metal within 3 \u00c5": {
+        "copies": 42,
+        "groups": 10,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.15079365079365079,
+          "low": 0.07575757575757576,
+          "high": 0.22523184949655534,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.20185185185185178,
+          "low": 0.06666666666666667,
+          "high": 0.4018518518518519,
+          "p_value": 0.005
+        }
+      },
+      "no metal": {
+        "copies": 208,
+        "groups": 28,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.08493589743589743,
+          "low": 0.03438844385106067,
+          "high": 0.1309549247049247,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.07885685455561231,
+          "low": 0.028621596585494104,
+          "high": 0.14195818451447328,
+          "p_value": 0.0
+        }
+      }
+    },
+    "interface": {
+      "interface": {
+        "copies": 58,
+        "groups": 13,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.028735632183908042,
+          "low": 0.0,
+          "high": 0.055585106382978575,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.04131054131054133,
+          "low": 0.0,
+          "high": 0.10256410256410256,
+          "p_value": 0.0
+        }
+      },
+      "single chain": {
+        "copies": 192,
+        "groups": 27,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.11631944444444443,
+          "low": 0.06481009070294784,
+          "high": 0.16421827533830433,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.12353742631520408,
+          "low": 0.04957248915582249,
+          "high": 0.22290192970748526,
+          "p_value": 0.0
+        }
+      }
+    },
+    "species": {
+      "InsP3": {
+        "copies": 39,
+        "groups": 10,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.08547008547008546,
+          "low": 0.0,
+          "high": 0.14814814814814814,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.04901960784313724,
+          "low": 0.0,
+          "high": 0.11568627450980397,
+          "p_value": 0.0
+        }
+      },
+      "InsP4": {
+        "copies": 23,
+        "groups": 5,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.10144927536231883,
+          "low": 0.0,
+          "high": 0.12643678160919541,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.05230769230769229,
+          "low": 0.0,
+          "high": 0.10564102564102565,
+          "p_value": 0.0
+        }
+      },
+      "InsP5": {
+        "copies": 10,
+        "groups": 4,
+        "evidence": false,
+        "per_copy": {
+          "point": 0.0,
+          "low": 0.0,
+          "high": 0.0,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.0,
+          "low": 0.0,
+          "high": 0.0,
+          "p_value": 0.0
+        }
+      },
+      "InsP6": {
+        "copies": 154,
+        "groups": 19,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.10606060606060605,
+          "low": 0.059427217915590004,
+          "high": 0.176154097747874,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.11370091896407687,
+          "low": 0.04650027847396268,
+          "high": 0.199416597048176,
+          "p_value": 0.0
+        }
+      },
+      "other": {
+        "copies": 24,
+        "groups": 13,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.08333333333333333,
+          "low": 0.0,
+          "high": 0.20838815789473655,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.11538461538461539,
+          "low": 0.0,
+          "high": 0.2692307692307692,
+          "p_value": 0.0
+        }
+      }
+    },
+    "resolution": {
+      "\u2264 2.0 \u00c5": {
+        "copies": 85,
+        "groups": 18,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.10588235294117647,
+          "low": 0.028246598233468603,
+          "high": 0.15910173160173155,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.07666870166870166,
+          "low": 0.015873015873015872,
+          "high": 0.16464692714692705,
+          "p_value": 0.0
+        }
+      },
+      "2.0-2.5 \u00c5": {
+        "copies": 64,
+        "groups": 19,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.10937499999999999,
+          "low": 0.06664141414141413,
+          "high": 0.1739212779973649,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.14020467836257308,
+          "low": 0.04020102339181287,
+          "high": 0.2684612573099413,
+          "p_value": 0.0
+        }
+      },
+      "2.5-3.0 \u00c5": {
+        "copies": 57,
+        "groups": 14,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.10526315789473684,
+          "low": 0.020833333333333332,
+          "high": 0.1788774233896184,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.07222222222222222,
+          "low": 0.015833333333333335,
+          "high": 0.1388888888888889,
+          "p_value": 0.0
+        }
+      },
+      "> 3.0 \u00c5": {
+        "copies": 44,
+        "groups": 6,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.045454545454545456,
+          "low": 0.01515151515151515,
+          "high": 0.1111111111111111,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.07685185185185185,
+          "low": 0.007407407407407407,
+          "high": 0.18796296296296297,
+          "p_value": 0.0
+        }
+      }
+    },
+    "method": {
+      "X-ray": {
+        "copies": 191,
+        "groups": 28,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.11518324607329843,
+          "low": 0.0605988455988456,
+          "high": 0.16162239680758192,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.1169501670617742,
+          "low": 0.044896499003641864,
+          "high": 0.21049955469877335,
+          "p_value": 0.0
+        }
+      },
+      "cryo-EM": {
+        "copies": 59,
+        "groups": 6,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.033898305084745756,
+          "low": 0.0,
+          "high": 0.05797101449275362,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.035285285285285274,
+          "low": 0.0,
+          "high": 0.09084084084084085,
+          "p_value": 0.0
+        }
+      }
+    }
+  },
+  "alphafold": {
+    "overall": {
+      "copies": 233,
+      "groups": 30,
+      "evidence": true,
+      "per_copy": {
+        "point": 0.017167381974248927,
+        "low": 0.0,
+        "high": 0.05826670474014841,
+        "p_value": 0.0
+      },
+      "per_group": {
+        "point": 0.04475308641975309,
+        "low": 0.0,
+        "high": 0.12222222222222225,
+        "p_value": 0.0
+      }
+    },
+    "by_burial_class": {
+      "cryptic": {
+        "copies": 15,
+        "groups": 4,
+        "evidence": false,
+        "per_copy": {
+          "point": 0.06666666666666667,
+          "low": 0.0,
+          "high": 0.6,
+          "p_value": 0.102
+        },
+        "per_group": {
+          "point": 0.25000000000000006,
+          "low": 0.0,
+          "high": 0.75,
+          "p_value": 0.48
+        }
+      },
+      "semi_cryptic": {
+        "copies": 44,
+        "groups": 11,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.045454545454545456,
+          "low": 0.0,
+          "high": 0.18181818181818182,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.045454545454545456,
+          "low": 0.0,
+          "high": 0.13636363636363635,
+          "p_value": 0.0
+        }
+      },
+      "surface": {
+        "copies": 174,
+        "groups": 24,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.005747126436781609,
+          "low": 0.0,
+          "high": 0.00847457627118644,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.00041666666666666675,
+          "low": 0.0,
+          "high": 0.0012500000000000002,
+          "p_value": 0.0
+        }
+      }
+    },
+    "paired_crystal_minus_af_seed1": {
+      "copies": 233,
+      "groups": 30,
+      "evidence": true,
+      "per_copy": {
+        "point": 0.017167381974248927,
+        "low": -0.025976849237718803,
+        "high": 0.03676724722146922,
+        "p_value": 0.345
+      },
+      "per_group": {
+        "point": -0.0021548821548821534,
+        "low": -0.029377104377104377,
+        "high": 0.016365319865319854,
+        "p_value": 0.939
+      }
+    }
+  },
+  "decisions": {
+    "R1": {
+      "question": "protocol reliability (group estimand)",
+      "estimate": {
+        "point": 0.11000235200171324,
+        "low": 0.045565757420596126,
+        "high": 0.19338567766146803,
+        "p_value": 0.0
+      },
+      "decision": "unreliable",
+      "holm_p": 0.0
+    },
+    "R2": {
+      "question": "success(cryptic) - success(surface)",
+      "estimate": {
+        "point": 0.29886499402628425,
+        "low": -0.055555555555555546,
+        "high": 0.9423076923076923,
+        "p_value": 0.21175278622087132
+      },
+      "groups": [
+        4,
+        25
+      ],
+      "decision": "not evaluable: [4, 25] strict groups (cryptic, surface); need 5",
+      "holm_p": null
+    },
+    "R3": {
+      "question": "AlphaFold cross-docking success (group estimand)",
+      "estimate": {
+        "point": 0.04475308641975309,
+        "low": 0.0,
+        "high": 0.12222222222222225,
+        "p_value": 0.0
+      },
+      "copies": 233,
+      "decision": "not trustworthy",
+      "holm_p": 0.0
+    },
+    "R4": {
+      "question": "Vina score separates true site from decoy (ROC-AUC)",
+      "estimate": {
+        "point": 0.7437138110675634,
+        "low": 0.6579787153990863,
+        "high": 0.8728043478030718,
+        "p_value": 0.0
+      },
+      "copies": 249,
+      "holm_p": 0.0,
+      "decision": "discriminates"
+    }
+  },
+  "controls": {
+    "failure_decomposition": {
+      "failed_seed1": 242,
+      "scoring": 230,
+      "sampling": 12
+    },
+    "seed_noise": {
+      "top_score_sd": {
+        "copies": 250,
+        "groups": 31,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.2326982968879921,
+          "low": 0.20207922907278567,
+          "high": 0.25172413913142017,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.2218528641703246,
+          "low": 0.1845231859516681,
+          "high": 0.26478592261642464,
+          "p_value": 0.0
+        }
+      },
+      "seed_agreement": {
+        "copies": 250,
+        "groups": 31,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.772,
+          "low": 0.6540517961570593,
+          "high": 0.8776978417266187,
+          "p_value": 0.001
+        },
+        "per_group": {
+          "point": 0.8184163347210297,
+          "low": 0.699263661965275,
+          "high": 0.9152335429395474,
+          "p_value": 0.0
+        }
+      }
+    },
+    "vinardo_success": {
+      "arm": {
+        "copies": 250,
+        "groups": 31,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.056,
+          "low": 0.02100402661064426,
+          "high": 0.10257575757575751,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.05623849725715321,
+          "low": 0.006505828137706696,
+          "high": 0.13178513297250025,
+          "p_value": 0.0
+        }
+      },
+      "arm_minus_primary_seed1": {
+        "copies": 250,
+        "groups": 31,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.024,
+          "low": 0.004607242808745239,
+          "high": 0.06349567099567097,
+          "p_value": 0.036
+        },
+        "per_group": {
+          "point": 0.014240380394775721,
+          "low": 0.00031938677738741617,
+          "high": 0.034052608296882815,
+          "p_value": 0.036
+        }
+      }
+    },
+    "ad4_success": {
+      "arm": {
+        "copies": 248,
+        "groups": 31,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.0967741935483871,
+          "low": 0.05142857142857143,
+          "high": 0.13793670598911068,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.09984775924054862,
+          "low": 0.025480352453786995,
+          "high": 0.1953032630451985,
+          "p_value": 0.0
+        }
+      },
+      "arm_minus_primary_seed1": {
+        "copies": 248,
+        "groups": 31,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.06451612903225806,
+          "low": 0.029406397595534563,
+          "high": 0.10714594661393967,
+          "p_value": 0.006
+        },
+        "per_group": {
+          "point": 0.05782383334565498,
+          "low": 0.00884819323623878,
+          "high": 0.13537285295349805,
+          "p_value": 0.006
+        }
+      }
+    },
+    "deprotonated_success": {
+      "arm": {
+        "copies": 250,
+        "groups": 31,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.044,
+          "low": 0.015870927318295737,
+          "high": 0.10001322751322744,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.0552321456054524,
+          "low": 0.006801075268817205,
+          "high": 0.12820274911741644,
+          "p_value": 0.0
+        }
+      },
+      "arm_minus_primary_seed1": {
+        "copies": 250,
+        "groups": 31,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.012,
+          "low": -0.014862193071768523,
+          "high": 0.06802721088435375,
+          "p_value": 0.587
+        },
+        "per_group": {
+          "point": 0.013234028743074904,
+          "low": -0.00294292102021262,
+          "high": 0.035190679206169466,
+          "p_value": 0.155
+        }
+      }
+    },
+    "metals_success": {
+      "arm": {
+        "copies": 42,
+        "groups": 10,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.14285714285714285,
+          "low": 0.09523809523809523,
+          "high": 0.19753086419753085,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.17592592592592587,
+          "low": 0.07407407407407407,
+          "high": 0.30555555555555547,
+          "p_value": 0.0
+        }
+      },
+      "arm_minus_primary_seed1": {
+        "copies": 42,
+        "groups": 10,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.09523809523809523,
+          "low": 0.018472222222222213,
+          "high": 0.13581649831649822,
+          "p_value": 0.027
+        },
+        "per_group": {
+          "point": 0.050925925925925895,
+          "low": -0.06020833333333332,
+          "high": 0.14912037037037013,
+          "p_value": 0.334
+        }
+      }
+    },
+    "site_finding": {
+      "lands_in_true_site": {
+        "copies": 244,
+        "groups": 31,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.3073770491803279,
+          "low": 0.19013415938669995,
+          "high": 0.553687651331719,
+          "p_value": 0.137
+        },
+        "per_group": {
+          "point": 0.329732538176561,
+          "low": 0.19672370561127678,
+          "high": 0.47233535887473277,
+          "p_value": 0.019
+        }
+      },
+      "any_positive_pocket_fraction": 0.38934426229508196
+    }
+  },
+  "notes": [
+    "The cryptic class holds few strict groups; any stratum marked 'evidence: false' has fewer than 5 independent groups and its interval is not evidence.",
+    "Docking scores for a -9 polyanion from a scoring function without electrostatics are weak evidence."
+  ]
+}

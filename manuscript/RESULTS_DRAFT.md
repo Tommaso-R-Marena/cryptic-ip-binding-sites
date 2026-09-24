@@ -266,6 +266,42 @@ established IP6 binders, but are too divergent in sequence to be excluded as
 homologues. We report them as hypotheses: the empirical precision at their depth is
 about 7–20 %, and that figure is a lower bound. The test of this lead is below.
 
+### Docking places inositol phosphates poorly, and the scoring function is why
+
+The screen ranks pockets; it does not place ligands. A pre-registered redocking
+benchmark (`docs/REDOCKING_PLAN.md`) asked how well the standard tool does the second
+job on this ligand class: every crystal IP copy of the benchmark put back into its own
+site with AutoDock Vina, three seeds per copy.
+
+- **Top-pose success is 0.110 [0.046, 0.193]** across 250 copies in 31 strict homology
+  groups (group estimand; per copy 0.096 [0.056, 0.141]). By the pre-registered rule
+  (R1) the protocol is *unreliable*.
+- **The search is not the problem.** Of the 242 copies whose top pose misses 2 Å, 230
+  are scoring failures: the crystal pose, minimised in the same receptor, scores worse
+  than the pose Vina ranked first. Only 12 are sampling failures. Success over the best
+  of 20 poses is three times the top-pose rate, at 0.324 [0.221, 0.441].
+- **Alternative scoring functions do not rescue it.** AD4 beats Vina by 0.058
+  [0.009, 0.135] and Vinardo by 0.014 [0.000, 0.034]. Both remain near the floor. So
+  does the fully deprotonated ligand, and so does keeping metals in the receptor.
+- **AlphaFold models are no worse than crystals here, because both fail.** Cross-docking
+  success is 0.045 [0.000, 0.122] (R3: *not trustworthy*), and the paired difference
+  against the crystal receptor is −0.002 [−0.029, 0.016].
+- **Site discrimination survives.** The Vina score separates the true site from a decoy
+  fpocket pocket with ROC-AUC 0.744 [0.658, 0.873] (R4: *discriminates*). Finding the
+  site and placing the ligand are different tasks, and only the first is what this
+  pipeline claims.
+- **Burial cannot be tested.** The cryptic class holds 4 strict groups, below the
+  pre-registered minimum of 5, so R2 is *not evaluable*. Its point estimate is higher
+  than the surface one (0.343 against 0.044), but the interval is wide.
+- **What is missing.** 19 of 269 primary copies (7.1 %) failed receptor preparation,
+  17 of them surface sites: PDB2PQR exceptions, and five large cryo-EM assemblies whose
+  outputs the receptor reader could not reconcile. These estimates are conditional on a
+  receptor that could be prepared.
+
+A scoring failure on a ligand carrying 5 to 9 negative charges points at the missing
+electrostatics in Vina's function. That prediction is tested, pre-registered before this
+report was read, in `docs/RERANK_PLAN.md`.
+
 ### The α-arrestins rank high as a family, but the two leads do not hold up
 
 A pre-registered test (`docs/ARRESTIN_PLAN.md`) asked whether the α-arrestin lead is

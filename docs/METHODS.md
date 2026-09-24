@@ -672,6 +672,108 @@ ADAR2 anchored the score threshold, so its rank is not independent evidence.
   Whether their top pocket corresponds to the β-arrestin IP6 site is the first thing to
   check. It does not (next section).
 
+### Redocking benchmark
+
+**Plan and run.** `docs/REDOCKING_PLAN.md`, redocking run 36020459246.
+
+- The report is attempt 2. Dock alphafold 21 was re-run once: its first attempt docked
+  all 9 copies but lost the artifact upload to a connection reset.
+- Results are in `results/redocking/`: `redocking.json`, `copies.csv` (one row per
+  selected copy), `census.csv`, `REPORT.md` and `report.html`. All were extracted from
+  the Report job's log with `scripts/extract_log_block.py`.
+- `configuration_audit.csv` holds the audit of the configuration exclusions (run
+  36029338442).
+
+**Census.**
+
+- 662 IP copies were found in 367 benchmark entries; 462 copies are eligible.
+- Exclusions: 167 whose configuration differs from the CCD template (the audit shows the
+  difference is real, with a median absolute chiral volume of 2.36 Å³ at the differing
+  centres, and 153 of the 167 are IHP), 32 crystal artefacts, and 1 copy that fails the
+  CCD template on valence.
+- 272 copies were selected, one per entry and burial class; 269 form the primary set, and
+  the 3 incomplete copies are a flagged stratum.
+
+**Accounting.**
+
+- No copy went unreached: every shard finished inside its time budget.
+- 19 of the 269 primary copies (7.1 %, in 5 strict groups) failed receptor preparation
+  and have no docking outcome. 14 are PDB2PQR exceptions, 11 of them hydrogen-placement
+  errors. The other 5 are large cryo-EM assemblies (7T3P, 7T3Q, 7T3R, 9YKY, 9YLI, each
+  130,000–140,000 atoms) whose PQR and PDB outputs disagree in atom count, which is a
+  limit of the receptor reader at that size.
+- 17 of the 19 are surface copies, so the estimates below are conditional on a receptor
+  that can be prepared.
+- Repairing the reader would have re-run the whole workflow and the plan has no rule for
+  it, so these failures are reported rather than fixed.
+- 250 copies in 31 strict groups have an outcome.
+
+**Decisions (Holm across R1–R4).**
+
+| | question | estimate (group estimand) | Holm p | decision |
+|---|---|---|---|---|
+| R1 | protocol reliability | 0.110 [0.046, 0.193] | < 0.001 | **unreliable** |
+| R2 | success(cryptic) − success(surface) | 0.299 [−0.056, 0.942] | – | **not evaluable** (4 cryptic groups) |
+| R3 | AlphaFold cross-docking success | 0.045 [0.000, 0.122] | < 0.001 | **not trustworthy** |
+| R4 | Vina score separates true site from decoy (ROC-AUC) | 0.744 [0.658, 0.873] | < 0.001 | **discriminates** |
+
+**Outcomes on the primary set** (250 copies, 31 groups; per copy and per group).
+
+| outcome | per copy | per group |
+|---|---|---|
+| top-pose success at 2 Å | 0.096 [0.056, 0.141] | 0.110 [0.046, 0.193] |
+| best of 20 poses at 2 Å | 0.295 [0.236, 0.419] | 0.324 [0.221, 0.441] |
+| success at 1 Å | 0.012 [0.002, 0.025] | 0.016 [0.001, 0.039] |
+| success at 3 Å | 0.199 [0.135, 0.317] | 0.202 [0.115, 0.302] |
+| phosphorus-only success at 2 Å | 0.100 [0.059, 0.143] | 0.111 [0.046, 0.194] |
+| Spearman (score vs RMSD) within runs | 0.072 [0.013, 0.134] | 0.058 [−0.025, 0.146] |
+
+**Where the failures are.** Of the 242 copies whose seed-1 top pose misses 2 Å, 230 are
+scoring failures: the minimised crystal pose scores worse than the top docked pose, so
+the search reached a near-native pose region and the function preferred something else.
+Only 12 are sampling failures. The best-of-20 rate, three times the top-pose rate, says
+the same thing.
+
+**Strata (top-pose success, group estimand).**
+
+- Burial: surface 0.044 [0.010, 0.084]; semi-cryptic 0.175 [0.085, 0.285]; cryptic 0.343
+  [0.000, 0.750] in 4 groups, which is not evidence.
+- Interface 0.041 [0.000, 0.103] against single-chain 0.124 [0.050, 0.223].
+- Metal within 3 Å 0.202 [0.067, 0.402] against no metal 0.079 [0.029, 0.142].
+- Method: X-ray 0.117 [0.045, 0.210]; cryo-EM 0.035 [0.000, 0.091] in 6 groups.
+- Species: InsP6 0.114 [0.047, 0.199]; InsP3 0.049; InsP4 0.052; InsP5 0.000 in 4 groups,
+  which is not evidence.
+- Resolution shows no trend: 0.077, 0.140, 0.072 and 0.077 from ≤ 2.0 Å to > 3.0 Å.
+
+**Controls.**
+
+- *Seed noise.* The three seeds agree on success for 0.818 [0.699, 0.915] of copies, and
+  the top score's seed-to-seed standard deviation is 0.222 [0.185, 0.265] kcal/mol.
+- *Scoring functions and protonation, paired against the primary seed 1.* AD4 is better
+  by 0.058 [0.009, 0.135]; Vinardo by 0.014 [0.000, 0.034]; the fully deprotonated
+  ligand by 0.013 [−0.003, 0.035]; keeping metals by 0.051 [−0.060, 0.149] on the 42
+  copies with a metal. Every arm is near the floor: AD4 reaches 0.100 [0.025, 0.195].
+- *Site finding.* fpocket's top 3 pockets contain a true IP site for 0.330 [0.197, 0.472]
+  of copies, and 39 % of structures have any positive pocket among them.
+- *AlphaFold cross-docking.* 233 copies had a usable model. Success is 0.045
+  [0.000, 0.122], and 0.000 [0.000, 0.001] on surface copies. Paired against the crystal
+  receptor on the same copies the difference is −0.002 [−0.029, 0.016]: the model is not
+  worse than the crystal, because both are near zero.
+
+**What this settles.**
+
+- The protocol recovers crystal IP poses in about a tenth of cases, so it is not a
+  reliable tool for placing an IP ligand, and R1's "unreliable" label is what the data
+  support.
+- The failure is in ranking, not in search. That is the prediction the electrostatic
+  re-ranking study (`docs/RERANK_PLAN.md`) was written to test, and it was pre-registered
+  before this report was read.
+- The score still separates a true site from a decoy pocket (R4). Site *detection*,
+  which is what the screen does, is a different and easier task than pose prediction.
+- R2 cannot be decided: the cryptic class holds 4 strict groups, below the plan's
+  minimum of 5. The point estimates run the other way from the usual expectation, with
+  buried sites easier than surface ones, but the interval is wide and no claim is made.
+
 ### The α-arrestin lead
 
 **Plan and run.** `docs/ARRESTIN_PLAN.md`, arrestin run 36023420103; results in
