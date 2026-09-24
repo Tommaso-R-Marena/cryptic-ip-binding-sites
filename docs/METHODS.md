@@ -1091,6 +1091,22 @@ validates the machinery, not the biology.
 - Effect sizes: Hedges' g (small-sample corrected) for the parametric case,
   Cliff's delta for the non-parametric case.
 - Enrichment: two-sided permutation tests with FDR correction.
+- Group bootstrap, measured calibration (`tests/test_statistical_calibration.py`,
+  run with `-m slow`). These are simulations of a null ROC-AUC with families correlated
+  within a group, 300 replicates each. The one-sided false-positive rate of "95 %
+  interval above 0.5" is:
+  - 2.3 % with 30 groups and 3.3 % with 80 groups, against a nominal 2.5 %;
+  - 6–8 % with 5–9 groups.
+
+  The docking plans' 5-group minimum therefore marks intervals from fewer than 5
+  groups as not evidence, but it does not make an interval from 5–9 groups exact. A
+  decision that rests on 5–9 groups is read with that caveat.
+- Cross-fitted re-ranking (study F), in the same simulations:
+  - No "improves" decision in 40 null data sets.
+  - With a partial electrostatic signal (half of the native poses marked), "improves"
+    in 10, 19 and 20 of 20 data sets at small, medium and large effects.
+  - The out-of-fold gain never exceeds the in-sample optimum, so choosing the weight
+    does not inflate it.
 
 ---
 

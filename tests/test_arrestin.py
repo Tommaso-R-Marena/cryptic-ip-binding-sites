@@ -206,3 +206,16 @@ def test_study_page_renders_the_decisions():
               "weakest_positive": -4.346}
     html = arrestin_page(json.loads(json.dumps(report)))
     assert html.startswith("<!DOCTYPE html>") and "not valid" in html and "ARRDC2" in html and "-4.300" in html
+
+
+def test_badges_classify_every_decision_word():
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from study_report_page import badge
+
+    for text in ("supported", "improves", "learnable", "reliable", "discriminates", "pass"):
+        assert 'class="badge ok"' in badge(text), text
+    for text in ("not supported", "worsens", "not learnable", "unreliable", "does not discriminate", "fail"):
+        assert 'class="badge no"' in badge(text), text
+    for text in ("not evaluable: 3 groups", "no detectable difference", "inconclusive",
+                 "gain not specific to electrostatics"):
+        assert 'class="badge meh"' in badge(text), text

@@ -19,8 +19,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from benchmark_report_page import PAGE_CSS, Forest  # noqa: E402
 
 GOOD = ("supported", "reliable", "trustworthy", "discriminates", "learnable", "remove", "relax",
-        "buried easier", "chance", "pass")
-BAD = ("not supported", "unreliable", "not trustworthy", "does not", "not learnable", "buried harder", "leak", "fail")
+        "buried easier", "chance", "pass", "improves")
+BAD = ("not supported", "unreliable", "not trustworthy", "does not", "not learnable", "buried harder", "leak", "fail",
+       "worsens")
 
 
 def badge(decision: str) -> str:
