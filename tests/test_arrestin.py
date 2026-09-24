@@ -184,3 +184,25 @@ def test_a_copy_counts_once_for_protocol_validity(arrestin):
     # sites x (twice, success 1) and z (success 0): the duplicate of x must not tip the mean to 2/3
     assert out["protocol_validity"]["crystal_sites"] == 2
     assert out["protocol_validity"]["mean_top_pose_success"] == pytest.approx(0.5)
+
+
+def test_study_page_renders_the_decisions():
+    import json
+
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from study_report_page import arrestin_page
+
+    est = {"point": 0.75, "low": 0.68, "high": 0.85, "p5": 0.69}
+    report = {"plan": "docs/ARRESTIN_PLAN.md",
+              "B1": {"decision": "supported", "roc_auc": est, "members_unseen": 20, "member_clusters": 14,
+                     "members": [{"uniprot_id": "Q8TBH0", "organism_key": "human", "rank": 11,
+                                  "rank_percentile": 99.97, "cluster": "c1"}]},
+              "B1_per_organism_descriptive": {"human": {"roc_auc": est, "decision": "not evaluable: 3 clusters"}},
+              "protocol_validity": {"crystal_sites": 24, "mean_top_pose_success": 0.0, "valid": False},
+              "proteins": {"Q8TBH0": {"gene": "ARRDC2", "verdict": "not supported", "failing": ["1_overlap"],
+                                      "criteria": {"1_overlap": {"pass": False, "jaccard": 0.0, "tm_score": 0.64,
+                                                                 "reference": "5TV1_A.pdb"}}}},
+              "docking": [{"gene": "ARRDC2", "kind": "lead_site", "site": "s", "ligand": "IHP", "best_score": -4.3}],
+              "weakest_positive": -4.346}
+    html = arrestin_page(json.loads(json.dumps(report)))
+    assert html.startswith("<!DOCTYPE html>") and "not valid" in html and "ARRDC2" in html and "-4.300" in html

@@ -264,7 +264,34 @@ experiment above.
 rank 27) rank highly. They share the arrestin fold of the β-arrestins, which are
 established IP6 binders, but are too divergent in sequence to be excluded as
 homologues. We report them as hypotheses: the empirical precision at their depth is
-about 7–20 %, and that figure is a lower bound.
+about 7–20 %, and that figure is a lower bound. The test of this lead is below.
+
+### The α-arrestins rank high as a family, but the two leads do not hold up
+
+A pre-registered test (`docs/ARRESTIN_PLAN.md`) asked whether the α-arrestin lead is
+worth an experiment.
+
+- **The family ranks high.** Across the three proteomes, the 20 unseen α-arrestins (14
+  sequence clusters) rank above other unseen proteins: ROC-AUC 0.757 [0.683, 0.856],
+  so the family test is *supported*.
+  - The effect is carried by yeast (0.820) and *Dictyostelium* (0.828).
+  - In human, ARRDC2 is the only α-arrestin near the top. Its paralogues rank in the
+    bottom 60 %, and human alone has too few clusters to test.
+- **ARRDC2 and ART5: not supported.** Neither protein's top pocket is the structural
+  counterpart of the β-arrestin IP6 site.
+  - *No overlap.* The site mapped by structural alignment (TM-score 0.64 and 0.68)
+    shares no residue with the top pocket.
+  - *No basic residues at ARRDC2's mapped positions,* so there is nothing to conserve
+    across its 119 homologues.
+  - *ART5's conservation cannot be assessed:* it has 8 homologues.
+- **Docking cannot arbitrate here.** The docking protocol failed its validity gate on
+  the arrestins themselves: none of 24 crystal arrestin–IP poses was recovered. The
+  docking criteria are therefore not evaluable. The descriptive scores point the same
+  way as the structural criteria: ARRDC2's mapped site scores worse than random
+  pockets of the same model, and ATP scores better than IP6 at both sites.
+- **What this means.** Whatever makes the α-arrestins score high, it is not a conserved
+  counterpart of the β-arrestin IP6 site. We do not recommend them for binding assays
+  on this evidence. The short MD study (E), conditional on this lead, was not run.
 
 ### Inositol phosphate sites can be told from other polyanion sites, but that does not improve the ranking
 

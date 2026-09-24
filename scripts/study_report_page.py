@@ -19,8 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from benchmark_report_page import PAGE_CSS, Forest  # noqa: E402
 
 GOOD = ("supported", "reliable", "trustworthy", "discriminates", "learnable", "remove", "relax",
-        "buried easier", "chance")
-BAD = ("not supported", "unreliable", "not trustworthy", "does not", "not learnable", "buried harder", "leak")
+        "buried easier", "chance", "pass")
+BAD = ("not supported", "unreliable", "not trustworthy", "does not", "not learnable", "buried harder", "leak", "fail")
 
 
 def badge(decision: str) -> str:
@@ -85,3 +85,63 @@ def evidence_note(entry: Mapping[str, object]) -> str:
 
 def as_rows(entries: Mapping[str, Mapping[str, object]], key: str = "per_group") -> List[Tuple[str, Dict, str]]:
     return [(name, dict(e.get(key) or {}), evidence_note(e)) for name, e in entries.items()]
+
+
+def arrestin_page(report: Mapping[str, object]) -> str:
+    """The α-arrestin study (results/arrestin/arrestin.json, built by ``scripts/arrestin.py decide``)."""
+    b1 = report["B1"]
+    validity = report["protocol_validity"]
+    rows = [("B1 family ranks high among unseen proteins", b1["decision"],
+             f"ROC-AUC {fmt(b1['roc_auc'])}, 5th percentile {b1['roc_auc']['p5']:.3f}; "
+             f"{b1['members_unseen']} unseen α-arrestins in {b1['member_clusters']} clusters"),
+            ("protocol validity (crystal redocks of arrestin–IP sites)",
+             "valid" if validity["valid"] else "not valid",
+             f"{validity['crystal_sites']} sites, mean top-pose success {validity['mean_top_pose_success']:.2f} "
+             "(needs ≥ 0.5)")]
+    for acc, p in report["proteins"].items():
+        failing = ", ".join(p["failing"]) or "none"
+        rows.append((f"B6 {p['gene']} ({acc})", p["verdict"], f"failing: {failing}"))
+    organisms = [(org, e["roc_auc"], e["decision"] if e["decision"].startswith("not evaluable") else "")
+                 for org, e in report["B1_per_organism_descriptive"].items()]
+    members = table(["protein", "organism", "rank among unseen", "percentile", "cluster"],
+                    [(m["uniprot_id"], m["organism_key"], m["rank"], f"{m['rank_percentile']:.2f}", m["cluster"])
+                     for m in b1["members"]])
+    criteria = []
+    for acc, p in report["proteins"].items():
+        for name, c in p["criteria"].items():
+            detail = c.get("decision") or ""
+            if "jaccard" in c:
+                detail = f"Jaccard {c['jaccard']:.2f} vs {c['reference']} (TM-score {c['tm_score']:.3f})"
+            criteria.append((f"{p['gene']} ({acc})", name, badge("pass" if c["pass"] else "fail"), detail))
+    scores = []
+    for d in report["docking"]:
+        if d.get("kind") in ("lead_site", "negative") and d.get("ligand") == "IHP":
+            scores.append((d["gene"], d["kind"], d["site"], f"{d['best_score']:.3f}"))
+    scores.append(("controls", "weakest positive", "", f"{report['weakest_positive']:.3f}"))
+    return page("The α-arrestin lead", str(report["plan"]), [
+        ("Decisions", [decisions(rows)]),
+        ("B1: the family among unseen proteins", [
+            forest([("all organisms", b1["roc_auc"], "")] + organisms, null=0.5,
+                   caption="ROC-AUC of α-arrestins against all other unseen proteins (per organism: descriptive)"),
+            members]),
+        ("B2–B6: the two leads", [table(["protein", "criterion", "result", "detail"], criteria)]),
+        ("Docking scores (descriptive; the protocol failed its validity gate)",
+         [table(["protein", "kind", "site", "best IP6 score (kcal/mol)"], scores)]),
+    ], footer="Docking scores are not evidence here: no crystal arrestin–IP pose was reproduced.")
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(description="Rebuild a study page from its committed result JSON.")
+    parser.add_argument("study", choices=["arrestin"])
+    parser.add_argument("json", type=Path)
+    parser.add_argument("output", type=Path)
+    args = parser.parse_args(argv)
+    args.output.write_text(arrestin_page(json.loads(args.json.read_text())))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

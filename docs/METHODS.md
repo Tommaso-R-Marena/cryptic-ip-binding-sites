@@ -670,7 +670,90 @@ ADAR2 anchored the score threshold, so its rank is not independent evidence.
   and yeast ART5 (rank 27). β-arrestins, which share the arrestin fold, are established
   IP6 binders, and α-arrestins are too distant in sequence to be excluded as homologues.
   Whether their top pocket corresponds to the β-arrestin IP6 site is the first thing to
-  check.
+  check. It does not (next section).
+
+### The α-arrestin lead
+
+**Plan and run.** `docs/ARRESTIN_PLAN.md`, arrestin run 36023420103; results in
+`results/arrestin/` (`arrestin.json`, `ARRESTIN.md` with one dossier per protein,
+`family.csv`, `mapping.json`, `report.html`).
+
+**B1: the family.** α-arrestins are arrestin-fold proteins (Pfam PF00339 or PF02752) that
+are not visual or β-arrestins. They were scored against every other unseen protein of
+the three pooled proteomes: 35,158 proteins, including 20 unseen α-arrestins in 14
+MMseqs2 clusters.
+
+- The learned score gives ROC-AUC 0.757 [0.683, 0.856] (2,000 cluster resamples). The
+  5th percentile is 0.694, so the family test is **supported**. The asymptotic
+  Mann–Whitney p is 3.4 × 10⁻⁵, which assumes paralogues are independent.
+- Per organism (descriptive): yeast 0.820 (6 clusters) and *Dictyostelium* 0.828
+  (5 clusters) are both supported. Human is *not evaluable*: its 6 unseen α-arrestins
+  fall in 3 clusters.
+- The human signal is ARRDC2 alone. It ranks 11th of 35,158 in the pooled ranking;
+  TXNIP and ARRDC1, 3, 4 and 5 all rank below 14,000th. ART5 ranks 135th.
+- Positive control: the four classic arrestins are all *seen*, homologous to benchmark
+  proteins, and rank at the 90.6–99.1th percentile of all scored proteins.
+
+**B2–B3: the site.**
+
+- *References.* The benchmark holds 7 classic-arrestin entries (1ZSH, 5TV1, 7F1W, 7F1X,
+  7JTB, 7JXA, 7MOR) with 24 distinct IP sites. They all fall in a single strict
+  homology group.
+- *ARRDC2.* It aligns best to 5TV1 chain A (TM-score 0.641, normalised by the
+  reference). Three of the four residues of site IHP_A_401 map (226→211, 227→212,
+  332→290).
+- *ART5.* It aligns best to 7F1W chain D (TM-score 0.678). Only one of the five residues
+  of IHP_D_501 maps (171→306).
+- *Overlap.* In both proteins the mapped site shares no residue with the top learned
+  pocket (Jaccard 0.0, threshold 0.20), so criterion 1 fails.
+- *Other α-arrestins.* No other α-arrestin's top pocket overlaps a mapped site. Their
+  TM-scores against the references are 0.60–0.69; the classic arrestins' own models
+  score 0.94–0.96.
+
+**B4: conservation.**
+
+- *ARRDC2.* Its UniRef50 cluster gives 119 homologues, but none of its mapped site
+  residues is K, R or H. It is therefore **not conserved** (at least 3 basic positions
+  are needed).
+- *ART5.* Its cluster has 8 homologues, so conservation is *not evaluable* (at least 10
+  are needed).
+
+**B5: docking.**
+
+- *Tasks.* There were 49 docking tasks with no failures.
+- *Protocol-validity gate.* IP6 redocked into the 24 crystal arrestin sites had a mean
+  top-pose success of **0.00** at 2 Å, against the 0.5 required. Every copy was
+  configuration-eligible and surface-bound. The top poses lay 5–15 Å from the crystal
+  ligand. The protocol is **not valid** on arrestin sites, so criteria 3 (convergence)
+  and 4 (scores) are *not evaluable* and count as failing.
+- *Descriptive scores (Vina, kcal/mol).* These are recorded because they were computed,
+  not as evidence.
+
+  | | ARRDC2 | ART5 |
+  |---|---|---|
+  | IP6 at the lead site | −4.28 | −6.58 |
+  | IP6 at the top pocket | −5.73 | −6.24 |
+  | IP6 at the five random negative pockets | −4.31 to −5.80 | −4.25 to −6.31 |
+  | ATP at the lead site | −6.01 | −8.08 |
+  | Largest-cluster fraction of the 15 top poses | 0.13 | 0.20 |
+
+  - For ARRDC2, the lead-site score is weaker than every negative pocket and than the
+    weakest positive control (−4.35; AlphaFold ARRB1/ARRB2/SAG controls −4.35 to −5.81).
+  - For ART5, the lead-site score beats its negatives, but its poses do not converge
+    (0.5 is required).
+  - At both lead sites, ATP scores better than IP6.
+
+**B6: verdict.**
+
+| protein | 1 overlap | 2 conservation | 3 convergence | 4 scores | verdict |
+|---|---|---|---|---|---|
+| ARRDC2 (Q8TBH0) | fails (Jaccard 0.0) | fails (no basic site residue) | not evaluable | not evaluable | **not supported** |
+| ART5 (P53244) | fails (Jaccard 0.0) | not evaluable (8 homologues) | not evaluable | not evaluable | **not supported** |
+
+**Study E (short MD) was not run.** The task made it conditional on A and B. B's leads
+failed on the structural criteria (overlap, conservation), which do not depend on
+docking. Simulating a docked pose from a protocol that reproduces none of 24 crystal
+arrestin–IP poses would have had no defensible starting structure.
 
 ### IP versus other polyanion sites (specificity)
 

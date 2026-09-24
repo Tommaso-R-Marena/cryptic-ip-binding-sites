@@ -1,0 +1,87 @@
+uniprot_id,gene,name,pfam,organism_id,length,organism_key,arrestin_fold,classic,alpha,in_screen,learned_score,seen,cluster,top_pocket_residues,top_pocket
+P10523,SAG,S-arrestin (48 kDa protein) (Retinal S-antigen) (S-AG) (Rod photoreceptor arrestin),PF02752;PF00339;,9606,405,human,True,True,False,True,0.6237192076521393,True,P36575,"18,19,70,74,150,152,175,176,177,302,305,381,382,383,384",44.0
+P32121,ARRB2,Beta-arrestin-2 (Arrestin beta-2) (Non-visual arrestin-3),PF02752;PF00339;,9606,409,human,True,True,False,True,0.4224381122011769,True,P36575,"16,18,48,52,151,152,153,157,158,159,160,162,163",9.0
+P36575,ARR3,Arrestin-C (Cone arrestin) (C-arrestin) (cArr) (Retinal cone arrestin-3) (X-arrestin),PF02752;PF00339;,9606,388,human,True,True,False,True,0.7002002510359129,True,P36575,"7,58,62,123,124,125,139,140,142,162,163,164,165,166,287,288,289,292,294,295,367,368,369,370,373,377",2.0
+P49407,ARRB1,Beta-arrestin-1 (Arrestin beta-1) (Non-visual arrestin-2),PF02752;PF00339;,9606,418,human,True,True,False,True,0.391809880158672,True,P36575,"145,147,160,163,164,165",56.0
+Q8N5I2,ARRDC1,Arrestin domain-containing protein 1 (Alpha-arrestin 1),PF02752;PF00339;,9606,433,human,True,False,True,True,0.0701323614922567,False,Q8N5I2,"42,44,46,68,70,110,112,113,114,116,125,126,127",46.0
+Q8NCT1,ARRDC4,Arrestin domain-containing protein 4,PF02752;PF00339;,9606,418,human,True,False,True,True,0.1093897926864898,False,Q9H3M7,"183,184,185,186,224,299,301,302,303",20.0
+Q96B67,ARRDC3,Arrestin domain-containing protein 3 (TBP-2-like inducible membrane protein) (TLIMP),PF02752;PF00339;,9606,414,human,True,False,True,True,0.0851364392214652,False,Q9H3M7,"4,5,41,42,43,45,46,48,87,90,91,93,94,95,96,97,98,99,100,101,102,103,143,144,145,146,147,149",6.0
+Q9H3M7,TXNIP,Thioredoxin-interacting protein (Thioredoxin-binding protein 2) (Vitamin D3 up-regulated protein 1),PF02752;PF00339;,9606,391,human,True,False,True,True,0.1010713066623799,False,Q9H3M7,"3,4,5,6,7,38,39,40,88,131,132,134,137",41.0
+Q8TBH0,ARRDC2,Arrestin domain-containing protein 2,PF02752;PF00339;,9606,407,human,True,False,True,True,0.8369623473192135,False,Q9H3M7,"50,52,54,56,126,128,130,132,144,146",15.0
+A8K103,,Beta-arrestin-1 (Arrestin beta-1),PF02752;PF00339;,9606,418,human,True,True,False,False,,,,,
+A0ACI8PFA8,ARRB1,Beta-arrestin-1 (Arrestin beta-1),PF02752;PF00339;,9606,398,human,True,True,False,False,,,,,
+A0ACI8PLY4,ARRDC1,Arrestin domain-containing protein 1 (Alpha-arrestin 1),PF02752;PF00339;,9606,431,human,True,False,True,False,,,,,
+A0ACI8PTN4,ARRB1,Beta-arrestin-1 (Arrestin beta-1),PF02752;PF00339;,9606,442,human,True,True,False,False,,,,,
+A0ACI8QAY4,ARRB1,Beta-arrestin-1 (Arrestin beta-1),PF02752;PF00339;,9606,406,human,True,True,False,False,,,,,
+A0ACI8QMF7,ARRB1,Beta-arrestin-1 (Arrestin beta-1),PF02752;PF00339;,9606,445,human,True,True,False,False,,,,,
+A0ACI8QVK5,ARRB1,Beta-arrestin-1 (Arrestin beta-1),PF02752;PF00339;,9606,434,human,True,True,False,False,,,,,
+A0ACI8RNG8,ARRB1,Beta-arrestin-1 (Arrestin beta-1),PF02752;PF00339;,9606,382,human,True,True,False,False,,,,,
+A0ACI8TFJ5,ARRB1,Beta-arrestin-1 (Arrestin beta-1),PF02752;PF00339;,9606,437,human,True,True,False,False,,,,,
+A0ACI8UT40,ARRB1,Beta-arrestin-1 (Arrestin beta-1),PF02752;PF00339;,9606,403,human,True,True,False,False,,,,,
+A0ACI8UU81,ARRB1,Beta-arrestin-1 (Arrestin beta-1),PF02752;PF00339;,9606,476,human,True,True,False,False,,,,,
+A0ACI8UU98,ARRB1,Beta-arrestin-1 (Arrestin beta-1),PF02752;PF00339;,9606,398,human,True,True,False,False,,,,,
+A0ACI8UUC3,ARRB1,Beta-arrestin-1 (Arrestin beta-1),PF02752;PF00339;,9606,446,human,True,True,False,False,,,,,
+A6NEK1,ARRDC5,Arrestin domain-containing protein 5,PF02752;PF00339;,9606,328,human,True,False,True,True,0.0736827234516247,False,A6NEK1,"57,59,61,90,133,135,149",28.0
+E7ESX4,SAG,S-arrestin (48 kDa protein) (Retinal S-antigen) (Rod photoreceptor arrestin),PF00339;,9606,169,human,True,True,False,False,,,,,
+E9PM35,ARRB1,Beta-arrestin-1 (Arrestin beta-1),PF02752;PF00339;,9606,257,human,True,True,False,False,,,,,
+I3L412,ARRB2,Beta-arrestin-2 (Arrestin beta-2),PF00339;,9606,196,human,True,True,False,False,,,,,
+K7EL17,ARRB2,Beta-arrestin-2 (Arrestin beta-2),PF02752;,9606,113,human,True,True,False,False,,,,,
+K7ENA6,ARRB2,Beta-arrestin-2 (Arrestin beta-2),PF02752;PF00339;,9606,330,human,True,True,False,False,,,,,
+Q59EM5,,Beta-arrestin-2 (Arrestin beta-2),PF02752;PF00339;,9606,410,human,True,True,False,False,,,,,
+Q68DZ5,DKFZp686L0365,Beta-arrestin-2 (Arrestin beta-2),PF02752;,9606,217,human,True,True,False,False,,,,,
+A0A804HLL9,ARRDC2,Arrestin domain containing 2,PF02752;,9606,180,human,True,True,False,False,,,,,
+A0ABB0MV92,ARRDC5,Arrestin domain containing 5,PF00339;,9606,111,human,True,True,False,False,,,,,
+A0ABB0MV98,ARRDC5,Arrestin domain containing 5,PF02752;PF00339;,9606,350,human,True,True,False,False,,,,,
+A0ACI8P962,ARRB2,Beta-arrestin-2 (Arrestin beta-2),PF00339;,9606,375,human,True,True,False,False,,,,,
+A0ACI8PBY5,ARRDC1,Arrestin domain containing 1,PF02752;,9606,362,human,True,True,False,False,,,,,
+A0ACI8PPF9,ARRB2,Beta-arrestin-2 (Arrestin beta-2),PF00339;,9606,390,human,True,True,False,False,,,,,
+A0ACI8PSK9,ARRDC1,Arrestin domain containing 1,PF02752;PF00339;,9606,396,human,True,True,False,False,,,,,
+A0ACI8PWD7,ARRB2,Beta-arrestin-2 (Arrestin beta-2),PF02752;PF00339;,9606,409,human,True,True,False,False,,,,,
+A0ACI8PZV4,ARRDC1,Arrestin domain containing 1,PF02752;PF00339;,9606,398,human,True,True,False,False,,,,,
+A0ACI8Q3D0,TXNIP,Thioredoxin-interacting protein,PF02752;PF00339;,9606,389,human,True,False,True,False,,,,,
+A0ACI8Q9N3,ARRDC2,Arrestin domain-containing protein 2,PF02752;PF00339;,9606,406,human,True,False,True,False,,,,,
+A0ACI8QGP4,ARRDC4,Arrestin domain containing 4,PF02752;PF00339;,9606,394,human,True,True,False,False,,,,,
+A0ACI8QVQ0,ARRDC1,Arrestin domain containing 1,PF02752;PF00339;,9606,415,human,True,True,False,False,,,,,
+A0ACI8R9A3,TXNIP,Thioredoxin-interacting protein,PF02752;PF00339;,9606,370,human,True,False,True,False,,,,,
+A0ACI8RAS1,ARRDC4,Arrestin domain containing 4,PF02752;PF00339;,9606,427,human,True,True,False,False,,,,,
+A0ACI8RDJ2,ARRDC1,Arrestin domain containing 1,PF02752;PF00339;,9606,429,human,True,True,False,False,,,,,
+A0ACI8REV2,ARRB2,Beta-arrestin-2 (Arrestin beta-2),PF02752;PF00339;,9606,364,human,True,True,False,False,,,,,
+A0ACI8RGW9,TXNIP,Thioredoxin-interacting protein,PF02752;PF00339;,9606,403,human,True,False,True,False,,,,,
+A0ACI8RTP6,TXNIP,Thioredoxin-interacting protein,PF02752;PF00339;,9606,385,human,True,False,True,False,,,,,
+A0ACI8RUQ9,ARRDC4,Arrestin domain containing 4,PF02752;PF00339;,9606,412,human,True,True,False,False,,,,,
+A0ACI8SB10,TXNIP,Thioredoxin-interacting protein,PF02752;PF00339;,9606,342,human,True,False,True,False,,,,,
+A0ACI8SR66,ARRB2,Beta-arrestin-2 (Arrestin beta-2),PF00339;,9606,373,human,True,True,False,False,,,,,
+A0ACI8THW9,ARRDC1,Arrestin domain containing 1,PF02752;PF00339;,9606,419,human,True,True,False,False,,,,,
+A0ACI8UDB7,ARRDC4,Arrestin domain containing 4,PF00339;,9606,363,human,True,True,False,False,,,,,
+A0ACI8UXB0,TXNIP,Thioredoxin-interacting protein,PF02752;PF00339;,9606,380,human,True,False,True,False,,,,,
+A0ACI8VN23,ARRDC1,Arrestin domain containing 1,PF02752;,9606,379,human,True,True,False,False,,,,,
+A0ACI8VN33,ARRDC1,Arrestin domain containing 1,PF02752;PF00339;,9606,423,human,True,True,False,False,,,,,
+A8K2F6,,"cDNA FLJ75621, highly similar to Homo sapiens arrestin domain containing 4 (ARRDC4), mRNA",PF02752;PF00339;,9606,418,human,True,True,False,False,,,,,
+A8K4I6,,Beta-arrestin-2 (Arrestin beta-2),PF02752;PF00339;,9606,394,human,True,True,False,False,,,,,
+B3KSD4,,"cDNA FLJ36045 fis, clone TESTI2017645, highly similar to Arrestin domain-containing protein 4",PF02752;PF00339;,9606,331,human,True,False,True,False,,,,,
+B4DK87,,"cDNA FLJ56955, highly similar to Arrestin domain-containing protein 4",PF02752;,9606,235,human,True,False,True,False,,,,,
+B4DVM7,,Thioredoxin-interacting protein,PF02752;PF00339;,9606,335,human,True,False,True,False,,,,,
+B7Z7L5,,48 kDa protein,PF02752;,9606,235,human,True,False,True,False,,,,,
+B7ZAG5,,"cDNA, FLJ79179, highly similar to Arrestin domain-containing protein 4",PF02752;,9606,235,human,True,False,True,False,,,,,
+D6RCT3,ARR3,Retinal cone arrestin-3,PF00339;,9606,97,human,True,True,False,False,,,,,
+H0YET9,ARRB1,Arrestin beta 1,PF02752;,9606,195,human,True,True,False,False,,,,,
+K7EJS0,ARRB2,Beta-arrestin-2 (Arrestin beta-2),PF02752;,9606,217,human,True,True,False,False,,,,,
+Q59FD7,,Arrestin domain containing 1 variant,PF02752;,9606,331,human,True,True,False,False,,,,,
+Q5T370,ARRDC1,Arrestin domain containing 1,PF02752;PF00339;,9606,271,human,True,True,False,False,,,,,
+Q5T371,ARRDC1,Arrestin domain containing 1,PF00339;,9606,177,human,True,True,False,False,,,,,
+Q7Z3R3,DKFZp686J1593,48 kDa protein,PF02752;,9606,203,human,True,False,True,False,,,,,
+V9GYU7,ARRDC2,Arrestin domain containing 2,PF02752;PF00339;,9606,322,human,True,True,False,False,,,,,
+P36117,ALY1,Arrestin-related trafficking adapter 6 (Arrestin-like protein 1),PF02752;,559292,915,yeast,True,False,True,True,0.1443770570017853,False,P36117,"378,379,380,381,383,425,440,441,442,445,452,495,496,497,502",100.0
+P38167,ECM21,Protein ECM21 (Extracellular mutant protein 21),PF02752;PF29154;,559292,1117,yeast,True,False,True,True,0.4003815153770295,False,P38167,"342,344,348,367,369,374,419,420,421,424,425,428,429,432,474",54.0
+P43602,ROG3,Protein ROG3 (Revertant of glycogen synthase kinase mutation protein 3),PF02752;PF00339;,559292,733,yeast,True,False,True,True,0.1568166651649886,False,P43602,"8,9,10,11,12,13,14,50,51,52,53,54,55,156,196,197,200",41.0
+P47029,ALY2,Arrestin-related trafficking adapter 3 (Arrestin-like protein 2),PF02752;PF00339;,559292,1046,yeast,True,False,True,True,0.2679511512941188,False,P36117,"397,399,428,430,443,444,449",15.0
+Q02805,ROD1,Protein ROD1 (Resistance to o-dinitrobenzene protein 1),PF02752;PF00339;,559292,837,yeast,True,False,True,True,0.276567943371738,False,P43602,"63,65,67,68,69,86,87,88,188,189,190,206,207,208,403,404,406,407,410,411,413",4.0
+P53179,RIM8,pH-response regulator protein palF/RIM8 (Regulator of IME2 protein 8),PF02752;PF00339;,559292,542,yeast,True,False,True,True,0.4203671179253903,False,P53179,"213,214,215,216,234,261,263,288,289,290,291,292,375,376,377,378,447,448,449,450",70.0
+P53244,ART5,Arrestin-related trafficking adapter 5,PF02752;,559292,586,yeast,True,False,True,True,0.7492798598156244,False,P53244,"64,66,175,219,221,225,266,267,268,297,298,299,300",18.0
+P33757,SPO23,Sporulation protein 23,PF00339;,559292,523,yeast,True,False,True,True,0.4068586467791907,False,P33757,"33,34,35,36,38,53,114,115,116,117,118,119,120,121,122,123,124,125,126,129,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,147,177,179,201,202,203,204,207,208,209,212,213,214,215,247,248,249,250,251,252,253,301,302,303,304,306,307,308,432,433,434,435,436,437,438,439,440,442,443,445,448,483,484,485,486,488,489",1.0
+Q54CH1,adcA,Arrestin domain-containing protein A,PF02752;PF00339;PF01363;,44689,580,dictyostelium,True,False,True,True,0.721382174561732,False,Q54CH1,"177,179,181,183,219,221,270,272,284,285,286",27.0
+Q55CH0,adcC,Arrestin domain-containing protein C,PF02752;PF00339;PF00168;,44689,654,dictyostelium,True,False,True,True,0.1111948620446822,False,Q86KB1,"378,379,380,409,410,411,413,414,415,416,460",65.0
+Q86KB1,adcB,Arrestin domain-containing protein B,PF02752;PF00339;PF00168;,44689,617,dictyostelium,True,False,True,True,0.1258353222191655,False,Q86KB1,"220,221,222,230,231,232,234,235,289,290,291",33.0
+Q54HT7,adcF,Arrestin domain-containing protein F,PF02752;,44689,1030,dictyostelium,True,False,True,True,0.3085430191503575,False,Q54HT7,"583,585,867,869,871,940,942,943,944,986,988,990,1002",85.0
+Q54LD5,adcD,Arrestin domain-containing protein D,PF00339;PF01363;,44689,785,dictyostelium,True,False,True,True,0.6446278764380096,False,Q54LD5,"112,114,116,118,120,138,264,266,281,285",25.0
+Q55GN8,adcE,Arrestin domain-containing protein E,PF02752;PF00412;PF04212;,44689,564,dictyostelium,True,False,True,True,0.1340168677385555,False,Q55GN8,"461,463,465,490,492,493,542,544,550",27.0
