@@ -1,0 +1,235 @@
+name: Arrestin lead
+
+# docs/ARRESTIN_PLAN.md: is the learned screen's alpha-arrestin lead (ARRDC2,
+# ART5) the structural counterpart of the beta-arrestin IP6 site?
+#
+#   family    B1: arrestin-fold families from UniProt Pfam cross-references and the
+#             learned scores (learned-screen run 35992676292)
+#   prepare   B2-B4: classic arrestin-IP references among the benchmark entries,
+#             US-align mapping onto AlphaFold models, pocket overlap, UniRef50
+#             conservation, and the B5 docking tasks
+#   dock      10 shards of docking tasks
+#   decide    B6: the four criteria per protein, dossiers; printed between markers
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/ARRESTIN_PLAN.md'
+      - 'scripts/arrestin.py'
+      - '.github/workflows/arrestin.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: arrestin-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  IP_BENCHMARK_RUN: '35949588200'
+  LEARNED_SCREEN_RUN: '35992676292'
+  SCREEN_RUN: '35935291031'
+  PY_DOCKING: 'rdkit==2026.3.6 vina==1.2.7 meeko==0.8.0 gemmi==0.7.5 pdb2pqr==3.6.1 propka==3.5.1'
+
+jobs:
+  prepare:
+    name: Family, references, mapping, conservation, tasks
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge -c bioconda usalign=20241201 mafft=7.526 pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+          which USalign mafft
+      - name: Learned screen, benchmark entries and screen shards
+        shell: bash -l {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$LEARNED_SCREEN_RUN" --repo "$GITHUB_REPOSITORY" --name learned-screen --dir ls
+          gh run download "$IP_BENCHMARK_RUN" --repo "$GITHUB_REPOSITORY" --name benchmark-dataset --dir bench
+          gh run download "$SCREEN_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'shard-*' --dir shards
+          find ls -name 'proteins.csv.gz'
+      - name: B1 family-level test
+        shell: bash -l {0}
+        run: |
+          python scripts/arrestin.py family --proteins "$(find ls -name 'proteins.csv.gz' | head -1)" --out-dir out
+      - name: Lead pockets from the screen
+        shell: bash -l {0}
+        run: |
+          python - <<'PY'
+          import glob
+          import pandas as pd
+          leads = {"Q8TBH0", "P53244"}
+          parts = []
+          for p in sorted(glob.glob("shards/**/*_pockets_part*.csv.gz", recursive=True)):
+              f = pd.read_csv(p, low_memory=False, usecols=lambda c: c in {
+                  "uniprot_id", "pocket_id", "pocket_residues", "plddt_mean", "center_x", "center_y", "center_z"})
+              parts.append(f[f["uniprot_id"].isin(leads)])
+          pockets = pd.concat(parts, ignore_index=True)
+          pockets.to_csv("out/lead_pockets.csv", index=False)
+          print(pockets.groupby("uniprot_id").size())
+          PY
+      - name: B2 references
+        shell: bash -l {0}
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, ".")
+          import pandas as pd
+          from cryptic_ip.database.async_fetch import fetch_rcsb_structures
+          ids = pd.read_csv("bench/entries_grouped.csv", dtype=str)["pdb_id"].str.upper().tolist()
+          res = fetch_rcsb_structures(ids, "structures", prefer=["pdb", "cif"], concurrency=8)
+          print(sum(r.ok for r in res.values()), "of", len(ids), "benchmark structures fetched")
+          PY
+          python scripts/arrestin.py references --entries bench/entries_grouped.csv --structures-dir structures \
+            --out-dir refs
+      - name: AlphaFold models of the targets and controls
+        shell: bash -l {0}
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          f = pd.read_csv("out/family.csv")
+          ids = set(f[f["alpha"] & f["organism_key"].isin(["human", "yeast"])]["uniprot_id"])
+          ids |= {"Q8TBH0", "P53244", "P10523", "P36575", "P49407", "P32121"}
+          open("af_ids.txt", "w").write("\n".join(sorted(ids)) + "\n")
+          print(len(ids), "targets")
+          PY
+          python scripts/fetch_structures.py alphafold --out af_models --ids-file af_ids.txt || true
+          ls af_models | head -50
+      - name: B2-B3 mapping and overlap
+        shell: bash -l {0}
+        run: python scripts/arrestin.py map --refs-dir refs --family out/family.csv --af-dir af_models --out out/mapping.json
+      - name: B4 conservation
+        shell: bash -l {0}
+        run: python scripts/arrestin.py conserve --mapping out/mapping.json --out-dir out/conservation --out out/conservation.json
+      - name: B5 tasks and CCD templates
+        shell: bash -l {0}
+        run: |
+          python scripts/arrestin.py tasks --mapping out/mapping.json --refs-dir refs --af-dir af_models \
+            --lead-pockets out/lead_pockets.csv --out out/tasks.json
+          python - <<'PY'
+          import json, sys
+          sys.path.insert(0, "scripts")
+          from pathlib import Path
+          import redocking
+          comps = {"IHP", "ATP"} | {t["ligand"] for t in json.load(open("out/tasks.json"))}
+          print(sorted(redocking.fetch_ccd(sorted(comps), Path("ccd"))))
+          PY
+          python - <<'PY'
+          import json, shutil
+          from pathlib import Path
+          Path("refstructs").mkdir()
+          for t in json.load(open("out/tasks.json")):
+              if t["kind"] == "positive_crystal":
+                  for p in Path("structures").glob(f"{t['pdb_id']}.*"):
+                      shutil.copy(p, "refstructs")
+          PY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: arrestin-prepare
+          path: |
+            out
+            refs
+            ccd
+            af_models
+            refstructs
+          retention-days: 90
+
+  dock:
+    name: Dock ${{ matrix.shard }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: arrestin-prepare
+          path: prep
+      - name: Dock
+        env:
+          OMP_NUM_THREADS: '1'
+        run: |
+          python scripts/arrestin.py dock --tasks prep/out/tasks.json --af-dir prep/af_models \
+            --structures-dir prep/refstructs --ccd-dir prep/ccd --out-dir dock \
+            --shard-index ${{ matrix.shard }} --shard-count 10
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: arrestin-dock-${{ matrix.shard }}
+          path: dock
+          retention-days: 90
+
+  decide:
+    name: Decide
+    needs: [prepare, dock]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: arrestin-prepare
+          path: prep
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: arrestin-dock-*
+          path: dock
+          merge-multiple: true
+      - name: Decide
+        run: |
+          python scripts/arrestin.py decide --tasks prep/out/tasks.json --dock-dir dock \
+            --mapping prep/out/mapping.json --conserve prep/out/conservation.json --family prep/out/family.json \
+            --out-dir results/arrestin
+          cp prep/out/family.csv results/arrestin/family.csv
+          cat results/arrestin/ARRESTIN.md >> "$GITHUB_STEP_SUMMARY"
+          python scripts/extract_log_block.py emit ARRESTIN_JSON results/arrestin/arrestin.json
+          python scripts/extract_log_block.py emit ARRESTIN_MD_B64 results/arrestin/ARRESTIN.md
+          python scripts/extract_log_block.py emit ARRESTIN_FAMILY_B64 results/arrestin/family.csv
+          python scripts/extract_log_block.py emit ARRESTIN_MAPPING_JSON prep/out/mapping.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: arrestin-report
+          path: results/arrestin
+          retention-days: 90
