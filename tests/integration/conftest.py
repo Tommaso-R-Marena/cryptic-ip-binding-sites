@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import shutil
-import urllib.request
 from pathlib import Path
 
 import numpy as np
@@ -17,16 +16,21 @@ from cryptic_ip.analysis.ml_classifier import FEATURE_COLUMNS
 def cached_adar2_structure(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Download ADAR2 once when network is available, else provide a fallback stub."""
     cache_dir = tmp_path_factory.mktemp("integration_cache")
-    out_path = cache_dir / "AF-P78563-F1-model_v4.pdb"
-
-    if out_path.exists():
-        return out_path
-
-    url = "https://alphafold.ebi.ac.uk/files/AF-P78563-F1-model_v4.pdb"
     try:
-        urllib.request.urlretrieve(url, out_path)
-        return out_path
-    except Exception:
+        # The current release, resolved through the AlphaFold API. A fixed
+        # "_v4" URL stops existing when the database moves on, and the fallback
+        # below would then run every test on a three-atom stub without saying so.
+        from cryptic_ip.database.async_fetch import fetch_alphafold_models
+
+        result = fetch_alphafold_models(["P78563"], cache_dir, concurrency=1)["P78563"]
+        if not result.ok:
+            raise RuntimeError(result.error)
+        return Path(result.path)
+    except Exception as exc:
+        import warnings
+
+        warnings.warn(f"AlphaFold unreachable ({exc}); integration tests use a stub structure")
+        out_path = cache_dir / "AF-P78563-F1-model_stub.pdb"
         stub = (
             "ATOM      1  N   GLY A   1      10.154  12.345  15.678  1.00 20.00           N\n"
             "ATOM      2  CA  GLY A   1      11.154  12.845  16.078  1.00 20.00           C\n"

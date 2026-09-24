@@ -1,0 +1,254 @@
+name: Proteome Screen
+
+# Phase 2 and Phase 3 of the project plan, end to end, on the three AlphaFold
+# proteomes: yeast (UP000002311), human (UP000005640) and Dictyostelium
+# (UP000002195).
+#
+#   prepare    download each proteome archive, catalogue every model, run the
+#              Phase 2 QC checklist, fetch UniProt annotations
+#   screen     screen the proteomes in parallel shards, recording every pocket
+#   aggregate  hit rates with exact intervals, a threshold sweep, the organism
+#              comparison, keyword enrichment, known-binder recovery, and the
+#              ranked lists for manual inspection (proteome-aggregate.yml, which
+#              can also re-analyse an earlier run's shards without re-screening)
+#
+# The plan estimates ~380 CPU-hours. Sharded across hosted runners it takes a
+# few hours of wall time; the shard counts below keep each shard near an hour.
+
+on:
+  # Re-screen when what the screen measures or how it is run changes. The hit
+  # statistics (proteome_stats.py) and the scorer are applied at aggregation,
+  # so a change there is re-analysed with proteome-aggregate.yml instead.
+  push:
+    # Analyses, not tests: on main they run on demand only, so merging
+    # does not re-derive every recorded result.
+    branches-ignore:
+      - main
+    paths:
+      - 'scripts/proteome_screen.py'
+      - 'cryptic_ip/database/proteome_catalog.py'
+      - '.github/workflows/proteome-screen.yml'
+  workflow_dispatch:
+    inputs:
+      organisms:
+        description: 'Space-separated subset of: yeast human dictyostelium'
+        default: 'yeast human dictyostelium'
+      limit:
+        description: 'Screen only the first N models per shard (0 = all)'
+        default: '0'
+
+concurrency:
+  group: proteome-screen-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ORGANISMS: ${{ inputs.organisms || 'yeast human dictyostelium' }}
+  LIMIT: ${{ inputs.limit || '0' }}
+
+jobs:
+  plan:
+    name: Plan shards
+    runs-on: ubuntu-latest
+    outputs:
+      organisms: ${{ steps.plan.outputs.organisms }}
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - id: plan
+        shell: python
+        run: |
+          import json, os
+          # Sized so a shard of ~650-800 models finishes in about an hour.
+          counts = {"yeast": 8, "dictyostelium": 16, "human": 32}
+          chosen = [o for o in os.environ["ORGANISMS"].split() if o in counts]
+          shards = [
+              {"organism": o, "shard_index": i, "shard_count": counts[o]}
+              for o in chosen
+              for i in range(counts[o])
+          ]
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              fh.write(f"organisms={json.dumps(chosen)}\n")
+              fh.write(f"shards={json.dumps({'include': shards})}\n")
+          print(json.dumps(shards))
+
+  prepare:
+    name: Phase 2 - ${{ matrix.organism }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        organism: ${{ fromJson(needs.plan.outputs.organisms) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+
+      - name: Locate the AlphaFold proteome archive
+        id: locate
+        # Read from the directory listing rather than hard-coded, so a new
+        # AlphaFold DB release is picked up as it is.
+        run: |
+          set -euo pipefail
+          case "${{ matrix.organism }}" in
+            yeast) PID=UP000002311 ;;
+            human) PID=UP000005640 ;;
+            dictyostelium) PID=UP000002195 ;;
+          esac
+          BASE=https://ftp.ebi.ac.uk/pub/databases/alphafold/latest
+          NAME=$(curl -fsSL --retry 5 "$BASE/" | grep -oE "${PID}_[0-9]+_[A-Z]+_v[0-9]+\.tar" | sort -uV | tail -1)
+          echo "archive: $NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "source=$BASE/$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Cache extracted models
+        id: cache
+        uses: actions/cache@v5
+        with:
+          path: data/proteomes/${{ matrix.organism }}
+          key: af-proteome-pdb-${{ steps.locate.outputs.name }}
+
+      - name: Download and extract the archive
+        if: steps.cache.outputs.cache-hit != 'true'
+        # A single stream from the EBI FTP server ran at well under 1 MB/s and
+        # the human archive did not finish in two hours. Segmented parallel
+        # download (aria2c) is used instead, onto the runner's large scratch
+        # disk, and only the PDB-format models are extracted.
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq aria2
+          sudo mkdir -p /mnt/af && sudo chown "$USER" /mnt/af
+          df -h /mnt | tail -1
+          aria2c --console-log-level=warn --summary-interval=120 \
+            -x 16 -s 16 -k 64M --max-tries=20 --retry-wait=15 --file-allocation=none \
+            -d /mnt/af -o archive.tar "${{ steps.locate.outputs.source }}"
+          OUT="data/proteomes/${{ matrix.organism }}"
+          mkdir -p "$OUT"
+          tar -xf /mnt/af/archive.tar -C "$OUT" --wildcards '*.pdb.gz'
+          rm -f /mnt/af/archive.tar
+          echo "extracted $(ls "$OUT" | wc -l) PDB models"
+          du -sh "$OUT"
+
+      - name: Catalogue and QC (Phase 2 checklist)
+        run: |
+          python scripts/proteome_screen.py catalog \
+            --organism "${{ matrix.organism }}" \
+            --structures-dir "data/proteomes/${{ matrix.organism }}" \
+            --output-dir results/proteome_screen/catalog \
+            --source "${{ steps.locate.outputs.source }}"
+
+      - name: UniProt annotations
+        continue-on-error: true
+        run: |
+          python scripts/proteome_screen.py annotate \
+            --organism "${{ matrix.organism }}" \
+            --output-dir results/proteome_screen/catalog
+
+      - name: Upload catalogue
+        uses: actions/upload-artifact@v6
+        with:
+          name: catalog-${{ matrix.organism }}
+          path: results/proteome_screen/catalog
+          retention-days: 30
+
+      - name: Upload screenable models
+        uses: actions/upload-artifact@v6
+        with:
+          name: models-${{ matrix.organism }}
+          path: data/proteomes/${{ matrix.organism }}/AF-*-F1-model_v*.pdb.gz
+          compression-level: 0
+          retention-days: 3
+
+  screen:
+    name: Screen ${{ matrix.organism }} ${{ matrix.shard_index }}/${{ matrix.shard_count }}
+    needs: [plan, prepare]
+    # Each organism's shards need only that organism's preparation. Without
+    # this, one organism's failed download skipped every shard of the others;
+    # a shard whose organism failed to prepare fails at its artifact download.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda,defaults
+
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge fpocket freesasa pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: catalog-${{ matrix.organism }}
+          path: results/proteome_screen/catalog
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: models-${{ matrix.organism }}
+          path: data/proteomes/${{ matrix.organism }}
+
+      - name: Screen shard
+        shell: bash -l {0}
+        # Inside the job's limit, so a shard that overruns still uploads the
+        # parts it has written (every 50 models) rather than losing them all.
+        timeout-minutes: 330
+        env:
+          # One process per core already; threaded BLAS in each would
+          # oversubscribe the runner.
+          OMP_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+        run: |
+          python scripts/proteome_screen.py screen \
+            --organism "${{ matrix.organism }}" \
+            --catalog "results/proteome_screen/catalog/${{ matrix.organism }}_catalog.csv" \
+            --shard-index ${{ matrix.shard_index }} \
+            --shard-count ${{ matrix.shard_count }} \
+            --workers "$(nproc)" \
+            --limit "$LIMIT" \
+            --output-dir results/proteome_screen/shards
+
+      - name: Upload shard
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: shard-${{ matrix.organism }}-${{ matrix.shard_index }}
+          path: results/proteome_screen/shards
+          if-no-files-found: warn
+          retention-days: 30
+
+  aggregate:
+    name: Aggregate
+    needs: screen
+    # Aggregate whatever shards finished even if some failed, but not when the
+    # run was cancelled (superseded by a newer push): there is nothing to
+    # aggregate then, and a red check on a superseded run is noise.
+    if: ${{ !cancelled() }}
+    permissions:
+      actions: read
+      contents: read
+    uses: ./.github/workflows/proteome-aggregate.yml
+    with:
+      run_id: ${{ github.run_id }}

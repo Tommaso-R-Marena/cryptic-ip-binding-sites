@@ -2,11 +2,53 @@
 Download and organize AlphaFold proteome structures.
 """
 
-import urllib.request
+import re
 import tarfile
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
+
 from tqdm import tqdm
+
+from .async_fetch import FetchJob, download_large_file, fetch_all
+
+
+def newest_archive(listing: str, proteome_id: str) -> str:
+    """The newest ``{proteome}_{taxon}_{MNEMONIC}_v{n}.tar`` named in a listing."""
+    found = set(re.findall(rf"({re.escape(proteome_id)}_\d+_[A-Z0-9]+_v\d+\.tar)", listing))
+    if not found:
+        raise RuntimeError(f"No archive for {proteome_id} in the listing")
+    return max(found, key=lambda name: int(re.search(r"_v(\d+)\.tar$", name).group(1)))
+
+
+def extract_models(tar_path: Path, dest: Path, *, pattern: str = ".pdb.gz") -> int:
+    """Extract the archive members ending in ``pattern`` into ``dest``.
+
+    Members are extracted by base name only, so an archive entry with a path
+    component cannot write outside ``dest``; the mmCIF copies AlphaFold ships
+    alongside are skipped unless asked for.
+    """
+    dest = Path(dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    count = 0
+    with tarfile.open(tar_path, "r:*") as archive:
+        for member in archive:
+            name = Path(member.name).name
+            if not member.isfile() or not name.endswith(pattern):
+                continue
+            source = archive.extractfile(member)
+            if source is None:
+                continue
+            target = dest / name
+            tmp = target.with_name(f".{name}.part")
+            with open(tmp, "wb") as handle:
+                while True:
+                    block = source.read(1 << 20)
+                    if not block:
+                        break
+                    handle.write(block)
+            tmp.replace(target)
+            count += 1
+    return count
 
 
 class ProteomeDownloader:
@@ -68,61 +110,48 @@ class ProteomeDownloader:
         """
         if organism not in self.PROTEOMES:
             raise ValueError(f"Unknown organism: {organism}")
-        
+
         info = self.PROTEOMES[organism]
         proteome_dir = self.data_dir / organism
-        
-        # Check if already downloaded
-        if proteome_dir.exists() and not force:
+        if proteome_dir.exists() and any(proteome_dir.glob("AF-*.pdb*")) and not force:
             print(f"{organism} proteome already exists at {proteome_dir}")
             return proteome_dir
-        
         proteome_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Construct download URL
-        uniprot_id = info['uniprot_id']
-        taxon = info['taxon']
-        filename = f"{uniprot_id}_{taxon}_{organism.upper()}_v4.tar"
-        url = f"{self.ALPHAFOLD_BASE}/{filename}"
-        
-        tar_path = self.data_dir / filename
-        
-        # Download
-        print(f"\nDownloading {organism} proteome...")
-        print(f"Size: ~{info['size_gb']} GB, {info['proteins']} proteins")
-        print(f"This may take a while...\n")
-        
+
+        # The archive name carries the release version and a mnemonic that is
+        # not the organism key (Dictyostelium is "DICDI"), so it is read from
+        # the directory listing. Building it from the key - as this method once
+        # did, with a fixed "_v4" - fails for every proteome once v4 is gone.
+        url = self.resolve_archive_url(organism)
+        tar_path = self.data_dir / url.rsplit("/", 1)[-1]
+        print(f"\nDownloading {organism} proteome: {url}")
+
+        with tqdm(unit="B", unit_scale=True, desc=tar_path.name) as pbar:
+            def report(done: int, total: int) -> None:
+                pbar.total = total or None
+                pbar.n = done
+                pbar.refresh()
+
+            result = download_large_file(url, tar_path, progress=report)
+        if not result.ok:
+            raise RuntimeError(f"Download of {url} failed: {result.error}")
+
+        print(f"\nExtracting PDB-format models to {proteome_dir}...")
         try:
-            with tqdm(unit='B', unit_scale=True, desc=filename) as pbar:
-                def report(block_num, block_size, total_size):
-                    pbar.total = total_size
-                    pbar.update(block_size)
-                
-                urllib.request.urlretrieve(url, tar_path, reporthook=report)
-            
-            # Extract
-            print(f"\nExtracting to {proteome_dir}...")
-            with tarfile.open(tar_path, 'r') as tar:
-                dest = proteome_dir.resolve()
-                for member in tar.getmembers():
-                    target = (dest / member.name).resolve()
-                    if not str(target).startswith(str(dest)):
-                        raise tarfile.TarError(f"Unsafe path in archive: {member.name}")
-                tar.extractall(dest)
-            
-            # Clean up tar file
-            tar_path.unlink()
-            
-            print(f"\nDownload complete: {proteome_dir}")
-            return proteome_dir
-            
-        except Exception as e:
-            print(f"\nDownload failed: {e}")
-            # Clean up partial downloads
-            if tar_path.exists():
-                tar_path.unlink()
-            raise
-    
+            n = extract_models(tar_path, proteome_dir, pattern=".pdb.gz")
+        finally:
+            tar_path.unlink(missing_ok=True)
+        print(f"Extracted {n} models: {proteome_dir}")
+        return proteome_dir
+
+    def resolve_archive_url(self, organism: str) -> str:
+        """URL of the newest archive for ``organism`` in the ``latest`` listing."""
+        proteome_id = self.PROTEOMES[organism]["uniprot_id"]
+        (listing,) = fetch_all([FetchJob("listing", f"{self.ALPHAFOLD_BASE}/")], concurrency=1)
+        if not listing.ok:
+            raise RuntimeError(f"Could not list {self.ALPHAFOLD_BASE}: {listing.error}")
+        return f"{self.ALPHAFOLD_BASE}/{newest_archive(listing.payload.decode(errors='replace'), proteome_id)}"
+
     def get_info(self, organism: str) -> Dict:
         """
         Get information about a proteome.

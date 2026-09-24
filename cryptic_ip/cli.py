@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from .analysis import ProteinAnalyzer
+from .analysis import units
 from .validation import validate_adar2, ValidationSuite, StructureValidator, ResultsValidator
 from .validation.md_validation import OpenMMMDValidationPipeline
 from .database import ProteomeDownloader, ProteomeManager, DatabaseIntegrityChecker
@@ -89,12 +90,19 @@ def check_dependencies():
 @click.option("--use-ml-model", is_flag=True, help="Use trained ML classifier if available")
 @click.option("--seed", type=int, default=42, show_default=True, help="Random seed")
 @click.option(
+    "--min-burial-depth",
+    type=float,
+    default=None,
+    help="Optional geometric burial-depth gate in Angstroms (distance of the pocket "
+    "center below the protein surface)",
+)
+@click.option(
     "--model-path",
     type=click.Path(exists=False),
     default="models/cryptic_ip_classifier_v1.pkl",
     help="Path to serialized ML model",
 )
-def analyze(pdb_file, output, score_threshold, use_ml_model, seed, model_path):
+def analyze(pdb_file, output, score_threshold, use_ml_model, seed, min_burial_depth, model_path):
     """
     Analyze a single protein structure for cryptic IP binding sites.
     """
@@ -126,17 +134,40 @@ def analyze(pdb_file, output, score_threshold, use_ml_model, seed, model_path):
 
     click.echo(f"\nFound {len(candidates)} candidates above threshold {score_threshold}\n")
 
+    if min_burial_depth is not None:
+        if "burial_depth" not in candidates.columns:
+            click.secho(
+                "No burial_depth column available; skipping burial-depth gate.", fg="yellow"
+            )
+        else:
+            before = len(candidates)
+            candidates = candidates[candidates["burial_depth"].fillna(0) >= min_burial_depth]
+            click.echo(
+                f"Applied burial-depth gate >= {min_burial_depth} {units.ANGSTROM}: "
+                f"{len(candidates)}/{before} candidates retained\n"
+            )
+
     if len(candidates) > 0:
         display_cols = ["pocket_id", "composite_score", "volume", "sasa", "basic_residues"]
         if "burial_depth" in candidates.columns:
             display_cols.insert(2, "burial_depth")
-        click.echo("Top candidates:")
-        click.echo(candidates[display_cols].head(10).to_string())
+        click.echo("Top candidates (column units in headers):")
+        labeled = candidates[display_cols].head(10).rename(
+            columns=units.label_columns(display_cols)
+        )
+        click.echo(labeled.to_string())
 
     # Save results
     if output:
         scored.to_csv(output, index=False)
         click.echo(f"\nResults saved to {output}")
+        # Machine-readable units sidecar so persisted results carry their units
+        # without altering the CSV column names that downstream tools rely on.
+        units_path = Path(output).with_suffix(Path(output).suffix + ".units.json")
+        units_path.write_text(
+            json.dumps(units.units_mapping(scored.columns), indent=2, ensure_ascii=False)
+        )
+        click.echo(f"Column units written to {units_path}")
 
 
 @main.command()
@@ -347,6 +378,67 @@ def screen(proteome_dir, output, score_threshold, max_structures, use_ml_model, 
         click.secho(f"Results saved to {output}", fg="green")
     else:
         click.secho("\nNo candidates found above threshold", fg="yellow")
+
+
+@main.command("self-check")
+@click.option(
+    "--output-dir",
+    "-o",
+    default="results/self_check",
+    help="Directory for generated structures and results",
+)
+@click.option("--n-structures", default=6, show_default=True, help="Synthetic structures to build")
+@click.option(
+    "--sasa-points",
+    default=128,
+    show_default=True,
+    help="SASA sample points per atom; lower is faster",
+)
+def self_check(output_dir, n_structures, sasa_points):
+    """Verify the measurement pipeline offline against known ground truth.
+
+    Builds synthetic structures whose burial is fixed by construction, measures
+    them, and reports whether the pipeline recovers the right answer. This needs
+    no network access and no PDB downloads, so it works as an installation check
+    and as a smoke test in restricted environments.
+
+    It validates the machinery, not the biology: passing means the code measures
+    what it claims to, not that any biological conclusion is correct.
+    """
+    from .testing.synthetic import build_synthetic_benchmark
+    from .validation.burial_metrics import compute_burial_metrics
+
+    out = Path(output_dir)
+    n_each = max(1, int(n_structures) // 3)
+    click.echo(f"Building {n_each * 3} synthetic structures in {out}...")
+    benchmark = build_synthetic_benchmark(
+        out / "structures", n_buried=n_each, n_surface=n_each, n_decoy=n_each
+    )
+
+    failures = []
+    click.echo("\nMeasuring ligand burial:\n")
+    click.echo(f"{'structure':<18}{'expected':<10}{'measured':<16}{'rel.SASA':>9}{'depth':>8}{'encl':>7}")
+    for path, spec in zip(benchmark.paths, benchmark.specs):
+        metrics = compute_burial_metrics(path, n_points=sasa_points)
+        if not spec.include_ligand:
+            measured, expected = metrics.burial_class, "unknown"
+        else:
+            measured, expected = metrics.burial_class, spec.expected_burial_class
+        ok = measured == expected
+        if not ok:
+            failures.append((spec.name, expected, measured))
+        click.secho(
+            f"{spec.name:<18}{expected:<10}{measured:<16}"
+            f"{(metrics.relative_sasa if metrics.relative_sasa is not None else float('nan')):>9.3f}"
+            f"{(metrics.burial_depth if metrics.burial_depth is not None else float('nan')):>8.2f}"
+            f"{(metrics.enclosure if metrics.enclosure is not None else float('nan')):>7.2f}",
+            fg="green" if ok else "red",
+        )
+
+    if failures:
+        click.secho(f"\n✗ {len(failures)} structure(s) measured incorrectly", fg="red", bold=True)
+        raise click.exceptions.Exit(1)
+    click.secho("\n✓ Burial measurement matches ground truth on every structure", fg="green", bold=True)
 
 
 @main.command("md-validate")

@@ -1,0 +1,165 @@
+name: Yeast Re-screen
+
+# Re-runs the strict yeast pilot screen on exactly the 499 proteins recorded in
+# results/yeast_pilot/screen_checkpoint.json, under the current scorer.
+#
+# The committed pilot result - one candidate, P07264 (LEU1), at a 0.2 % hit rate
+# - was produced before the composite scorer's volume window and weights were
+# corrected. Re-screening the identical protein set isolates the effect of those
+# corrections: same inputs, same filters, different scorer.
+#
+# The screen writes to a fresh directory on purpose. The committed pilot
+# directory holds a resume checkpoint and an analysis cache, and a run pointed
+# at it would skip every protein already recorded there and hand back the old
+# scorer's answer - a re-test that tests nothing.
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only, so merging
+    # does not re-derive every recorded result.
+    branches-ignore:
+      - main
+    paths:
+      - 'scripts/run_yeast_pilot_screen.py'
+      - 'cryptic_ip/analysis/scorer.py'
+      - 'cryptic_ip/analysis/analyzer.py'
+      - 'cryptic_ip/analysis/features.py'
+      - 'cryptic_ip/analysis/structure_arrays.py'
+      - 'cryptic_ip/analysis/filters.py'
+      - '.github/workflows/yeast-rescreen.yml'
+  workflow_dispatch:
+
+jobs:
+  rescreen:
+    name: Strict yeast re-screen (499 proteins)
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda,defaults
+
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge fpocket freesasa pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+
+      - name: Cache AlphaFold models
+        uses: actions/cache@v5
+        with:
+          path: data/structures/yeast_rescreen
+          key: yeast-rescreen-af-models-v1
+
+      - name: Download the pilot's 499 AlphaFold models
+        shell: bash -l {0}
+        # The model URL comes from the AlphaFold API rather than a hard-coded
+        # version suffix, so the current model is fetched whichever version it
+        # is; downloads run concurrently and are checked before being kept.
+        run: |
+          python scripts/fetch_structures.py alphafold \
+            --out data/structures/yeast_rescreen \
+            --ids-json results/yeast_pilot/screen_checkpoint.json --json-key processed
+
+      - name: Run the strict screen
+        shell: bash -l {0}
+        run: |
+          python scripts/run_yeast_pilot_screen.py \
+            --structures-dir data/structures/yeast_rescreen \
+            --output-dir results/yeast_rescreen \
+            --n-proteins 499 \
+            --skip-download \
+            --workers 4
+
+      - name: Score the pilot candidate directly
+        shell: bash -l {0}
+        # The screen records only pockets that pass every filter, so a candidate
+        # that no longer qualifies would simply be absent. Score it outright and
+        # keep its best pockets, so a change is visible and attributable.
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          from cryptic_ip.analysis import ProteinAnalyzer
+
+          models = sorted(Path("data/structures/yeast_rescreen").glob("AF-P07264-F1-model_v*.pdb"))
+          out = Path("results/yeast_rescreen/P07264_pockets.csv")
+          out.parent.mkdir(parents=True, exist_ok=True)
+          if not models:
+              out.write_text("error\nP07264 model unavailable\n")
+              raise SystemExit(0)
+          analyzer = ProteinAnalyzer(str(models[0]), skip_electrostatics=True)
+          scored = analyzer.run_pipeline(include_electrostatics=False)
+          scored.sort_values("composite_score", ascending=False).head(10).to_csv(out, index=False)
+          print(f"wrote {out}")
+          PY
+
+      - name: Upload re-screen results
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: yeast-rescreen
+          path: results/yeast_rescreen
+          if-no-files-found: warn
+
+      - name: Re-screen digest
+        shell: bash -l {0}
+        if: always()
+        continue-on-error: true
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          import pandas as pd
+
+          def summary(path):
+              p = Path(path)
+              return json.loads(p.read_text()) if p.exists() else {}
+
+          def hits(path):
+              p = Path(path)
+              if not p.exists() or p.stat().st_size == 0:
+                  return pd.DataFrame()
+              return pd.read_csv(p)
+
+          old_s = summary("results/yeast_pilot/yeast_pilot_summary.json")
+          new_s = summary("results/yeast_rescreen/yeast_pilot_summary.json")
+          print("## Strict yeast screen: committed pilot vs current scorer\n")
+          print("| | committed pilot | re-screen |")
+          print("| --- | --- | --- |")
+          for key in ("structures_screened", "proteins_with_hits", "total_hits", "hit_rate"):
+              print(f"| {key} | {old_s.get(key, '-')} | {new_s.get(key, '-')} |")
+
+          old_h, new_h = hits("results/yeast_pilot/yeast_pilot_hits.csv"), hits("results/yeast_rescreen/yeast_pilot_hits.csv")
+          old_ids = set(old_h.get("uniprot_id", pd.Series(dtype=str)))
+          new_ids = set(new_h.get("uniprot_id", pd.Series(dtype=str)))
+          print(f"\n- kept: `{sorted(old_ids & new_ids)}`")
+          print(f"- lost: `{sorted(old_ids - new_ids)}`")
+          print(f"- new: `{sorted(new_ids - old_ids)}`")
+
+          if not new_h.empty:
+              cols = [c for c in ("uniprot_id", "pocket_id", "composite_score", "volume",
+                                  "sasa", "basic_residues", "burial_depth", "plddt_confidence")
+                      if c in new_h.columns]
+              print("\n### Re-screen hits\n")
+              print(new_h[cols].to_markdown(index=False))
+
+          leu1 = Path("results/yeast_rescreen/P07264_pockets.csv")
+          if leu1.exists():
+              frame = pd.read_csv(leu1)
+              cols = [c for c in ("pocket_id", "composite_score", "volume", "sasa",
+                                  "basic_residues", "burial_depth", "enclosure",
+                                  "plddt_confidence") if c in frame.columns]
+              print("\n### P07264 (LEU1) best pockets under the current scorer\n")
+              print(frame[cols].head(5).to_markdown(index=False) if cols else frame.head(5).to_markdown(index=False))
+          PY

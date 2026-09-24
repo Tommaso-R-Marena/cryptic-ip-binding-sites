@@ -19,53 +19,58 @@ def _double_value(item):
 
 
 class FakeResponse:
-    def __init__(self, payload):
-        self._payload = payload
-
-    def json(self):
-        return self._payload
+    def __init__(self, text):
+        self.text = text
 
     def raise_for_status(self):
         return None
 
 
 class FakeSession:
+    def __init__(self):
+        self.calls = []
+
     def request(self, method, url, timeout=30, **kwargs):
-        params = kwargs.get("params", {})
-        query = params.get("query", "")
-        proteome = query.split(":", 1)[1]
-        payload = {
-            "results": [
-                {"primaryAccession": f"{proteome}_A"},
-                {"primaryAccession": f"{proteome}_B"},
-            ]
-        }
-        return FakeResponse(payload)
+        self.calls.append((url, kwargs.get("params", {})))
+        proteome = kwargs.get("params", {}).get("query", "").split(":", 1)[1]
+        return FakeResponse(f"{proteome}_A\n{proteome}_B\n{proteome}_C\n")
+
+
+class _Result:
+    def __init__(self, ok, not_found=False):
+        self.ok, self.not_found, self.error = ok, not_found, "" if ok else "missing"
 
 
 def test_batch_downloader_resume(tmp_path):
+    session = FakeSession()
     downloader = AlphaFoldBatchDownloader(
         output_dir=tmp_path / "af",
         state_path=tmp_path / "state.json",
         requests_per_second=10,
-        session=FakeSession(),
+        session=session,
     )
 
     calls = []
 
-    def fake_fetch(uniprot_id):
-        calls.append(uniprot_id)
-        (tmp_path / "af" / f"{uniprot_id}.pdb").write_text("MODEL")
-        return tmp_path / "af" / f"{uniprot_id}.pdb"
+    def fake_fetch(uniprot_ids):
+        calls.extend(uniprot_ids)
+        # _C has no AlphaFold model: not found, not a failure.
+        return {uid: _Result(ok=not uid.endswith("_C"), not_found=uid.endswith("_C")) for uid in uniprot_ids}
 
-    downloader.af_client.fetch_structure = fake_fetch
+    downloader._fetch_models = fake_fetch
 
     summary_first = downloader.download_proteomes(["UP000002311"], resume=True)
     assert summary_first["downloaded"] == 2
+    assert summary_first["not_found"] == 1
+    assert summary_first["failed"] == 0
 
     summary_second = downloader.download_proteomes(["UP000002311"], resume=True)
     assert summary_second["skipped"] == 2
-    assert len(calls) == 2
+    # Only the absent accession is asked for again.
+    assert calls == ["UP000002311_A", "UP000002311_B", "UP000002311_C", "UP000002311_C"]
+    # One streamed request per listing, not one per page of 500.
+    assert all("stream" in url for url, _ in session.calls)
+    assert session.calls[0][1]["format"] == "list"
 
 
 def test_batch_downloader_corrupt_state(tmp_path):

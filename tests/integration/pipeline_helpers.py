@@ -33,11 +33,9 @@ def seed_ml_structures(raw_dir: Path) -> int:
 def seed_yeast_structures(structures_dir: Path, *, n_proteins: int = 2) -> list[Path]:
     """Seed a tiny yeast pilot set from local validation caches (no network)."""
     structures_dir.mkdir(parents=True, exist_ok=True)
-    candidates = [
-        VALIDATION_DIR / "1MAI.pdb",
-        VALIDATION_DIR / "AF-P78563-F1-model_v6.pdb",
-        VALIDATION_DIR / "1ZY7.pdb",
-    ]
+    # Whatever AlphaFold release was fetched, not a fixed version suffix.
+    models = sorted(VALIDATION_DIR.glob("AF-P78563-F1-model_v*.pdb"))
+    candidates = [VALIDATION_DIR / "1MAI.pdb", *models[-1:], VALIDATION_DIR / "1ZY7.pdb"]
     sources = [path for path in candidates if path.exists()]
     if not sources:
         raise FileNotFoundError("No local structures available to seed yeast pilot")
@@ -54,12 +52,15 @@ def seed_yeast_structures(structures_dir: Path, *, n_proteins: int = 2) -> list[
 
 
 def resolve_ml_features_csv(raw_dir: Path) -> Path | None:
-    """Return bundled pocket features when local structure coverage is too sparse for training."""
-    copied = seed_ml_structures(raw_dir)
-    if copied >= 10:
-        return None
-    if BUNDLED_FEATURES.exists():
-        return BUNDLED_FEATURES
+    """Return a usable pocket feature table, or ``None`` to extract a fresh one.
+
+    Always ``None`` now. The bundled table at ``BUNDLED_FEATURES`` was produced by
+    the previous labelling scheme - 12 190 pockets with 5 positives, from a
+    copy-summed burial measure - and carries the legacy six-column schema.
+    Training on it would reproduce the defect it was built with, so the ML stage
+    extracts features from the control structures instead.
+    """
+    seed_ml_structures(raw_dir)
     return None
 
 

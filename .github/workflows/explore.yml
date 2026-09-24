@@ -1,0 +1,81 @@
+name: Descriptor exploration
+
+# docs/EXPLORATION_PLAN.md: zero-parameter descriptors on the full benchmark's
+# table. The table comes from one pinned full-mode benchmark run - never a smoke
+# run, whose table is a real subsample of the same entries. A push explores;
+# confirmation on the holdout runs only on demand, once, and the script refuses
+# a second confirmation of the same table using the committed ledger.
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only, so merging
+    # does not re-derive every recorded result.
+    branches-ignore:
+      - main
+    paths:
+      - 'scripts/explore_descriptors.py'
+      - 'docs/EXPLORATION_PLAN.md'
+      - '.github/workflows/explore.yml'
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'explore or confirm'
+        default: 'explore'
+      benchmark_run:
+        description: 'full-mode benchmark run id holding benchmark-table'
+        default: '35949588200'
+
+concurrency:
+  group: explore-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  STAGE: ${{ inputs.stage || 'explore' }}
+  BENCHMARK_RUN: ${{ inputs.benchmark_run || '35949588200' }}
+
+jobs:
+  explore:
+    name: ${{ inputs.stage || 'explore' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+
+      - name: Fetch the benchmark table
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$BENCHMARK_RUN" --repo "$GITHUB_REPOSITORY" --name benchmark-table --dir table
+          ls -l table
+          sha256sum table/table.csv.gz
+          python -c "import json; s=json.load(open('table/prepare_summary.json')); print('entries', s.get('entries'), 'holdout', s.get('holdout_entries'))"
+
+      - name: Run
+        run: |
+          python scripts/explore_descriptors.py "$STAGE" --table table/table.csv.gz \
+            --ledger results/exploration/ledger.jsonl --out-dir results/exploration
+          echo "::group::ledger line (commit this to results/exploration/ledger.jsonl)"
+          tail -n 1 results/exploration/ledger.jsonl
+          echo "::endgroup::"
+          if [ -f results/exploration/EXPLORATION.md ]; then cat results/exploration/EXPLORATION.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: exploration-${{ env.STAGE }}
+          path: results/exploration
+          retention-days: 90

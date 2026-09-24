@@ -1,0 +1,103 @@
+name: Proteome Aggregate
+
+# The analysis half of the proteome screen: hit rates, the threshold sweep, the
+# organism comparison, keyword enrichment and known-binder recovery, from the
+# shards and catalogues a screen run uploaded.
+#
+# The screen calls this for its own run. It can also be run on demand against
+# any earlier screen run, which re-analyses that run's pockets with the current
+# code - pockets are stored with their full descriptors and rescored here, so a
+# change to the scorer or the hit criteria needs a re-aggregation, never a
+# re-screen of ~40,000 models.
+
+on:
+  workflow_call:
+    inputs:
+      run_id:
+        description: 'Screen run whose artifacts to aggregate'
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Proteome Screen run ID whose shard and catalogue artifacts to aggregate'
+        required: true
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  aggregate:
+    name: Aggregate and compare
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: catalog-*
+          path: results/proteome_screen/catalog
+          merge-multiple: true
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: shard-*
+          path: results/proteome_screen/shards
+          merge-multiple: true
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Aggregate
+        run: |
+          python scripts/proteome_screen.py aggregate \
+            --shards-dir results/proteome_screen/shards \
+            --catalog-dir results/proteome_screen/catalog \
+            --output-dir results/proteome_screen/summary
+
+      - name: Upload summary
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: proteome-screen-summary
+          path: |
+            results/proteome_screen/summary
+            results/proteome_screen/catalog/*_qc.json
+          retention-days: 90
+
+      - name: Digest
+        if: always()
+        continue-on-error: true
+        run: |
+          {
+            echo "_Screen run ${{ inputs.run_id }}_"
+            echo
+            echo "## Phase 2 QC"
+            for f in results/proteome_screen/catalog/*_qc.json; do
+              python - "$f" <<'PY'
+          import json, sys
+          r = json.load(open(sys.argv[1]))
+          c = r["checklist"]
+          print(f"\n**{r['organism']}** ({r['proteome_id']}, AlphaFold v{r['alphafold_versions']})\n")
+          for name, item in c.items():
+              detail = {k: v for k, v in item.items() if k != "passes"}
+              print(f"- {'PASS' if item['passes'] else 'FAIL'} {name}: {detail}")
+          print(f"- screenable F1 models: {r['screenable_f1_models']}")
+          PY
+            done
+            cat results/proteome_screen/summary/DIGEST.md
+          } | tee -a "$GITHUB_STEP_SUMMARY"

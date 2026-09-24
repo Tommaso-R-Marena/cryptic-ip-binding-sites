@@ -1,0 +1,612 @@
+#!/usr/bin/env python3
+"""Extract pocket descriptors and training labels from a structure collection.
+
+This is the bridge between the ground-truth dataset and model training. For each
+structure it runs pocket detection, computes the full descriptor suite, and
+labels each pocket by **atom-level overlap** with the observed ligand copies -
+not by centroid distance, and not by a structure-level burial class.
+
+Design points
+-------------
+* **Ambiguous pockets are excluded, not called negative.** Pockets that partially
+  overlap the ligand are written with label ``-1`` and dropped at training time.
+  Forcing them to 0 injects label noise exactly where the decision boundary lies.
+* **Detector recall is reported.** If a structure contains a ligand but no pocket
+  matches it, that is a pocket-detection failure and it bounds every downstream
+  result. It is counted and printed rather than being absorbed into the negatives.
+* **Grouping keys are emitted.** ``group_key`` (UniProt accession when known,
+  otherwise the entry id) travels with every row so training can split by protein
+  rather than by pocket.
+* **Resumable.** Per-structure results are cached as JSON, so an interrupted run
+  restarts where it stopped - which matters when the collection is thousands of
+  structures.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import logging
+import shutil
+import sys
+import tempfile
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+import numpy as np
+import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from cryptic_ip.analysis.analyzer import ProteinAnalyzer  # noqa: E402
+from cryptic_ip.analysis.features import FEATURE_NAMES  # noqa: E402
+from cryptic_ip.analysis.labeling import (  # noqa: E402
+    LigandSite,
+    assign_pocket_labels,
+    summarise_labels,
+)
+from cryptic_ip.analysis.structure_arrays import (  # noqa: E402
+    load_structure_arrays,
+    write_apo_structure,
+)
+from cryptic_ip.validation.burial_metrics import (  # noqa: E402
+    compute_ligand_burial,
+    find_ligand_instances,
+)
+
+LOGGER = logging.getLogger("extract_pocket_features")
+
+
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--structures-dir",
+        type=Path,
+        default=Path("data/validation/raw/structures"),
+        help="Directory of PDB/mmCIF structure files",
+    )
+    parser.add_argument(
+        "--entry-csv",
+        type=Path,
+        default=Path("data/validation/ip_binding_validation_dataset.csv"),
+        help="Per-entry dataset CSV supplying metadata and grouping keys",
+    )
+    parser.add_argument(
+        "--output-csv",
+        type=Path,
+        default=Path("results/ml_training/pocket_features.csv"),
+        help="Output feature/label table",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        type=Path,
+        default=Path("results/ml_training/feature_cache"),
+        help="Per-structure JSON cache enabling resume",
+    )
+    parser.add_argument(
+        "--summary-json",
+        type=Path,
+        default=Path("results/ml_training/labeling_summary.json"),
+        help="Label and detector-recall summary output",
+    )
+    parser.add_argument(
+        "--comp-ids",
+        nargs="*",
+        default=None,
+        help="Ligand component identifiers; defaults to the built-in registry",
+    )
+    parser.add_argument(
+        "--require-cryptic",
+        action="store_true",
+        help=(
+            "Only cryptic ligand copies produce positives; surface copies become "
+            "ambiguous and are excluded rather than treated as negatives."
+        ),
+    )
+    parser.add_argument(
+        "--holo-descriptors",
+        dest="apo",
+        action="store_false",
+        help=(
+            "Compute pocket descriptors on the deposited structure, ligand "
+            "included, instead of on a ligand-free copy. Only for measuring how "
+            "much the bound ligand inflates them: a model trained this way learns "
+            "to recognise an occupied pocket, which an apo target never has."
+        ),
+    )
+    parser.add_argument("--jobs", type=int, default=4, help="Parallel worker processes")
+    parser.add_argument(
+        "--sasa-points", type=int, default=256, help="SASA sample points per atom"
+    )
+    parser.add_argument(
+        "--max-protein-atoms",
+        type=int,
+        default=None,
+        help=(
+            "Exclude structures with more polymer atoms than this; each "
+            "exclusion is recorded in the summary, never dropped silently"
+        ),
+    )
+    parser.add_argument(
+        "--ids-file",
+        type=Path,
+        default=None,
+        help="Process only the structures listed (one identifier per line)",
+    )
+    parser.add_argument(
+        "--fpocket-timeout",
+        type=float,
+        default=None,
+        help="Seconds fpocket may run on one structure (default: the analyzer's)",
+    )
+    parser.add_argument("--shard-index", type=int, default=0, help="This shard (0-based)")
+    parser.add_argument("--shard-count", type=int, default=1, help="Number of shards")
+    parser.add_argument(
+        "--max-structures", type=int, default=None, help="Cap structures processed"
+    )
+    parser.add_argument("--min-alpha-spheres", type=int, default=3, help="fpocket -m parameter")
+    parser.add_argument(
+        "--skip-electrostatics",
+        action="store_true",
+        default=True,
+        help="Skip APBS; the screened Coulomb surrogate is always computed",
+    )
+    parser.add_argument(
+        "--with-electrostatics",
+        dest="skip_electrostatics",
+        action="store_false",
+        help="Run APBS for the Poisson-Boltzmann potential feature",
+    )
+    parser.add_argument(
+        "--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"]
+    )
+    return parser.parse_args(argv)
+
+
+def _ligand_sites(
+    path: Path, comp_ids: Optional[Sequence[str]], sasa_points: int
+) -> List[LigandSite]:
+    """Locate ligand copies and attach their burial class.
+
+    Args:
+        path: Structure file.
+        comp_ids: Ligand component identifiers, or ``None`` to identify
+            inositol phosphates from their coordinates.
+        sasa_points: SASA sample points per atom.
+
+    Returns:
+        Ligand copies, most buried first.
+    """
+    arrays = load_structure_arrays(path)
+    found = find_ligand_instances(arrays, comp_ids)
+    if not found:
+        return []
+
+    burial_by_id = {
+        instance.instance_id: instance.burial_class
+        for instance in compute_ligand_burial(
+            path,
+            comp_ids=list(comp_ids) if comp_ids is not None else None,
+            n_points=sasa_points,
+        )
+    }
+
+    sites: List[LigandSite] = []
+    for key, comp_id, atom_indices in found:
+        suffix = f"{key[2]}{key[3]}".strip()
+        instance_id = f"{comp_id}_{key[1]}_{suffix}"
+        sites.append(
+            LigandSite(
+                instance_id=instance_id,
+                comp_id=comp_id,
+                coords=arrays.coords[atom_indices],
+                burial_class=burial_by_id.get(instance_id, "unknown"),
+            )
+        )
+    return sites
+
+
+def process_structure(
+    task: Tuple[str, str, Sequence[str], Dict[str, Any]]
+) -> Tuple[str, List[Dict[str, Any]], Dict[str, Any]]:
+    """Worker: detect, describe and label every pocket of one structure.
+
+    Args:
+        task: ``(structure_id, path, comp_ids, options)``.
+
+    Returns:
+        ``(structure_id, rows, diagnostics)``.
+    """
+    structure_id, path_str, comp_ids, options = task
+    path = Path(path_str)
+    diagnostics: Dict[str, Any] = {"structure_id": structure_id, "error": None}
+
+    try:
+        cap = options.get("max_protein_atoms")
+        if cap:
+            # The apo copy holds every polymer atom, and is written in PDB format;
+            # the cap counts exactly what it would have to hold.
+            arrays = load_structure_arrays(path)
+            n_polymer = int(np.sum(arrays.is_polymer))
+            diagnostics["n_polymer_atoms"] = n_polymer
+            if n_polymer > int(cap):
+                diagnostics["excluded"] = f"{n_polymer} polymer atoms > {int(cap)}"
+                return structure_id, [], diagnostics
+        # Labels always come from the deposited (holo) structure: they need to
+        # know where the ligand sits.
+        sites = _ligand_sites(path, comp_ids, int(options.get("sasa_points", 256)))
+        diagnostics["n_ligand_instances"] = len(sites)
+
+        # Descriptors come from an apo copy unless told otherwise. On the holo
+        # structure the bound ligand covers the residues lining its own pocket,
+        # so solvent accessibility - and burial depth through it - read as
+        # "buried" because the ligand is present. A model trained on that learns
+        # to recognise an occupied pocket, which an AlphaFold model never has.
+        describe_path = path
+        apo_dir = None
+        if options.get("apo", True):
+            apo_dir = Path(tempfile.mkdtemp(prefix=f"apo_{structure_id}_"))
+            describe_path = write_apo_structure(path, apo_dir / f"{structure_id}.pdb")
+        diagnostics["descriptors_from"] = "apo" if apo_dir is not None else "holo"
+
+        analyzer = ProteinAnalyzer(
+            str(describe_path),
+            skip_electrostatics=bool(options.get("skip_electrostatics", True)),
+        )
+        if options.get("fpocket_timeout"):
+            analyzer.fpocket_timeout_s = float(options["fpocket_timeout"])
+        analyzer.detect_pockets(min_alpha_sphere=int(options.get("min_alpha_spheres", 3)))
+        if not options.get("skip_electrostatics", True):
+            analyzer.calculate_electrostatics()
+
+        pocket_records: List[Dict[str, Any]] = []
+        pocket_geometry: List[Tuple[int, np.ndarray, np.ndarray]] = []
+        for pocket_id in analyzer.pockets["pocket_id"]:
+            record = analyzer.analyze_pocket(int(pocket_id))
+            pocket_records.append(record)
+            centre = np.asarray(record["center"], dtype=float)
+            spheres = analyzer._pocket_alpha_spheres(int(pocket_id))
+            points = spheres if spheres is not None and len(spheres) else centre.reshape(1, 3)
+            pocket_geometry.append((int(pocket_id), centre, points))
+
+        assignments = assign_pocket_labels(
+            pocket_geometry,
+            sites,
+            require_cryptic=bool(options.get("require_cryptic", False)),
+        )
+        assignment_by_id = {a.pocket_id: a for a in assignments}
+
+        rows: List[Dict[str, Any]] = []
+        for record in pocket_records:
+            pocket_id = int(record["pocket_id"])
+            row: Dict[str, Any] = {
+                "structure_id": structure_id,
+                "pocket_id": pocket_id,
+            }
+            row.update({name: record.get(name, np.nan) for name in FEATURE_NAMES})
+            row["mean_local_hydrophobic_density"] = record.get(
+                "mean_local_hydrophobic_density", np.nan
+            )
+            assignment = assignment_by_id.get(pocket_id)
+            if assignment is not None:
+                row.update(assignment.to_row())
+                row["pocket_id"] = pocket_id
+            rows.append(row)
+
+        diagnostics["n_pockets"] = len(rows)
+        diagnostics["n_positive"] = sum(1 for row in rows if row.get("label") == 1)
+        analyzer.cleanup()
+        if apo_dir is not None:
+            shutil.rmtree(apo_dir, ignore_errors=True)
+        return structure_id, rows, diagnostics
+
+    except Exception as exc:  # noqa: BLE001 - one structure must not abort the run
+        diagnostics["error"] = f"{type(exc).__name__}: {exc}"
+        return structure_id, [], diagnostics
+
+
+#: Options that change the rows a structure produces. A cached result is reused
+#: only when all of them match; otherwise it is recomputed.
+CACHE_KEY_OPTIONS = (
+    "apo",
+    "require_cryptic",
+    "sasa_points",
+    "min_alpha_spheres",
+    "skip_electrostatics",
+    "max_protein_atoms",
+)
+
+
+def cache_fingerprint(options: Dict[str, Any], comp_ids: Optional[Sequence[str]]) -> str:
+    """Identify the settings a cached structure's rows were computed under.
+
+    The per-structure cache used to be keyed on the structure identifier alone,
+    so a run could silently reuse rows computed under different settings: an apo
+    run picking up holo descriptors, or a cryptic-only run picking up labels
+    assigned without that restriction. Recording this fingerprint alongside each
+    cached result, and recomputing on a mismatch, makes that impossible.
+
+    Args:
+        options: Worker options passed to :func:`process_structure`.
+        comp_ids: Explicit component identifiers, or ``None`` for structural
+            identification.
+
+    Returns:
+        A short hex digest of the settings that affect the output.
+    """
+    import hashlib
+
+    relevant = {key: options.get(key) for key in CACHE_KEY_OPTIONS}
+    relevant["comp_ids"] = sorted(comp_ids) if comp_ids is not None else None
+    encoded = json.dumps(relevant, sort_keys=True, default=str).encode("utf-8")
+    return hashlib.sha1(encoded).hexdigest()[:16]
+
+
+def load_entry_metadata(entry_csv: Path) -> Dict[str, Dict[str, Any]]:
+    """Load per-entry metadata used for grouping and annotation.
+
+    Args:
+        entry_csv: Per-entry dataset CSV.
+
+    Returns:
+        Metadata keyed by upper-case structure identifier; empty when absent.
+    """
+    if not entry_csv.exists():
+        LOGGER.warning("Entry metadata %s not found; grouping falls back to file stem", entry_csv)
+        return {}
+    frame = pd.read_csv(entry_csv)
+    out: Dict[str, Dict[str, Any]] = {}
+    for _, row in frame.iterrows():
+        identifier = str(row.get("pdb_id", "")).upper()
+        if identifier:
+            out[identifier] = row.to_dict()
+    return out
+
+
+def group_key_for(structure_id: str, metadata: Dict[str, Any]) -> str:
+    """Choose the grouping key that prevents leakage between related structures.
+
+    The UniProt accession is preferred over the entry identifier: the PDB holds
+    many entries of the same protein, and splitting by entry would place the same
+    protein on both sides of a fold. Falls back to the entry identifier when no
+    accession is annotated.
+
+    Args:
+        structure_id: Structure identifier.
+        metadata: Entry metadata row.
+
+    Returns:
+        The group key.
+    """
+    # The builder writes ``uniprot_ids``; the legacy dataset wrote ``uniprot_id``.
+    # Reading only the first silently grouped every legacy entry by itself.
+    if metadata.get("homology_group"):
+        return str(metadata["homology_group"])
+    accessions = str(
+        metadata.get("uniprot_ids", "") or metadata.get("uniprot_id", "") or ""
+    ).strip()
+    if accessions.lower() == "nan":
+        accessions = ""
+    if accessions:
+        # Sorting makes the key deterministic for multi-chain complexes.
+        return "|".join(sorted(accessions.split(";")))
+    return structure_id.upper()
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    """Entry point."""
+    args = parse_args(argv)
+    logging.basicConfig(
+        level=getattr(logging, args.log_level),
+        format="%(asctime)s | %(levelname)s | %(message)s",
+    )
+
+    # None means identify inositol phosphates from coordinates rather than
+    # from a fixed identifier list; --comp-ids overrides for a targeted run.
+    comp_ids = list(args.comp_ids) if args.comp_ids else None
+    structures = sorted(
+        [
+            path
+            for path in args.structures_dir.glob("*")
+            if path.suffix.lower() in {".pdb", ".cif", ".ent", ".mmcif"}
+        ]
+    )
+    if args.ids_file is not None:
+        wanted = {
+            line.strip().upper()
+            for line in args.ids_file.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        }
+        structures = [path for path in structures if path.stem.upper() in wanted]
+    if args.shard_count > 1:
+        # Deterministic by identifier, so shards are disjoint and cover everything.
+        structures = [
+            path
+            for path in structures
+            if int(hashlib.sha1(path.stem.upper().encode()).hexdigest(), 16) % args.shard_count
+            == args.shard_index
+        ]
+    if args.max_structures:
+        structures = structures[: args.max_structures]
+    if not structures:
+        LOGGER.error("No structure files found in %s", args.structures_dir)
+        return 2
+
+    metadata = load_entry_metadata(args.entry_csv)
+    args.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    options = {
+        "sasa_points": args.sasa_points,
+        "skip_electrostatics": args.skip_electrostatics,
+        "min_alpha_spheres": args.min_alpha_spheres,
+        "require_cryptic": args.require_cryptic,
+        "apo": args.apo,
+        "max_protein_atoms": args.max_protein_atoms,
+        "fpocket_timeout": args.fpocket_timeout,
+    }
+
+    tasks: List[Tuple[str, str, Sequence[str], Dict[str, Any]]] = []
+    cached_rows: Dict[str, List[Dict[str, Any]]] = {}
+    diagnostics: List[Dict[str, Any]] = []
+
+    fingerprint = cache_fingerprint(options, comp_ids)
+    n_stale = 0
+    for path in structures:
+        structure_id = path.stem.upper()
+        cache_path = args.cache_dir / f"{structure_id}.json"
+        if cache_path.exists():
+            try:
+                payload = json.loads(cache_path.read_text(encoding="utf-8"))
+                if payload.get("fingerprint") == fingerprint:
+                    cached_rows[structure_id] = payload["rows"]
+                    diagnostics.append(payload["diagnostics"])
+                    continue
+                n_stale += 1
+            except (json.JSONDecodeError, KeyError, OSError):
+                cache_path.unlink(missing_ok=True)
+        tasks.append((structure_id, str(path), comp_ids, options))
+    if n_stale:
+        LOGGER.info(
+            "Recomputing %d cached structure(s) computed under different settings", n_stale
+        )
+
+    LOGGER.info(
+        "Processing %d structures (%d already cached)", len(tasks), len(cached_rows)
+    )
+
+    def store(structure_id: str, rows: List[Dict[str, Any]], diag: Dict[str, Any]) -> None:
+        cached_rows[structure_id] = rows
+        diagnostics.append(diag)
+        if diag.get("error"):
+            LOGGER.warning("%s failed: %s", structure_id, diag["error"])
+        elif diag.get("excluded"):
+            LOGGER.warning("%s excluded: %s", structure_id, diag["excluded"])
+        (args.cache_dir / f"{structure_id}.json").write_text(
+            json.dumps(
+                {"rows": rows, "diagnostics": diag, "fingerprint": fingerprint},
+                default=float,
+            ),
+            encoding="utf-8",
+        )
+
+    if args.jobs > 1 and tasks:
+        with ProcessPoolExecutor(max_workers=args.jobs) as pool:
+            futures = {pool.submit(process_structure, task): task[0] for task in tasks}
+            for index, future in enumerate(as_completed(futures), start=1):
+                structure_id, rows, diag = future.result()
+                store(structure_id, rows, diag)
+                if index % 25 == 0:
+                    LOGGER.info("  %d/%d structures processed", index, len(tasks))
+    else:
+        for index, task in enumerate(tasks, start=1):
+            structure_id, rows, diag = process_structure(task)
+            store(structure_id, rows, diag)
+            if index % 25 == 0:
+                LOGGER.info("  %d/%d structures processed", index, len(tasks))
+
+    all_rows: List[Dict[str, Any]] = []
+    per_structure_assignments: Dict[str, List[Any]] = {}
+    for structure_id, rows in cached_rows.items():
+        entry_meta = metadata.get(structure_id, {})
+        for row in rows:
+            row = dict(row)
+            row["structure_id"] = structure_id
+            row["group_key"] = group_key_for(structure_id, entry_meta)
+            row["uniprot_ids"] = entry_meta.get("uniprot_ids", "")
+            row["organism"] = entry_meta.get("organism", "")
+            row["resolution"] = entry_meta.get("resolution", np.nan)
+            row["structure_classification"] = entry_meta.get("classification", "")
+            all_rows.append(row)
+
+    # Per-structure accounting, so every exclusion and failure is countable
+    # downstream rather than inferred from which structures have rows.
+    diagnostics_path = args.summary_json.with_name(args.summary_json.stem + "_structures.csv")
+    diagnostics_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(diagnostics).to_csv(diagnostics_path, index=False)
+
+    n_failed = sum(1 for d in diagnostics if d.get("error"))
+    n_excluded = sum(1 for d in diagnostics if d.get("excluded"))
+    LOGGER.info(
+        "Accounting: %d structures, %d with pockets, %d excluded, %d failed",
+        len(diagnostics), len({row["structure_id"] for row in all_rows}), n_excluded, n_failed,
+    )
+    if not all_rows:
+        if args.shard_count > 1 and n_failed == 0 and n_excluded == len(diagnostics):
+            LOGGER.warning("Shard produced no pockets: every structure was excluded")
+            return 0
+        LOGGER.error("No pockets were extracted; check that fpocket is installed and working.")
+        return 3
+
+    frame = pd.DataFrame(all_rows)
+    args.output_csv.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(args.output_csv, index=False)
+
+    # Detector-recall accounting: which ligand-bearing structures yielded a site?
+    structures_with_ligand = [
+        diag["structure_id"]
+        for diag in diagnostics
+        if diag.get("n_ligand_instances", 0) > 0 and not diag.get("error")
+    ]
+    from cryptic_ip.analysis.labeling import PocketAssignment, PocketLabel
+
+    for structure_id, rows in cached_rows.items():
+        per_structure_assignments[structure_id] = [
+            PocketAssignment(
+                pocket_id=int(row.get("pocket_id", 0)),
+                label=PocketLabel(int(row.get("label", 0))),
+                overlap_fraction=float(row.get("overlap_fraction", 0.0) or 0.0),
+            )
+            for row in rows
+        ]
+    summary = summarise_labels(per_structure_assignments, structures_with_ligand)
+
+    payload = {
+        **summary.to_dict(),
+        "n_structures_processed": len(cached_rows),
+        "n_failures": sum(1 for diag in diagnostics if diag.get("error")),
+        "n_excluded": sum(1 for diag in diagnostics if diag.get("excluded")),
+        "excluded": {
+            diag["structure_id"]: diag["excluded"] for diag in diagnostics if diag.get("excluded")
+        },
+        "failures": {
+            diag["structure_id"]: diag["error"] for diag in diagnostics if diag.get("error")
+        },
+        "n_groups": int(frame["group_key"].nunique()),
+        "feature_columns": list(FEATURE_NAMES),
+        "output_csv": str(args.output_csv),
+    }
+    args.summary_json.parent.mkdir(parents=True, exist_ok=True)
+    args.summary_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    LOGGER.info(
+        "Wrote %d pockets from %d structures (%d groups): %d positive, %d negative, %d ambiguous",
+        len(frame),
+        summary.n_structures,
+        payload["n_groups"],
+        summary.n_positive,
+        summary.n_negative,
+        summary.n_ambiguous,
+    )
+    if np.isfinite(summary.site_recall):
+        LOGGER.info(
+            "Pocket-detector recall on known ligand sites: %.1f%% (%d/%d structures)",
+            100.0 * summary.site_recall,
+            summary.n_structures_with_site,
+            summary.n_structures_with_site + summary.n_structures_with_ligand_but_no_site,
+        )
+        if summary.site_recall < 0.8:
+            LOGGER.warning(
+                "Detector recall is below 80%%. Every missed site is unreachable by the "
+                "classifier, so this bounds the whole pipeline; consider lowering "
+                "--min-alpha-spheres."
+            )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

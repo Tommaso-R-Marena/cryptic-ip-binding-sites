@@ -23,6 +23,7 @@ except ImportError:
 
 @pytest.mark.integration
 @pytest.mark.skipif(not SKLEARN_AVAILABLE, reason="scikit-learn not installed")
+@pytest.mark.requires_network
 def test_end_to_end_pipeline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, validation_feature_set):
     """Download ADAR2 -> analyze -> train ML -> score batch -> run mocked MD -> make figures."""
 

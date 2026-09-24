@@ -17,10 +17,10 @@ jobs:
         python-version: ['3.10', '3.11']
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
@@ -42,7 +42,7 @@ jobs:
           flake8 cryptic_ip --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Cache validation structures
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: data/validation
           key: ci-validation-pdbs-v1
@@ -51,10 +51,8 @@ jobs:
         shell: bash -l {0}
         run: |
           mkdir -p data/validation tests/data/structures
+          python scripts/fetch_structures.py rcsb --out data/validation --require-all 1ZY7 1MAI
           for pdb in 1ZY7 1MAI; do
-            if [ ! -f "data/validation/${pdb}.pdb" ]; then
-              wget -q -O "data/validation/${pdb}.pdb" "https://files.rcsb.org/download/${pdb}.pdb"
-            fi
             cp "data/validation/${pdb}.pdb" "tests/data/structures/${pdb}.pdb"
           done
 
@@ -68,12 +66,25 @@ jobs:
           cryptic-ip validate --database tests/data/validation/example.db
           cryptic-ip validate --all --structure tests/data/validation/example.pdb --results tests/data/validation/example_results.csv --database tests/data/validation/example.db
 
+      - name: Offline pipeline self-check
+        shell: bash -l {0}
+        # Verifies the measurement path against synthetic structures whose burial
+        # follows from their construction. Needs no database access, so it fails
+        # only on a real defect.
+        run: cryptic-ip self-check --output-dir results/ci_self_check --n-structures 6
+
       - name: Run unit tests
         shell: bash -l {0}
         run: |
           pytest tests/ -v --cov=cryptic_ip --cov-report=term \
             -m "not requires_network and not slow" \
             --ignore=tests/integration
+
+      - name: Offline end-to-end pipeline test
+        shell: bash -l {0}
+        # Exercises structures -> features -> labels -> nested CV -> model card
+        # through the actual command-line scripts.
+        run: pytest tests/integration/test_synthetic_end_to_end.py -v
 
       - name: Run benchmark regression tests
         shell: bash -l {0}
@@ -86,10 +97,10 @@ jobs:
     timeout-minutes: 25
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           auto-update-conda: true
           python-version: '3.11'
@@ -105,7 +116,7 @@ jobs:
           python -m pip install pytest
 
       - name: Cache validation structures
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: data/validation
           key: ci-validation-pdbs-v1
@@ -114,15 +125,10 @@ jobs:
         shell: bash -l {0}
         run: |
           mkdir -p data/validation data/validation/raw/structures tests/data/structures
-          for pdb in 1ZY7 1MAI 1BWN 5HDT 5ICN; do
-            if [ ! -f "data/validation/${pdb}.pdb" ]; then
-              wget -q -O "data/validation/${pdb}.pdb" "https://files.rcsb.org/download/${pdb}.pdb"
-            fi
-          done
-          if [ ! -f data/validation/AF-P78563-F1-model_v6.pdb ]; then
-            wget -q -O data/validation/AF-P78563-F1-model_v6.pdb \
-              https://alphafold.ebi.ac.uk/files/AF-P78563-F1-model_v6.pdb
-          fi
+          python scripts/fetch_structures.py rcsb --out data/validation --require-all \
+            1ZY7 1MAI 1BWN 5HDT 5ICN
+          # The current AlphaFold release, whatever its version suffix.
+          python scripts/fetch_structures.py alphafold --out data/validation --require-all P78563
           python - <<'PY'
           import shutil
           from pathlib import Path
@@ -145,10 +151,10 @@ jobs:
     needs: test
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v3
+        uses: conda-incubator/setup-miniconda@v4
         with:
           auto-update-conda: true
           python-version: '3.11'
@@ -163,7 +169,7 @@ jobs:
           python -m pip install -e .
 
       - name: Cache validation structures
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: data/validation
           key: ci-validation-pdbs-v1
@@ -171,12 +177,7 @@ jobs:
       - name: Download control structures
         shell: bash -l {0}
         run: |
-          mkdir -p data/validation
-          for pdb in 1ZY7 1MAI; do
-            if [ ! -f "data/validation/${pdb}.pdb" ]; then
-              wget -q -O "data/validation/${pdb}.pdb" "https://files.rcsb.org/download/${pdb}.pdb"
-            fi
-          done
+          python scripts/fetch_structures.py rcsb --out data/validation --require-all 1ZY7 1MAI
 
       - name: Run publication package smoke test
         shell: bash -l {0}
@@ -194,10 +195,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -213,10 +214,10 @@ jobs:
     needs: [test, integration-test, publication-smoke]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 

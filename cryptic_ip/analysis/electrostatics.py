@@ -95,6 +95,7 @@ class ElectrostaticsCalculator:
         pdb_path: Union[str, Path],
         ph: float,
         output_dir: Union[str, Path],
+        forcefield: str = "PARSE",
     ) -> Path:
         """Generate a PQR file at a target pH using pdb2pqr."""
         pdb_path = Path(pdb_path)
@@ -104,7 +105,7 @@ class ElectrostaticsCalculator:
 
         cmd = [
             self.pdb2pqr_path,
-            "--ff=PARSE",
+            f"--ff={forcefield}",
             f"--with-ph={ph}",
             str(pdb_path),
             str(pqr_path),
@@ -120,11 +121,56 @@ class ElectrostaticsCalculator:
             raise RuntimeError(f"pdb2pqr did not create expected output: {pqr_path}")
         return pqr_path
 
-    def run_apbs(self, pqr_path: Union[str, Path], output_dir: Union[str, Path]) -> float:
-        """Run APBS and return a scalar electrostatic proxy value from stdout."""
+    @staticmethod
+    def _grid_geometry(
+        pqr_path: Path, focus_center: Optional[Sequence[float]], fine_length: float = 60.0
+    ) -> Tuple[str, str, str, str]:
+        """Coarse and fine grid lengths and centres for an APBS focusing run.
+
+        A fixed 80 A coarse / 60 A fine box centred on the molecule - the
+        previous setting - does not contain a large protein, so a pocket far
+        from the centre fell outside the fine grid and the sampler read the
+        boundary value instead. The coarse box now spans the molecule plus a
+        margin wide enough to hold the fine box wherever it is centred, and the
+        fine box is centred on the point of interest when one is given.
+        """
+        coords = []
+        with Path(pqr_path).open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if line.startswith(("ATOM", "HETATM")):
+                    parts = line[30:].split()
+                    try:
+                        coords.append([float(parts[0]), float(parts[1]), float(parts[2])])
+                    except (IndexError, ValueError):
+                        continue
+        if not coords:
+            return "80 80 80", "mol 1", f"{fine_length:g} {fine_length:g} {fine_length:g}", "mol 1"
+        arr = np.asarray(coords, dtype=float)
+        extent = arr.max(axis=0) - arr.min(axis=0)
+        coarse = np.maximum(extent + fine_length + 10.0, 80.0)
+        cglen = " ".join(f"{v:.1f}" for v in coarse)
+        cgcent = " ".join(f"{v:.3f}" for v in (arr.max(axis=0) + arr.min(axis=0)) / 2.0)
+        fgcent = "mol 1" if focus_center is None else " ".join(f"{float(v):.3f}" for v in focus_center)
+        return cglen, cgcent, f"{fine_length:g} {fine_length:g} {fine_length:g}", fgcent
+
+    def run_apbs(
+        self,
+        pqr_path: Union[str, Path],
+        output_dir: Union[str, Path],
+        focus_center: Optional[Sequence[float]] = None,
+    ) -> float:
+        """Run APBS and return a scalar electrostatic proxy value from stdout.
+
+        Args:
+            pqr_path: Input PQR.
+            output_dir: Where the input file and DX map are written.
+            focus_center: Centre of the fine grid (e.g. a pocket centre). The
+                fine grid is centred on the molecule when omitted.
+        """
         pqr_path = Path(pqr_path)
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
+        cglen, cgcent, fglen, fgcent = self._grid_geometry(pqr_path, focus_center)
 
         apbs_input = output_dir / f"{pqr_path.stem}.in"
         map_path = output_dir / f"{pqr_path.stem}.dx"
@@ -136,11 +182,11 @@ class ElectrostaticsCalculator:
                     "end",
                     "elec",
                     "    mg-auto",
-                    "    dime 65 65 65",
-                    "    cglen 80 80 80",
-                    "    fglen 60 60 60",
-                    "    cgcent mol 1",
-                    "    fgcent mol 1",
+                    "    dime 97 97 97",
+                    f"    cglen {cglen}",
+                    f"    fglen {fglen}",
+                    f"    cgcent {cgcent}",
+                    f"    fgcent {fgcent}",
                     "    mol 1",
                     "    lpbe",
                     "    bcfl sdh",
@@ -174,22 +220,29 @@ class ElectrostaticsCalculator:
         except subprocess.CalledProcessError as exc:
             raise RuntimeError(f"APBS failed for {pqr_path.name}: {exc.stderr.strip()}") from exc
 
+        # The energy is a by-product; the potential map is what the pipeline
+        # samples. APBS versions differ in where they print the energy (stdout
+        # or io.mc), so a missing energy line is not a failure - a missing map is.
         energy_match = re.search(
             r"Global net ELEC energy\s*=\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)",
             result.stdout,
         )
-        if not energy_match:
-            raise RuntimeError("APBS output did not include 'Global net ELEC energy'.")
+        if not energy_match and not map_path.exists():
+            tail = "\n".join((result.stdout + result.stderr).strip().splitlines()[-15:])
+            raise RuntimeError(f"APBS produced neither an energy nor a potential map:\n{tail}")
 
-        return float(energy_match.group(1))
+        return float(energy_match.group(1)) if energy_match else float("nan")
 
     def run_apbs_with_map(
-        self, pqr_path: Union[str, Path], output_dir: Union[str, Path]
+        self,
+        pqr_path: Union[str, Path],
+        output_dir: Union[str, Path],
+        focus_center: Optional[Sequence[float]] = None,
     ) -> Tuple[float, Path]:
-        """Run APBS and return scalar energy plus the potential DX map path."""
+        """Run APBS and return scalar energy (``nan`` if unreported) and the DX map path."""
         pqr_path = Path(pqr_path)
         output_dir = Path(output_dir)
-        energy = self.run_apbs(pqr_path, output_dir)
+        energy = self.run_apbs(pqr_path, output_dir, focus_center=focus_center)
         map_path = output_dir / f"{pqr_path.stem}.dx"
         if not map_path.exists():
             raise RuntimeError(f"APBS potential map not found: {map_path}")
@@ -206,28 +259,52 @@ class ElectrostaticsCalculator:
         deltas = []
         values: List[float] = []
 
+        # APBS writes the header as, e.g.
+        #   object 1 class gridpositions counts 65 65 65
+        #   origin ...
+        #   delta ... (x3)
+        #   object 2 class gridconnections counts 65 65 65
+        #   object 3 class array type double rank 0 items 274625 data follows
+        # The grid shape is read from the "gridpositions counts" record and the
+        # values start after "data follows". Matching bare "counts" or an exact
+        # "object 3 class array" line - as this parser once did - never matches
+        # real APBS output, so every map failed to parse.
         with dx_path.open("r", encoding="utf-8") as handle:
             in_data = False
             for line in handle:
                 stripped = line.strip()
-                if stripped.startswith("counts"):
-                    counts = [int(x) for x in stripped.split()[1:4]]
+                if in_data:
+                    if not stripped or stripped.startswith(("attribute", "object", "#")):
+                        break
+                    values.extend(float(x) for x in stripped.split())
+                    continue
+                if stripped.startswith("#") or not stripped:
+                    continue
+                if "gridpositions" in stripped and "counts" in stripped:
+                    tokens = stripped.split()
+                    at = tokens.index("counts")
+                    counts = [int(x) for x in tokens[at + 1 : at + 4]]
                 elif stripped.startswith("origin"):
                     origin = np.asarray([float(x) for x in stripped.split()[1:4]], dtype=float)
                 elif stripped.startswith("delta"):
                     deltas.append(np.asarray([float(x) for x in stripped.split()[1:4]], dtype=float))
-                elif stripped == "object 3 class array":
+                elif "class array" in stripped and "data follows" in stripped:
                     in_data = True
-                    continue
-                elif in_data:
-                    if stripped.startswith("attribute") or stripped.startswith("object"):
-                        break
-                    values.extend(float(x) for x in stripped.split())
 
         if counts is None or origin is None or len(deltas) < 3:
             raise RuntimeError(f"Unable to parse DX grid metadata from {dx_path}")
+        if len(values) != counts[0] * counts[1] * counts[2]:
+            raise RuntimeError(
+                f"DX map {dx_path} holds {len(values)} values for a "
+                f"{counts[0]}x{counts[1]}x{counts[2]} grid"
+            )
 
-        grid = np.asarray(values, dtype=float).reshape(counts[2], counts[1], counts[0])
+        # OpenDX as APBS writes it lists values with z varying fastest and x
+        # slowest, so the array is (nx, ny, nz) and indexed [ix, iy, iz].
+        # Reading it as x-fastest transposes x and z: on APBS's cubic grids the
+        # shape still fits, so the error is silent - the potential "at" a pocket
+        # centre is read from the x<->z mirror point.
+        grid = np.asarray(values, dtype=float).reshape(counts[0], counts[1], counts[2])
         xs = origin[0] + np.arange(counts[0]) * deltas[0][0]
         ys = origin[1] + np.arange(counts[1]) * deltas[1][1]
         zs = origin[2] + np.arange(counts[2]) * deltas[2][2]
@@ -241,6 +318,16 @@ class ElectrostaticsCalculator:
 
         xs, ys, zs, grid = self.parse_dx_grid(dx_path)
         x, y, z = (float(point[0]), float(point[1]), float(point[2]))
+        # Outside the grid there is no measurement. Clamping to the edge - as
+        # this method once did - returns the boundary value as if it had been
+        # measured at the point.
+        tolerance = 1e-6
+        for value, axis, name in ((x, xs, "x"), (y, ys, "y"), (z, zs, "z")):
+            if value < axis[0] - tolerance or value > axis[-1] + tolerance:
+                raise ValueError(
+                    f"{name}={value:.2f} lies outside the potential map "
+                    f"({axis[0]:.2f} to {axis[-1]:.2f}); refocus the grid on this point"
+                )
 
         ix = int(np.clip(np.searchsorted(xs, x) - 1, 0, len(xs) - 2))
         iy = int(np.clip(np.searchsorted(ys, y) - 1, 0, len(ys) - 2))
@@ -253,14 +340,14 @@ class ElectrostaticsCalculator:
         ty = 0.0 if y1 == y0 else (y - y0) / (y1 - y0)
         tz = 0.0 if z1 == z0 else (z - z0) / (z1 - z0)
 
-        c000 = grid[iz, iy, ix]
-        c100 = grid[iz, iy, ix + 1]
-        c010 = grid[iz, iy + 1, ix]
-        c110 = grid[iz, iy + 1, ix + 1]
-        c001 = grid[iz + 1, iy, ix]
-        c101 = grid[iz + 1, iy, ix + 1]
-        c011 = grid[iz + 1, iy + 1, ix]
-        c111 = grid[iz + 1, iy + 1, ix + 1]
+        c000 = grid[ix, iy, iz]
+        c100 = grid[ix + 1, iy, iz]
+        c010 = grid[ix, iy + 1, iz]
+        c110 = grid[ix + 1, iy + 1, iz]
+        c001 = grid[ix, iy, iz + 1]
+        c101 = grid[ix + 1, iy, iz + 1]
+        c011 = grid[ix, iy + 1, iz + 1]
+        c111 = grid[ix + 1, iy + 1, iz + 1]
 
         c00 = c000 * (1 - tx) + c100 * tx
         c01 = c001 * (1 - tx) + c101 * tx

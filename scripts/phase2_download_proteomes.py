@@ -31,6 +31,12 @@ def main():
         help='Data directory for structures'
     )
     
+    parser.add_argument(
+        '--yes', '-y',
+        action='store_true',
+        help='Do not ask for confirmation (for CI and batch jobs)'
+    )
+
     args = parser.parse_args()
     
     # Expand 'all' option
@@ -54,11 +60,10 @@ def main():
         total_size += info['size_gb']
     
     print(f"\nTotal estimated size: ~{total_size} GB")
-    print("\nNote: Downloads may take several hours depending on connection speed\n")
+    print("\nArchives are fetched in parallel byte ranges and only PDB models are extracted.\n")
     
     # Confirm
-    response = input("Proceed with downloads? [y/N]: ")
-    if response.lower() != 'y':
+    if not args.yes and input("Proceed with downloads? [y/N]: ").lower() != 'y':
         print("Download cancelled")
         return 0
     

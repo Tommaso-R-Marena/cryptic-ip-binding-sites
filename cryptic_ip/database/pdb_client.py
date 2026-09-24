@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Dict, Optional, List
 import json
 
+from .async_fetch import FetchJob, fetch_all
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,30 +44,20 @@ class PDBClient:
         pdb_id = pdb_id.upper()
         filename = f"{pdb_id}.{format}"
         cached_file = self.cache_dir / filename
-        
-        if cached_file.exists():
-            logger.info(f"Using cached structure: {cached_file}")
-            return cached_file
-        
-        # Download
         url = f"{self.BASE_URL}/download/{pdb_id}.{format}"
-        logger.info(f"Downloading {pdb_id} from RCSB PDB: {url}")
-        
-        try:
-            response = self.session.get(url, timeout=30)
-            response.raise_for_status()
-            
-            with open(cached_file, 'wb') as f:
-                f.write(response.content)
-            
-            logger.info(f"Downloaded structure to {cached_file}")
+
+        # Retried, checked to be a complete coordinate file, written atomically,
+        # and a cached file that fails the check (a cut-off download) is
+        # fetched again rather than reused.
+        (result,) = fetch_all([FetchJob(pdb_id, url, cached_file)], concurrency=1)
+        if result.ok:
+            if not result.from_cache:
+                logger.info(f"Downloaded structure to {cached_file}")
             return cached_file
-            
-        except requests.HTTPError as e:
-            if e.response.status_code == 404:
-                raise ValueError(f"PDB ID {pdb_id} not found")
-            raise
-    
+        if result.not_found:
+            raise ValueError(f"PDB ID {pdb_id} not found")
+        raise ConnectionError(f"Could not download {pdb_id} from RCSB: {result.error}")
+
     def get_entry_info(self, pdb_id: str) -> Dict:
         """Fetch PDB entry metadata.
         

@@ -1,0 +1,192 @@
+name: Transfer secondary
+
+# docs/TRANSFER_PLAN_AMENDMENT_1.md: T1b/T2b - the transfer plan's hull-depth
+# comparisons with the single dominant strict group removed. On demand, against
+# a finished transfer run's table. Stops at "not evaluable" when any remaining
+# largest-group share exceeds 40 %.
+
+on:
+  # A push registers the workflow (dispatch-only files on a non-default branch
+  # cannot be dispatched until they have run) and runs it on the default table.
+  push:
+    # Analyses, not tests: on main they run on demand only, so merging
+    # does not re-derive every recorded result.
+    branches-ignore:
+      - main
+    paths:
+      - 'scripts/transfer_secondary.py'
+      - 'docs/TRANSFER_PLAN_AMENDMENT_1.md'
+      - '.github/workflows/transfer-secondary.yml'
+  workflow_dispatch:
+    inputs:
+      transfer_run:
+        description: 'transfer run id holding transfer-table and transfer-dataset'
+        default: '35972729955'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: transfer-secondary-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TRANSFER_RUN: ${{ inputs.transfer_run || '35972729955' }}
+
+jobs:
+  drop:
+    name: Drop the dominant group
+    runs-on: ubuntu-latest
+    outputs:
+      evaluable: ${{ steps.drop.outputs.evaluable }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Transfer table
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$TRANSFER_RUN" --repo "$GITHUB_REPOSITORY" --name transfer-table --dir transfer
+          gh run download "$TRANSFER_RUN" --repo "$GITHUB_REPOSITORY" --name transfer-dataset --dir transfer
+          sha256sum transfer/table.csv.gz
+      - id: drop
+        name: Drop and recompute
+        run: |
+          set +e
+          python scripts/transfer_secondary.py --table transfer/table.csv.gz \
+            --summary transfer/prepare_summary.json --entries transfer/entries_grouped.csv \
+            --out-dir secondary
+          code=$?
+          set -e
+          if [ "$code" = "0" ]; then echo "evaluable=true" >> "$GITHUB_OUTPUT";
+          elif [ "$code" = "3" ]; then echo "evaluable=false" >> "$GITHUB_OUTPUT"; echo "T1b/T2b: not evaluable";
+          else exit "$code"; fi
+          head -40 secondary/removed_entries.csv || true
+      - uses: actions/upload-artifact@v6
+        with:
+          name: secondary-table
+          path: secondary
+          retention-days: 90
+
+  plan:
+    name: Plan
+    needs: drop
+    if: needs.drop.outputs.evaluable == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      runs: ${{ steps.plan.outputs.runs }}
+    steps:
+      - id: plan
+        shell: python
+        run: |
+          import json, os
+          runs = []
+          for task in ["cryptic_ip_site", "burial"]:
+              for arm in ["full", "no_hull_depth"]:
+                  for r in [0, 1, 2]:
+                      runs.append({"task": task, "arm": arm, "grouping": "sequence", "repeat": r,
+                                   "holdout": r == 0, "permute": False})
+                  runs.append({"task": task, "arm": arm, "grouping": "strict", "repeat": 0,
+                               "holdout": False, "permute": False})
+              for r in range(10):
+                  runs.append({"task": task, "arm": "full", "grouping": "sequence", "repeat": r,
+                               "holdout": False, "permute": True})
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              fh.write(f"runs={json.dumps({'include': runs})}\n")
+
+  evaluate:
+    name: ${{ matrix.task }} ${{ matrix.arm }} ${{ matrix.grouping }} r${{ matrix.repeat }}${{ matrix.permute && ' permuted' || '' }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.runs) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: secondary-table
+          path: secondary
+      - name: Evaluate
+        run: |
+          flags=()
+          if [ "${{ matrix.holdout }}" = "true" ]; then flags+=(--holdout); fi
+          if [ "${{ matrix.permute }}" = "true" ]; then flags+=(--permute); fi
+          python scripts/benchmark.py run --table secondary/table.csv.gz \
+            --task ${{ matrix.task }} --arm ${{ matrix.arm }} --grouping ${{ matrix.grouping }} \
+            --repeat ${{ matrix.repeat }} --n-draws 10 --out-dir predictions "${flags[@]}"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ${{ (matrix.permute && matrix.repeat > 0) && 'secondary-null' || 'secondary-predictions' }}-${{ matrix.task }}-${{ matrix.arm }}-${{ matrix.grouping }}-${{ matrix.repeat }}-${{ matrix.permute }}
+          path: predictions
+          retention-days: 90
+
+  compare:
+    name: Compare, null and decisions
+    needs: evaluate
+    if: ${{ !cancelled() && needs.evaluate.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: secondary-table
+          path: secondary
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: secondary-predictions-*
+          path: predictions
+          merge-multiple: true
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: secondary-predictions-*-true
+          path: nulldist
+          merge-multiple: true
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: secondary-null-*
+          path: nulldist
+          merge-multiple: true
+      - name: Compare
+        run: |
+          python scripts/benchmark.py compare --predictions-dir predictions \
+            --prepare-summary secondary/prepare_summary.json --out-dir report
+          python scripts/permutation_null.py --predictions-dir nulldist --output report/permutation_null.json
+          python scripts/transfer.py decide --report report/benchmark_report.json \
+            --null report/permutation_null.json --output report/transfer_decisions.json
+          echo "(T1/T2 in these tables are T1b/T2b: docs/TRANSFER_PLAN_AMENDMENT_1.md)"
+          echo "BEGIN_REPORT_JSON"
+          python -c "import json; print(json.dumps(json.load(open('report/benchmark_report.json')), separators=(',', ':')))"
+          echo "END_REPORT_JSON"
+          cat report/REPORT.md report/permutation_null.md report/transfer_decisions.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: secondary-report
+          path: report
+          retention-days: 90

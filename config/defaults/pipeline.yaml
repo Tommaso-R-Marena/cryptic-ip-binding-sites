@@ -11,6 +11,55 @@ pipeline:
   float_tolerance: 1.0e-6
   output_precision_decimals: 6
 
+# Burial measurement. Thresholds apply to relative SASA - the fraction of the
+# ligand's own surface still reachable by solvent - which is invariant to ligand
+# size and to how many copies a crystal contained. See docs/METHODS.md.
+burial:
+  cryptic_relative_sasa_max: 0.05
+  semi_cryptic_relative_sasa_max: 0.25
+  exposed_atom_sasa: 5.0        # Atom SASA (A^2) counting as molecular surface
+  min_contacts_for_site: 8      # Fewer contacts => probable crystallisation additive
+  contact_cutoff: 4.5
+  coordination_cutoff: 4.0
+  sasa_points_per_atom: 512     # Shrake-Rupley sampling density
+
+# Pocket labelling from observed ligand positions. The band between the two
+# overlap thresholds is excluded from training rather than called negative.
+labeling:
+  overlap_contact_distance: 4.0
+  positive_overlap: 0.30
+  negative_overlap: 0.05
+  require_cryptic: false
+
+# Model training. Splits are grouped by protein so no protein appears on both
+# sides of a fold; hyperparameters are chosen in an inner loop the reported
+# metrics never see.
+model:
+  group_column: group_key
+  n_splits: 5
+  inner_splits: 3
+  n_search_iter: 40
+  n_bootstrap: 2000
+  scoring: average_precision
+  threshold_objective: mcc
+  calibrate: true
+  calibration_fraction: 0.25
+  candidates:
+    - logistic_regression
+    - random_forest
+    - extra_trees
+    - hist_gradient_boosting
+    - xgboost
+
+# Ground-truth collection from the RCSB.
+data_acquisition:
+  experimental_methods: null    # null accepts every method, including cryo-EM
+  max_resolution: null
+  n_decoys: 500                 # Protein-level negatives with no IP ligand
+  decoy_max_resolution: 2.0
+  include_unphosphorylated: false
+  download_workers: 4
+
 provenance:
   log_inputs: true
   log_outputs: true

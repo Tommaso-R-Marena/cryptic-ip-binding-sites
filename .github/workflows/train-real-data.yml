@@ -1,0 +1,187 @@
+name: Train on Real Data
+
+# Retrains the pocket classifier on deposited inositol phosphate complexes and
+# publishes the model, its evaluation and its training features as artifacts.
+#
+# This runs here rather than in a development container because it needs bulk
+# access to the RCSB, and because the model it produces is the artifact that
+# ships: anyone should be able to regenerate it from a versioned workflow.
+#
+# Two questions are trained side by side, because they differ in kind:
+#
+#   ip_site          Is this pocket an inositol phosphate binding site at all?
+#                    Every pocket that holds a ligand copy is a positive.
+#   cryptic_ip_site  Is it a *buried* one - the target of this project?
+#                    Only pockets holding a cryptic copy are positive; pockets
+#                    holding a surface copy are excluded as ambiguous rather
+#                    than counted as negatives.
+#
+# The second is the scientifically interesting task and the harder one: the
+# burial survey finds only about 14 cryptic entries among 135, so its intervals
+# will be wide. Reporting both keeps that from being hidden.
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only, so merging
+    # does not re-derive every recorded result.
+    branches-ignore:
+      - main
+    paths:
+      - 'scripts/train_ml_classifier.py'
+      - 'scripts/extract_pocket_features.py'
+      - 'cryptic_ip/analysis/ml_classifier.py'
+      - 'cryptic_ip/analysis/features.py'
+      - 'cryptic_ip/analysis/labeling.py'
+      - 'cryptic_ip/analysis/inositol_detection.py'
+      - 'cryptic_ip/analysis/structure_arrays.py'
+      - 'cryptic_ip/analysis/analyzer.py'
+      - 'data/validation/ip_binding_validation_dataset.csv'
+      - '.github/workflows/train-real-data.yml'
+  workflow_dispatch:
+    inputs:
+      n_search_iter:
+        description: 'Randomised-search budget per inner loop'
+        required: false
+        default: '20'
+      n_bootstrap:
+        description: 'Group-bootstrap resamples for confidence intervals'
+        required: false
+        default: '1000'
+
+concurrency:
+  group: train-real-data-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  train:
+    name: Train (${{ matrix.task }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - task: ip_site
+            extract_flags: ''
+          - task: cryptic_ip_site
+            extract_flags: '--require-cryptic'
+          # Same task, descriptors computed with the ligand still bound. It
+          # exists only to measure the leak: on a holo structure the ligand
+          # covers its own pocket, so the model can learn "occupied" - a signal
+          # no apo AlphaFold model has. The gap between this and ip_site is how
+          # much that inflated the earlier result.
+          - task: ip_site_holo
+            extract_flags: '--holo-descriptors'
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          # The post-job cleanup prints a line per package and buries the
+          # diagnostic output this job exists to produce.
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda,defaults
+
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge fpocket freesasa pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+
+      - name: Cache structures
+        uses: actions/cache@v5
+        with:
+          # Shared with the burial survey, which downloads the same entries.
+          path: data/validation/raw/structures
+          key: burial-survey-structures-v1
+
+      - name: Download dataset structures
+        shell: bash -l {0}
+        # Concurrent, retried, validated and written atomically; legacy PDB
+        # preferred (the format every entry here has), mmCIF when an entry has
+        # none. An entry that cannot be fetched is reported in the manifest and
+        # the run continues: the analysis reports on what it could measure.
+        run: |
+          python scripts/fetch_structures.py rcsb \
+            --out data/validation/raw/structures \
+            --ids-csv data/validation/ip_binding_validation_dataset.csv --column pdb_id
+
+      - name: Extract pocket features and labels
+        shell: bash -l {0}
+        run: |
+          mkdir -p results/training/${{ matrix.task }}
+          python scripts/extract_pocket_features.py \
+            --structures-dir data/validation/raw/structures \
+            --entry-csv data/validation/ip_binding_validation_dataset.csv \
+            --output-csv results/training/${{ matrix.task }}/pocket_features.csv \
+            --cache-dir results/training/${{ matrix.task }}/feature_cache \
+            --summary-json results/training/${{ matrix.task }}/labeling_summary.json \
+            --sasa-points 256 \
+            --jobs 4 \
+            ${{ matrix.extract_flags }}
+
+      - name: Train and evaluate
+        shell: bash -l {0}
+        run: |
+          python scripts/train_ml_classifier.py \
+            --features-csv results/training/${{ matrix.task }}/pocket_features.csv \
+            --work-dir results/training/${{ matrix.task }} \
+            --model-dir results/training/${{ matrix.task }}/model \
+            --model-name cryptic_ip_classifier_${{ matrix.task }} \
+            --n-splits 5 \
+            --inner-splits 3 \
+            --n-search-iter "${{ github.event.inputs.n_search_iter || '20' }}" \
+            --n-bootstrap "${{ github.event.inputs.n_bootstrap || '1000' }}"
+
+      - name: Upload training results
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: training-${{ matrix.task }}
+          path: |
+            results/training/${{ matrix.task }}
+            !results/training/${{ matrix.task }}/feature_cache
+          if-no-files-found: warn
+
+      - name: Training digest
+        shell: bash -l {0}
+        # Last on purpose, so the result is reachable from a short log tail and
+        # lands in the run summary.
+        if: always()
+        continue-on-error: true
+        run: |
+          {
+            echo "## Training: ${{ matrix.task }}"
+            echo
+            summary=results/training/${{ matrix.task }}/labeling_summary.json
+            if [ -f "$summary" ]; then
+              python - "$summary" <<'PY'
+          import json, sys
+          s = json.load(open(sys.argv[1]))
+          keep = [k for k in s if not isinstance(s[k], (dict, list))]
+          print("### Labels\n")
+          print("| field | value |")
+          print("| --- | --- |")
+          for k in keep:
+              print(f"| {k} | {s[k]} |")
+          print()
+          PY
+            else
+              echo "_no labelling summary produced_"
+            fi
+            for f in model_comparison.md ml_vs_threshold_comparison.md; do
+              path=results/training/${{ matrix.task }}/$f
+              if [ -f "$path" ]; then
+                echo "### ${f%.md}"
+                echo
+                cat "$path"
+                echo
+              fi
+            done
+          } | tee -a "$GITHUB_STEP_SUMMARY"

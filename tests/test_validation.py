@@ -13,8 +13,9 @@ class TestValidationSuite:
         assert suite.data_dir.exists()
 
     @pytest.mark.slow
+    @pytest.mark.requires_network
     def test_tier1_controls_offline(self):
-        """Run tier-1 controls when structures are cached."""
+        """Run tier-1 controls when structures are cached or downloadable."""
         suite = ValidationSuite(data_dir="data/validation", use_electrostatics=False)
         pos = suite.validate_positive_control("ADAR2", suite.POSITIVE_CONTROLS["ADAR2"])
         neg = suite.validate_negative_control("PLCd1_PH", suite.NEGATIVE_CONTROLS["PLCd1_PH"])

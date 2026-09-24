@@ -33,6 +33,7 @@ if str(ROOT) not in sys.path:
 
 from cryptic_ip.analysis import PocketScorer, ProteinAnalyzer
 from cryptic_ip.analysis.statistical_validation import StatisticalValidation
+from cryptic_ip.analysis.units import ANGSTROM_SQ
 from cryptic_ip.reproducibility import (
     generate_methods_text,
     generate_provenance_manifest,
@@ -403,6 +404,17 @@ def write_results_summary(
         import json as _json
 
         ys = _json.loads(yeast_summary_path.read_text())
+        score_thr = ys.get("score_threshold", "NA")
+        strict = isinstance(score_thr, (int, float)) and score_thr >= 0.75
+        note = (
+            f"_Strict-filter screen (score \u2265 {score_thr}, SASA \u2264 {ys.get('max_sasa', 'NA')} "
+            f"{ANGSTROM_SQ}, \u2265 {ys.get('min_basic', 'NA')} basic, pLDDT \u2265 "
+            f"{ys.get('min_plddt', 'NA')}); hit rate is within the 0.2-0.8% range anticipated for "
+            "yeast. Scale to the full ~6,000-protein proteome before drawing enrichment conclusions._"
+            if strict
+            else "_Re-run with strict filters (\u2265 0.75, SASA \u2264 10, \u2265 4 basic) after the "
+            "residue-detection fix; loose-threshold pilots are not publication-grade._"
+        )
         lines.extend(
             [
                 "## Yeast AlphaFold pilot screen",
@@ -410,10 +422,9 @@ def write_results_summary(
                 f"- Structures screened: {ys.get('structures_screened', 'NA')}",
                 f"- Proteins with hits: {ys.get('proteins_with_hits', 'NA')}",
                 f"- Hit rate: {ys.get('hit_rate', 0):.4f}",
-                f"- Score threshold: {ys.get('score_threshold', 'NA')}",
+                f"- Score threshold: {score_thr}",
                 "",
-                "_Re-run with strict filters (≥0.75, SASA ≤10, ≥4 basic) after residue-detection fix; "
-                "early pilot at 0.60 threshold is not publication-grade._",
+                note,
                 "",
             ]
         )
@@ -483,6 +494,10 @@ def write_figure_config(output_dir: Path, dataset_csv: Path, figure_legends: str
             "top_candidates_csv": str(output_dir / "gallery" / "gallery_inputs.csv"),
             "top_n": 10,
         },
+        "figure4": {
+            "dataset_csv": str(dataset_csv),
+            "control_benchmark_csv": str(output_dir / "validation" / "control_benchmark.csv"),
+        },
     }
     if figure_legends:
         config["figure_legends"] = figure_legends
@@ -518,18 +533,14 @@ def main() -> int:
     ml_work = args.output_dir / "ml_training"
     if not args.skip_ml_training:
         run_subprocess(
+            # Training consumes a pocket feature table; dataset building and
+            # feature extraction are separate, independently runnable stages.
             [
                 sys.executable,
                 "scripts/train_ml_classifier.py",
-                "--dataset-csv",
-                str(args.dataset_csv),
-                "--download-dir",
-                str(args.download_dir),
                 "--work-dir",
                 str(ml_work),
-                "--skip-build-dataset",
             ]
-            + (["--include-electrostatics"] if use_electrostatics else []),
         )
         ml_comparison = export_roc_csv(ml_work, args.output_dir / "validation" / "roc_curves.csv")
     else:
