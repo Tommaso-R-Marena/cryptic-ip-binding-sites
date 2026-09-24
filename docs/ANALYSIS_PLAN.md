@@ -163,3 +163,21 @@ underpowered; it can then neither support nor refute.
 All numbers above are produced by CI from the committed code; the report links
 the run. Any deviation from this plan is listed with its reason in the report,
 next to the result it affects.
+
+## Amendments
+
+Each amendment is made before any result of the full analysis exists and is
+recorded with its reason. Smoke runs permute every label and cannot inform
+them.
+
+**1. Size limit (2026-09-24, after the blind smoke run, before the full run).**
+Section 2 excluded entries with more than 60,000 protein heavy atoms. In the
+smoke run's first 60 search hits, every entry - all recent cryo-EM assemblies,
+69,000 to 116,000 protein heavy atoms - was excluded, so the rule would have
+removed a large, non-random share of the data: the multi-protein assemblies in
+which inositol phosphates act as structural cofactors. The limit becomes the
+pipeline's technical one: an entry is excluded when its **polymer atoms exceed
+99,999**, the most the PDB-format ligand-free copy that fpocket reads can hold.
+Every exclusion is still counted and reported. Smoke runs now draw a seeded
+random sample of entries rather than the first search hits, so they exercise
+structures of every size.

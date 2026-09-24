@@ -12,7 +12,7 @@ name: Benchmark
 #              permutation controls; paired arms share every seed
 #   compare    intervals, paired ablations and the plan's decisions
 #
-# MODE=smoke runs 60 entries with every label permuted: it exercises the whole
+# MODE=smoke runs a seeded sample of 60 entries with every label permuted: it exercises the whole
 # pipeline and cannot reveal anything about the hypotheses. MODE=full is the
 # pre-registered analysis.
 
@@ -101,7 +101,7 @@ jobs:
         shell: bash -l {0}
         run: |
           limit=()
-          if [ "${{ needs.plan.outputs.max_entries }}" != "0" ]; then limit=(--max-entries "${{ needs.plan.outputs.max_entries }}"); fi
+          if [ "${{ needs.plan.outputs.max_entries }}" != "0" ]; then limit=(--sample-entries "${{ needs.plan.outputs.max_entries }}"); fi
           python scripts/build_ip_validation_dataset.py --metadata-only \
             --experimental-methods "X-RAY DIFFRACTION" "ELECTRON MICROSCOPY" \
             --max-resolution 3.5 "${limit[@]}" \
@@ -202,7 +202,7 @@ jobs:
             --output-csv results/benchmark/pockets/pockets_${{ matrix.shard }}.csv \
             --cache-dir /tmp/feature_cache \
             --summary-json results/benchmark/pockets/summary_${{ matrix.shard }}.json \
-            --max-protein-atoms 60000 \
+            --max-protein-atoms 99999 \
             --shard-index ${{ matrix.shard }} --shard-count ${{ strategy.job-total }} \
             --sasa-points 256 --jobs "$(nproc)"
 

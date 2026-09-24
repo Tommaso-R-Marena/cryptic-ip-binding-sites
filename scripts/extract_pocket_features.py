@@ -128,7 +128,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         type=int,
         default=None,
         help=(
-            "Exclude structures with more protein heavy atoms than this; each "
+            "Exclude structures with more polymer atoms than this; each "
             "exclusion is recorded in the summary, never dropped silently"
         ),
     )
@@ -223,11 +223,13 @@ def process_structure(
     try:
         cap = options.get("max_protein_atoms")
         if cap:
+            # The apo copy holds every polymer atom, and is written in PDB format;
+            # the cap counts exactly what it would have to hold.
             arrays = load_structure_arrays(path)
-            n_protein = int(np.sum(arrays.is_polymer & (arrays.elements != "H")))
-            diagnostics["n_protein_heavy_atoms"] = n_protein
-            if n_protein > int(cap):
-                diagnostics["excluded"] = f"{n_protein} protein heavy atoms > {int(cap)}"
+            n_polymer = int(np.sum(arrays.is_polymer))
+            diagnostics["n_polymer_atoms"] = n_polymer
+            if n_polymer > int(cap):
+                diagnostics["excluded"] = f"{n_polymer} polymer atoms > {int(cap)}"
                 return structure_id, [], diagnostics
         # Labels always come from the deposited (holo) structure: they need to
         # know where the ligand sits.

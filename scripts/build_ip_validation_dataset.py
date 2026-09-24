@@ -207,6 +207,16 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="Include free inositols (InsP0) as reference ligands",
     )
     parser.add_argument(
+        "--sample-entries",
+        type=int,
+        default=None,
+        help=(
+            "Keep a seeded random sample of this many entries (for smoke runs); unlike "
+            "--max-entries it does not take whatever the search lists first"
+        ),
+    )
+    parser.add_argument("--sample-seed", type=int, default=20260924)
+    parser.add_argument(
         "--metadata-only",
         action="store_true",
         help=(
@@ -426,6 +436,11 @@ def build_dataset(args: argparse.Namespace) -> Dict[str, Any]:
     target_comp_ids = list(ligand_comp_ids(ligands))
 
     entries, decoys = collect_entries(client, ligands, args)
+    if getattr(args, "sample_entries", None):
+        import random
+
+        entries = sorted(random.Random(args.sample_seed).sample(sorted(entries), min(args.sample_entries, len(entries))))
+        LOGGER.info("Sampled %d entries (seed %d)", len(entries), args.sample_seed)
     all_ids = list(entries) + list(decoys)
     if not all_ids:
         raise RcsbUnavailableError("Search returned no entries; nothing to build.")
