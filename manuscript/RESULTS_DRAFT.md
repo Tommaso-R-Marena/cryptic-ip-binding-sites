@@ -128,26 +128,63 @@ class and labelled its pockets — including the true inositol phosphate sites �
 as negatives, leaving 5 positives among 12,190 pockets. It measured the
 labelling defect and says nothing about how learnable the problem is.
 
-*[To be replaced: the figures in this paragraph come from an evaluation later
-found to leak - cross-validation folds that did not separate entries of the same
-protein or its homologues, B-factor descriptors that encode the removed ligand,
-and thresholds and model choice fitted on the reported predictions. They
-overstate performance. The pre-registered benchmark (docs/ANALYSIS_PLAN.md)
-replaces them.]*
+### Finding inositol phosphate sites generalises to new protein families
 
-Trained on the corrected labels, with descriptors computed on ligand-free
-structures and nested cross-validation grouped by protein, an extremely
-randomised trees classifier identifies the pocket that holds the inositol
-phosphate with ROC-AUC **0.975** (95 % CI 0.960–0.986) and PR-AUC **0.786**
-(0.724–0.840) across 136 entries, against 0.934 and 0.497 for the rule-based
-score (DeLong p = 4 × 10⁻⁸). Leaving the ligand in place while computing
-descriptors inflates both (0.982 / 0.832), because the ligand occludes its own
-pocket; the effect is small for the learned model and larger for the rule-based
-score. For the narrower task of finding *cryptic* sites the data are thin - 32
-positive pockets in 13 structures - and the learned model (0.937, 0.869–0.992)
-is not distinguishable from the rule-based score (0.953; p = 0.47). Neither
-task is a proteome-screen precision: both are measured within proteins already
-known to bind an inositol phosphate.
+To test this without leakage we built a pre-registered benchmark (`docs/ANALYSIS_PLAN.md`).
+
+**Data.**
+
+- Every X-ray or cryo-EM entry in the PDB at 3.5 Å or better that holds an inositol
+  phosphate: 367 measurable entries and 78,920 pockets, with descriptors computed on
+  ligand-free structures.
+- Homology groups from MMseqs2 sequence links, and a stricter grouping that adds
+  Foldseek structural links.
+- A temporal holdout: the protein families released last, 21 entries in 8 families,
+  set aside before any model was fitted.
+
+**Leak controls.**
+
+- Cross-validation is nested and grouped by homology, and the model family,
+  hyperparameters, threshold and calibration are all chosen inside it.
+- B-factor descriptors are excluded by an assertion in code.
+- Every interval resamples whole homology groups.
+
+**Result.**
+
+- Cross-validation: the learned model identifies the pocket holding the inositol
+  phosphate with ROC-AUC **0.951** (95 % CI 0.932–0.966) under sequence grouping and
+  **0.929** (0.907–0.954) under strict grouping. The rule-based score gets 0.879.
+- Holdout: the locked model reaches **0.871** (0.782–0.932) against 0.730 for the
+  rule-based score, a paired difference of **+0.141** (0.033–0.200).
+- The same pipeline with shuffled labels scores 0.491 (0.477–0.509).
+
+An earlier figure of 0.975 for this task came from a smaller evaluation (136 entries)
+that let homologues straddle folds and read B-factors. The sets differ, so the
+comparison is approximate: that figure sits about 0.03 above this cross-validation
+and about 0.10 above performance on genuinely new families.
+
+**Which physics carries the signal.** We fixed a predicted direction for every
+descriptor before computing any of them, and corrected for testing 82 of them at once.
+
+- The electrostatic potential at the pocket centre ranks the true site first in 43 %
+  of structures, against 4 % by chance.
+- Counts of basic residues and basic nitrogens come next.
+- Three descriptors chosen by a pre-set rule all replicate on the holdout:
+  - basic nitrogens: ROC-AUC 0.78 (0.66–0.85);
+  - electropositive enclosure: 0.77 (0.63–0.83);
+  - Arg + Lys count: 0.69 (0.58–0.83).
+- None of them beats the rule-based score. Inositol phosphate sites are found by their
+  positive charge, as expected; what the benchmark adds is that this holds in protein
+  families never seen in development.
+
+**Buried sites cannot be benchmarked from the PDB.** The PDB's 60 buried-site
+pockets come from about six independent families, and one family holds 87 % of them.
+By the rule we fixed in advance, no cross-validated estimate on such data is evidence,
+and the holdout contains no buried site. Whether hull depth improves the detection of
+buried sites (H1), or the discrimination of buried from surface sites (H2), is
+therefore **not evaluable** from deposited structures. This is a limit of the
+crystallographic record, not of the method. Answering it needs new structures, or a
+transfer test from a broader class of buried polyanion sites.
 
 ### A depth measure that fits the controls does not generalise
 
@@ -163,7 +200,9 @@ p = 0.89) at a lower PR-AUC. The rule-based score therefore keeps burial depth.
 Hull depth is retained as a descriptor the classifier can weigh, and as a
 threshold in the screen's calibrated hit definition. A five-protein control
 panel can show that a measurement separates the controls; it cannot show that
-the measurement generalises, and here it did not.
+the measurement generalises, and here it did not. The pre-registered benchmark
+could not settle the question for buried sites either way (see above): the PDB
+holds too few independent families with a buried inositol phosphate.
 
 ### The yeast pilot does not yet yield a candidate
 

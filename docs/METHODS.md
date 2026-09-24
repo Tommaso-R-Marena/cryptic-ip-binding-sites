@@ -393,7 +393,103 @@ rows, with a DeLong test. If the transparent weighted score matches the learned
 model, the learned model adds complexity without adding information, and the
 report says so.
 
-### Results on the deposited set
+### Pre-registered benchmark: results
+
+The protocol above is replaced by `docs/ANALYSIS_PLAN.md`, run end to end in CI
+by `.github/workflows/benchmark.yml`. The run reported here is 35949588200 at
+commit 72f1ae4. The report is `results/benchmark/benchmark_report.json`, and the
+page rendered from it is `results/benchmark/report.html`.
+
+**Data.**
+
+- 367 entries (409 qualified; the rest were over the atom limit or failed extraction,
+  and each is counted in the run's accounting).
+- 78,920 pockets from fpocket on ligand-free structures.
+- Two homology groupings:
+  - sequence: MMseqs2, ≥ 30 % identity over ≥ 50 % of the shorter chain; 85 groups;
+  - strict: sequence links plus Foldseek links with TM-score ≥ 0.5; 40 groups.
+- Temporal holdout: the latest 20 % of strict groups by first release date. That is
+  21 entries (7,312 pockets), never seen by any fitting, selection or threshold.
+
+| task | development positives (sequence / strict groups) | largest group's share | holdout positives |
+|---|---|---|---|
+| `ip_site` | 765 (70 / 29) | 7 % / 40 % | 55 (8 groups) |
+| `cryptic_ip_site` | 60 (6 / 5) | 87 % / 87 % | 0 |
+| `burial` | 60 (6 / 5) | 87 % / 87 % | 0 |
+
+**Finding the inositol phosphate site (`ip_site`).** Nested grouped
+cross-validation jointly selects the model family and its hyperparameters in the
+inner loop, and fits the threshold and calibration there too. It uses 39 descriptors,
+with no B-factors and no ligand. Every interval resamples whole homology groups.
+
+| evaluation | learned model ROC-AUC | PR-AUC | rule-based ROC-AUC | learned − rule ROC-AUC |
+|---|---|---|---|---|
+| CV, sequence groups (3 repeats) | 0.951 [0.932, 0.966] | 0.358 [0.260, 0.489] | 0.879 | +0.072 [0.046, 0.093] |
+| CV, strict groups | 0.929 [0.907, 0.954] | 0.187 [0.166, 0.590] | 0.879 | +0.051 [0.022, 0.069] |
+| **temporal holdout (locked model)** | **0.871 [0.782, 0.932]** | 0.136 [0.105, 0.250] | 0.730 | **+0.141 [0.033, 0.200]** |
+| shuffled labels (control) | 0.491 [0.477, 0.509] | 0.010 | 0.493 | – |
+
+The learned model generalises to protein families released after everything it
+was trained on, and there it beats the rule-based score by more than it does in
+cross-validation. The gap from 0.95 (cross-validation) to 0.87 (holdout) is the
+cost of meeting new families. The shuffled-label control is at chance.
+
+**The hull-depth hypotheses (H1, H2) are not evaluable.** For both buried-site
+tasks, one homology group holds 87 % of the 60 positives. By the rule fixed before
+the run, no grouped cross-validation estimate is then evidence, and the holdout
+contains no buried site. The point estimates are not interpreted:
+
+- H1 (paired ROC-AUC with minus without hull depth): −0.087 [−0.256, 0.398] with
+  sequence groups, 0.308 [−0.001, 0.369] with strict groups;
+- H2: 0.063 [−0.212, 0.146] and −0.332 [−0.410, 0.048].
+
+The PDB holds about six independent families with a buried inositol phosphate.
+That is a property of the deposited record, not of this pipeline, and no
+re-analysis of PDB data alone can answer H1 or H2. Four `cryptic_ip_site` runs
+also failed to fit, on folds holding a single positive. The fitting guard that
+prevents this was added after the run (commit 19d193d), and it cannot change these
+decisions.
+
+For `ip_site`, hull depth adds a little in cross-validation: 0.951 against 0.931
+without it (sequence), and 0.929 against 0.924 (strict). On the holdout it is
+0.871 against 0.861. The plan did not pre-register this comparison, so it is
+reported as a description, not a test.
+
+**Controls.**
+
+- `ip_site` and `cryptic_ip_site` pass their shuffled-label controls.
+- `burial` fails: 0.613 [0.506, 0.682]. Diagnostic D1 in the plan separates a chance
+  excursion from a leak with 30 further shuffles (run 35965940997; result pending).
+
+**Which single descriptors carry the signal** (`docs/EXPLORATION_PLAN.md`, with
+every analysis in `results/exploration/ledger.jsonl`). Each descriptor was signed
+by a direction predicted from physics before any value was computed. Each was scored
+on development pockets with strict-group intervals, and Benjamini–Hochberg was applied
+across all 82 tests.
+
+- **Electrostatics comes first.** The Debye-screened Coulomb potential at the pocket
+  centre ranks the true site first in 43 % of structures, against 4 % by chance
+  (ROC-AUC 0.855). Counts of basic residues and basic nitrogens follow (0.85).
+- **No zero-parameter descriptor beats the rule-based score** (0.879).
+- **The confirmatory set was chosen by rule and all three members replicate** on the
+  temporal holdout (Holm across the set):
+
+  | descriptor | holdout ROC-AUC [95 % CI] | Holm p |
+  |---|---|---|
+  | `n_basic_nitrogens` | 0.782 [0.660, 0.847] | < 0.001 |
+  | `electropositive_enclosure` | 0.766 [0.625, 0.833] | 0.012 |
+  | `n_strong_basic_residues` | 0.692 [0.583, 0.830] | 0.012 |
+
+- **This is the textbook determinant of phosphate binding, now shown out of family.**
+  It is not a new descriptor.
+- **Four priors failed**: `positive_charge_density`, `alpha_sphere_density`,
+  `burial_depth` and `basic_nitrogen_dispersion` all rank IP sites *below* other
+  pockets. Each is a ratio or a nearest-distance, and each falls with pocket size,
+  while fpocket's pockets on IP sites are large. So on this data the four are
+  mostly size in disguise. Testing that needs a size-adjusted analysis, which is
+  not yet pre-registered.
+
+### Results on the deposited set (superseded)
 
 > **Superseded: these numbers overstate performance.** An audit found that the
 > protocol below leaks. Cross-validation groups fell back to the PDB entry
@@ -405,7 +501,7 @@ report says so.
 > DeLong tests treated pockets clustered within proteins as independent. The
 > pre-registered benchmark (`docs/ANALYSIS_PLAN.md`, `.github/workflows/benchmark.yml`)
 > corrects each of these, on every inositol phosphate complex in the PDB rather
-> than 136, and replaces this table when it reports.
+> than 136. Its results are in the section above.
 
 Trained in CI (`.github/workflows/train-real-data.yml`) on the 136 measurable
 RCSB entries; nested 5×3 grouped CV, intervals bootstrapped over proteins.
