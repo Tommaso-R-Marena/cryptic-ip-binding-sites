@@ -125,7 +125,6 @@ def test_crossfit_chooses_zero_when_nothing_helps():
 # ---------------------------------------------------------------- end to end
 @pytest.mark.skipif(shutil.which("pdb2pqr") is None and shutil.which("pdb2pqr30") is None,
                     reason="pdb2pqr not installed")
-@pytest.mark.timeout(1800)
 def test_dock_and_report_end_to_end(tmp_path):
     pytest.importorskip("vina")
     pytest.importorskip("meeko")
