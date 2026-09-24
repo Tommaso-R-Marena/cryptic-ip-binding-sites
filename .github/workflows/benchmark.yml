@@ -5,16 +5,17 @@ name: Benchmark
 #   dataset    every PDB entry holding an inositol phosphate (X-ray or EM, 3.5 A
 #              or better), its structures, and its homology groups - MMseqs2
 #              sequence links and Foldseek structural links over every chain
-#   extract    pockets, descriptors (ligand-free) and labels, sharded
+#   extract    pockets, descriptors (ligand-free) and labels, in 40 shards so
+#              that no shard nears the 6-hour job limit; fpocket may take 45 min
 #   prepare    one table: each task's labels, both groupings, the temporal
 #              holdout, the rule-based score
 #   evaluate   one job per task x descriptor arm x grouping x repeat, plus the
 #              permutation controls; paired arms share every seed
 #   compare    intervals, paired ablations and the plan's decisions
 #
-# MODE=smoke runs a seeded sample of 60 entries with every label permuted: it exercises the whole
-# pipeline and cannot reveal anything about the hypotheses. MODE=full is the
-# pre-registered analysis.
+# MODE=full, the default, is the pre-registered analysis. MODE=smoke (on
+# demand) runs a seeded sample of 60 entries with every label permuted: it
+# exercises the whole pipeline and cannot reveal anything about the hypotheses.
 
 on:
   push:
@@ -34,7 +35,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MODE: ${{ inputs.mode || 'smoke' }}
+  MODE: ${{ inputs.mode || 'full' }}
 
 jobs:
   plan:
@@ -51,7 +52,7 @@ jobs:
         run: |
           import json, os
           smoke = os.environ["MODE"] == "smoke"
-          n_shards = 4 if smoke else 24
+          n_shards = 4 if smoke else 40
           tasks = ["ip_site", "cryptic_ip_site", "burial"]
           runs = []
           for task in tasks:
@@ -202,7 +203,7 @@ jobs:
             --output-csv results/benchmark/pockets/pockets_${{ matrix.shard }}.csv \
             --cache-dir /tmp/feature_cache \
             --summary-json results/benchmark/pockets/summary_${{ matrix.shard }}.json \
-            --max-protein-atoms 99999 \
+            --max-protein-atoms 99999 --fpocket-timeout 2700 \
             --shard-index ${{ matrix.shard }} --shard-count ${{ strategy.job-total }} \
             --sasa-points 256 --jobs "$(nproc)"
 
@@ -328,7 +329,9 @@ jobs:
   compare:
     name: Compare
     needs: evaluate
-    if: ${{ !cancelled() }}
+    # Compare whatever evaluations finished, but not when none ran (an upstream
+    # step failed): there is nothing to compare then.
+    if: ${{ !cancelled() && needs.evaluate.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:

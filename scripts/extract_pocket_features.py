@@ -138,6 +138,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default=None,
         help="Process only the structures listed (one identifier per line)",
     )
+    parser.add_argument(
+        "--fpocket-timeout",
+        type=float,
+        default=None,
+        help="Seconds fpocket may run on one structure (default: the analyzer's)",
+    )
     parser.add_argument("--shard-index", type=int, default=0, help="This shard (0-based)")
     parser.add_argument("--shard-count", type=int, default=1, help="Number of shards")
     parser.add_argument(
@@ -252,6 +258,8 @@ def process_structure(
             str(describe_path),
             skip_electrostatics=bool(options.get("skip_electrostatics", True)),
         )
+        if options.get("fpocket_timeout"):
+            analyzer.fpocket_timeout_s = float(options["fpocket_timeout"])
         analyzer.detect_pockets(min_alpha_sphere=int(options.get("min_alpha_spheres", 3)))
         if not options.get("skip_electrostatics", True):
             analyzer.calculate_electrostatics()
@@ -439,6 +447,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "require_cryptic": args.require_cryptic,
         "apo": args.apo,
         "max_protein_atoms": args.max_protein_atoms,
+        "fpocket_timeout": args.fpocket_timeout,
     }
 
     tasks: List[Tuple[str, str, Sequence[str], Dict[str, Any]]] = []

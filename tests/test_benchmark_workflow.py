@@ -54,6 +54,7 @@ def test_smoke_mode_is_blind(tmp_path):
     assert values["max_entries"] != "0"
 
 
-def test_workflow_defaults_to_the_blind_smoke_run_on_push():
+def test_push_runs_the_full_analysis_and_smoke_is_on_demand():
     workflow = yaml.safe_load(WORKFLOW.read_text())
-    assert "smoke" in workflow["env"]["MODE"]
+    assert "'full'" in workflow["env"]["MODE"]
+    assert "mode" in workflow[True]["workflow_dispatch"]["inputs"]
