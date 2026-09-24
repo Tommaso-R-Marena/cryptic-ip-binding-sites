@@ -302,6 +302,38 @@ A scoring failure on a ligand carrying 5 to 9 negative charges points at the mis
 electrostatics in Vina's function. That prediction is tested, pre-registered before this
 report was read, in `docs/RERANK_PLAN.md`.
 
+### Adding electrostatics helps the ranking, but not by enough to call it
+
+Because the redocking failures are failures of ranking rather than of search, and the
+ligand carries 5 to 9 charges, the obvious suspect is the missing electrostatics in
+Vina's scoring function. A separate pre-registered study (`docs/RERANK_PLAN.md`, with
+amendment 1) re-docked the same 250 copies keeping 40 poses per seed, scored every pose
+with a screened Coulomb term and re-ranked by Vina + w·E_el, with w chosen out of sample
+over folds of homology groups.
+
+- **The point estimate moves, the interval does not clear zero.** Top-pose success goes
+  from 0.093 [0.034, 0.176] to 0.147 [0.090, 0.213], a difference of +0.054
+  [−0.001, 0.114]. By the pre-registered rule this is *no detectable difference*.
+- **The movement is specific to electrostatics.** Shuffling the electrostatic energies
+  among each run's poses 100 times gives a mean gain of 0.002 and a maximum of 0.023,
+  never reaching the observed value (p = 0.0099). The amendment added this gate precisely
+  because re-ranking a systematically wrong order by noise can lift success on its own;
+  here the gate is passed and the interval is what falls short.
+- **The ceiling is sampling, not scoring.** Re-ranking cuts scoring failures from 26.3 %
+  to 22.8 % of runs and leaves sampling failures at 64.7 %. Any re-scoring of these pose
+  lists is capped at 0.399 [0.286, 0.521], the rate at which a near-native pose is present
+  at all.
+- **Surface sites gain most,** from 0.030 to 0.099, and semi-cryptic from 0.154 to 0.216
+  (descriptive). The cryptic stratum has 4 homology groups and is not evidence.
+- **The two docking runs agree.** Against the redocking benchmark's own arm on the same
+  750 seed runs, success agrees for 98.7 % of runs, so the comparison is not an artefact
+  of re-docking.
+
+The honest reading is that a single charge term recovers part of what Vina is missing on
+polyanions, with the direction and the specificity established but the size not bounded
+away from zero at this sample. Closing the rest of the gap needs better sampling, not a
+better score.
+
 ### The α-arrestins rank high as a family, but the two leads do not hold up
 
 A pre-registered test (`docs/ARRESTIN_PLAN.md`) asked whether the α-arrestin lead is

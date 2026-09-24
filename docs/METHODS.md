@@ -774,6 +774,78 @@ the same thing.
   minimum of 5. The point estimates run the other way from the usual expectation, with
   buried sites easier than surface ones, but the interval is wide and no claim is made.
 
+### Electrostatic re-ranking of docked poses
+
+**Plan and run.** `docs/RERANK_PLAN.md` with `docs/RERANK_PLAN_AMENDMENT_1.md`, rerank run
+36055694750; results in `results/rerank/`, extracted from the Report job's log.
+
+Both plan files were committed before any pose for this study was generated, and before
+any redocking outcome had been read.
+
+**Why.** The redocking benchmark's failures are failures of ranking, not of search
+(230 of 242). Vina's function has no explicit electrostatics, and the ligand carries 5
+to 9 negative charges. The study asks whether one screened-Coulomb term, with a single
+weight fitted out of sample, picks the crystal-like pose out of Vina's own pose list
+more often than Vina's ranking does.
+
+**Data and term.**
+
+- The redocking primary set, re-docked with the same protocol (Vina 1.2.7,
+  exhaustiveness 32, seeds 1–3), keeping up to 40 poses within 10 kcal/mol so the
+  re-ranker has room to act. 250 copies in 31 strict groups, 750 seed runs; the same 19
+  copies failed receptor preparation as in study A, and no copy went unreached.
+- E_el = 332.0637 Σ q_i q_j exp(−κ r) / (ε(r) r) over pairs within 12 Å, with ε(r) = 4r,
+  κ = 0.127 Å⁻¹ (150 mM monovalent salt at 298 K) and r floored at 1.5 Å. Charges are the
+  PDBQT partial charges: PDB2PQR/AMBER at pH 7.4 for the receptor, Meeko's Gasteiger
+  charges for the ligand. Nothing in the term is fitted.
+- The re-ranking score is Vina + w·E_el over the grid {0, 0.002, 0.005, 0.01, 0.02, 0.05,
+  0.1, 0.2, 0.5, 1}, where w = 0 is Vina itself.
+
+**Cross-fitting.** w is chosen on four folds of strict homology groups and applied to
+the fifth, and the whole procedure is repeated inside each of the 2,000 bootstrap
+resamples, so the interval carries the uncertainty of choosing w. The folds chose
+w = 0.1 four times and 0.5 once.
+
+**Reproducibility.** Against study A's primary arm on the same 750 seed runs, the two
+independent docking runs agree on success for 98.7 % of runs and on top-pose RMSD within
+0.5 Å for 89.2 %.
+
+**Results.**
+
+| estimand | Vina | re-ranked (out of fold) | difference |
+|---|---|---|---|
+| group | 0.093 [0.034, 0.176] | 0.147 [0.090, 0.213] | 0.054 [−0.001, 0.114] |
+| per copy | 0.091 [0.050, 0.129] | 0.125 [0.091, 0.190] | 0.035 [0.000, 0.104] |
+
+- **F1: no detectable difference.** The group difference is +0.054, which would be a
+  58 % relative gain, but its 95 % lower bound is −0.001 and the interval includes zero.
+  The pre-registered rule needs a lower bound above zero, so the gain is not established.
+- **F3, permutation control: the signal is specific.** In 100 permutations of E_el
+  within each pose list the mean gain is 0.002 and the largest is 0.023, never reaching
+  the observed 0.054 (p = 0.0099). So the term is not acting as noise, which is what the
+  amendment was written to detect. F1 and F3 disagree in the informative way: the effect
+  is real in direction and specific to electrostatics, but too small for this sample to
+  bound away from zero.
+- **F2, decomposition.** Re-ranking cuts scoring failures from 26.3 % to 22.8 % of seed
+  runs. Sampling failures are unchanged at 64.7 %, as they must be, since re-ranking
+  cannot invent a pose. The sampling ceiling, the rate at which any pose in the list is
+  within 2 Å, is 0.399 [0.286, 0.521], so no re-scoring of these lists can do better than
+  about 0.40.
+- **F4, strata (descriptive).** Surface copies gain most, from 0.030 to 0.099, and
+  semi-cryptic from 0.154 to 0.216. Cryptic copies (4 groups) and the classic arrestins
+  (1 group) are below the 5-group minimum and are not evidence.
+- E_el correlates with RMSD within runs, with a median Spearman of 0.615, so the term
+  does rank near-native poses better; the median minimised crystal pose has
+  E_el = −59.3 kcal/mol.
+
+**What this settles.** One charge term, with a single out-of-sample weight, moves
+top-pose success from about 0.09 to about 0.15 in point estimate, and the permutation
+control says the movement is electrostatic rather than noise. The pre-registered interval
+does not exclude zero, so this is a lead, not a result. It is also bounded: even a perfect
+re-ranker of these pose lists would reach only about 0.40, because two thirds of runs
+never sample a near-native pose. A sampling fix, not a scoring fix, is what the remaining
+gap needs.
+
 ### The α-arrestin lead
 
 **Plan and run.** `docs/ARRESTIN_PLAN.md`, arrestin run 36023420103; results in
