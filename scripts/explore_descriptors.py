@@ -297,8 +297,14 @@ def cmd_explore(args: argparse.Namespace) -> int:
     table = pd.read_csv(args.table, low_memory=False)
     ledger = read_ledger(args.ledger)
     digest = sha256(args.table)
-    if any(r["stage"] == "explore" and r["table_sha256"] == digest for r in ledger) and not args.rerun:
-        raise LedgerError("this table was already explored; results are in the ledger (use --rerun to append again)")
+    previous = [r for r in ledger if r["stage"] == "explore" and r["table_sha256"] == digest]
+    if previous and not args.rerun:
+        # Explored already: re-render the ledger's record; nothing is recomputed or appended.
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        (args.out_dir / "EXPLORATION.md").write_text(render_explore(previous[0]))
+        print("this table was already explored; rendering the ledger's record\n")
+        print((args.out_dir / "EXPLORATION.md").read_text())
+        return 0
     dev = table[~table["holdout"].astype(bool)].reset_index(drop=True)
     assert not dev["holdout"].astype(bool).any(), "exploration must never see holdout rows"
     tasks = {}
@@ -359,12 +365,20 @@ def cmd_confirm(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------- report
+def _p(value: float, n_bootstrap: int) -> str:
+    """A bootstrap p-value; zero means below the resampling floor."""
+    if value != value:
+        return "–"
+    return f"< {1 / n_bootstrap:.0e}" if value == 0 else f"{value:.2g}"
+
+
 def _ci(est: Mapping[str, float], digits: int = 3) -> str:
     return f"{est['point']:.{digits}f} [{est['low']:.{digits}f}, {est['high']:.{digits}f}]"
 
 
 def render_explore(record: Mapping[str, object]) -> str:
     lines = [f"## Descriptor exploration (table {record['table_sha256'][:12]}, commit {record['commit'][:10]})", ""]
+    nb = int(record.get("n_bootstrap", 2000))
     for task, entry in record["tasks"].items():
         if "not_evaluable" in entry:
             lines += [f"### {task}: not evaluable ({entry['not_evaluable']})", ""]
@@ -380,9 +394,9 @@ def render_explore(record: Mapping[str, object]) -> str:
             for n in order:
                 r = results[n]
                 lines.append(
-                    f"| {n} | {r['prior']:+d} | {_ci(r['auroc'])} | {r.get('q_auroc', float('nan')):.2g} | "
+                    f"| {n} | {r['prior']:+d} | {_ci(r['auroc'])} | {_p(r.get('q_auroc', float('nan')), nb)} | "
                     f"{r['top1_hit']:.2f} / {r['top1_chance']:.2f} | {_ci(r['top1_excess'])} | "
-                    f"{r.get('q_top1', float('nan')):.2g} | {r.get('verdict', 'reference')} |")
+                    f"{_p(r.get('q_top1', float('nan')), nb)} | {r.get('verdict', 'reference')} |")
             sel = entry["selection"]
             lines += ["", f"BH across {sel['family_size']} tests at q = {sel['q']}. "
                       f"Eligible: {', '.join(sel['eligible']) or 'none'}. "
@@ -390,7 +404,7 @@ def render_explore(record: Mapping[str, object]) -> str:
             if sel["vs_rule_score"]:
                 lines += ["| eligible score | AUROC - rule_score [95% CI] | p |", "|---|---|---|"]
                 for n, est in sel["vs_rule_score"].items():
-                    lines.append(f"| {n} | {_ci(est)} | {est['p_value']:.2g} |")
+                    lines.append(f"| {n} | {_ci(est)} | {_p(est['p_value'], nb)} |")
                 lines.append("")
         else:
             lines += ["Descriptive only (plan): pooled AUROC and top-1 hits per strict group; no p-values.", "",

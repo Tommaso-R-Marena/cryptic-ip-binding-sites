@@ -102,8 +102,8 @@ def test_selection_rule_and_ledger_discipline(table, tmp_path):
     with pytest.raises(ex.LedgerError):
         ex.main(["confirm", *common])  # nothing explored yet
     assert ex.main(["explore", *common]) == 0
-    with pytest.raises(ex.LedgerError):
-        ex.main(["explore", *common])  # the same table twice needs --rerun
+    assert ex.main(["explore", *common]) == 0  # the same table again: re-rendered, not recomputed
+    assert len(ex.read_ledger(ledger)) == 1
     record = ex.read_ledger(ledger)[0]
     ip = record["tasks"]["ip_site"]
     sel = ip["selection"]
