@@ -161,18 +161,18 @@ jobs:
       - uses: actions/download-artifact@v7
         with:
           pattern: secondary-predictions-*-true
-          path: null
+          path: nulldist
           merge-multiple: true
       - uses: actions/download-artifact@v7
         with:
           pattern: secondary-null-*
-          path: null
+          path: nulldist
           merge-multiple: true
       - name: Compare
         run: |
           python scripts/benchmark.py compare --predictions-dir predictions \
             --prepare-summary secondary/prepare_summary.json --out-dir report
-          python scripts/permutation_null.py --predictions-dir null --output report/permutation_null.json
+          python scripts/permutation_null.py --predictions-dir nulldist --output report/permutation_null.json
           python scripts/transfer.py decide --report report/benchmark_report.json \
             --null report/permutation_null.json --output report/transfer_decisions.json
           echo "(T1/T2 in these tables are T1b/T2b: docs/TRANSFER_PLAN_AMENDMENT_1.md)"

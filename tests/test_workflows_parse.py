@@ -23,3 +23,13 @@ def test_workflow_jobs_are_named_by_strings(path):
         needs = job.get("needs", [])
         for dependency in [needs] if isinstance(needs, str) else needs:
             assert dependency in jobs, f"{path.name}: {name} needs unknown job {dependency!r}"
+
+
+@pytest.mark.parametrize("path", WORKFLOWS, ids=lambda p: p.name)
+def test_no_step_input_parses_to_null(path):
+    """``path: null`` is YAML null, not a directory called null: the input is silently dropped."""
+    data = yaml.safe_load(path.read_text())
+    for name, job in data["jobs"].items():
+        for step in job.get("steps", []):
+            for key, value in (step.get("with") or {}).items():
+                assert value is not None, f"{path.name}: job {name!r} step input {key!r} is YAML null"
