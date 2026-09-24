@@ -471,6 +471,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     def store(structure_id: str, rows: List[Dict[str, Any]], diag: Dict[str, Any]) -> None:
         cached_rows[structure_id] = rows
         diagnostics.append(diag)
+        if diag.get("error"):
+            LOGGER.warning("%s failed: %s", structure_id, diag["error"])
+        elif diag.get("excluded"):
+            LOGGER.warning("%s excluded: %s", structure_id, diag["excluded"])
         (args.cache_dir / f"{structure_id}.json").write_text(
             json.dumps(
                 {"rows": rows, "diagnostics": diag, "fingerprint": fingerprint},
@@ -514,9 +518,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     diagnostics_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(diagnostics).to_csv(diagnostics_path, index=False)
 
+    n_failed = sum(1 for d in diagnostics if d.get("error"))
+    n_excluded = sum(1 for d in diagnostics if d.get("excluded"))
+    LOGGER.info(
+        "Accounting: %d structures, %d with pockets, %d excluded, %d failed",
+        len(diagnostics), len({row["structure_id"] for row in all_rows}), n_excluded, n_failed,
+    )
     if not all_rows:
-        if args.shard_count > 1 and all(d.get("excluded") or d.get("error") for d in diagnostics):
-            LOGGER.warning("Shard produced no pockets: every structure excluded or failed")
+        if args.shard_count > 1 and n_failed == 0 and n_excluded == len(diagnostics):
+            LOGGER.warning("Shard produced no pockets: every structure was excluded")
             return 0
         LOGGER.error("No pockets were extracted; check that fpocket is installed and working.")
         return 3

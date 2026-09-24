@@ -248,7 +248,10 @@ jobs:
           import glob, json
           import pandas as pd
           parts = [pd.read_csv(p, low_memory=False) for p in sorted(glob.glob("results/benchmark/pockets/pockets_*.csv"))]
-          pockets = pd.concat([p for p in parts if len(p)], ignore_index=True)
+          parts = [p for p in parts if len(p)]
+          if not parts:
+              raise SystemExit("no shard produced pockets; see the extract jobs' accounting lines")
+          pockets = pd.concat(parts, ignore_index=True)
           pockets.to_csv("results/benchmark/pockets_all.csv.gz", index=False)
           structures = pd.concat(
               [pd.read_csv(p) for p in sorted(glob.glob("results/benchmark/pockets/summary_*_structures.csv"))],
