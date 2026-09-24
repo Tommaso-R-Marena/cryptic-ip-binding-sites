@@ -1,0 +1,545 @@
+name: Redocking
+
+# docs/REDOCKING_PLAN.md: put every crystal inositol phosphate copy of the IP
+# benchmark (run 35949588200) back into its own site with AutoDock Vina, and
+# measure how often the crystal pose is recovered, by burial class; plus the
+# scoring/sampling, decoy-pocket, protonation, metal, Vinardo, AD4, site-finding
+# and AlphaFold cross-docking controls.
+#
+#   inputs      benchmark entries and table; structures from RCSB (cached)
+#   census      20 shards: copies, burial, flags, CCD templates, selection
+#   merge       one census; the CCD files
+#   primary     30 shards: Vina seeds 1-3 and the crystal-pose control
+#   secondary   30 shards: Vinardo, AD4, deprotonated ligand, kept metals
+#   pockets     30 shards: fpocket site finding and the decoy pocket
+#   alphafold   30 shards: docking into the superposed AlphaFold model
+#   report      estimands, decisions, accounting; printed between markers
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/REDOCKING_PLAN.md'
+      - 'scripts/redocking.py'
+      - 'scripts/redocking_report.py'
+      - 'cryptic_ip/docking/**'
+      - '.github/workflows/redocking.yml'
+  workflow_dispatch:
+    inputs:
+      census_run:
+        description: 'reuse the census of this run (empty = compute it); for re-docking not-reached copies'
+        default: ''
+
+concurrency:
+  group: redocking-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  IP_BENCHMARK_RUN: '35949588200'
+  TABLE_SHA256: 'a21d92fd0f57306848c260d1f163017f0bf1e82a5dfcf1f3be69e0c20b698a1d'
+  PY_DOCKING: 'rdkit==2026.3.6 vina==1.2.7 meeko==0.8.0 gemmi==0.7.5 pdb2pqr==3.6.1 propka==3.5.1'
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      census: ${{ steps.plan.outputs.census }}
+      dock: ${{ steps.plan.outputs.dock }}
+    steps:
+      - id: plan
+        run: |
+          echo "census=$(python3 -c 'import json; print(json.dumps(list(range(20))))')" >> "$GITHUB_OUTPUT"
+          echo "dock=$(python3 -c 'import json; print(json.dumps(list(range(30))))')" >> "$GITHUB_OUTPUT"
+
+  inputs:
+    name: Inputs and structures
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Benchmark entries and table
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$IP_BENCHMARK_RUN" --repo "$GITHUB_REPOSITORY" --name benchmark-dataset --dir bench
+          gh run download "$IP_BENCHMARK_RUN" --repo "$GITHUB_REPOSITORY" --name benchmark-table --dir bench
+          echo "$TABLE_SHA256  bench/table.csv.gz" | sha256sum -c -
+          python - <<'PY'
+          import pandas as pd
+          ids = sorted(set(pd.read_csv("bench/table.csv.gz", usecols=["structure_id"])["structure_id"].str.upper()))
+          open("bench/table_ids.txt", "w").write("\n".join(ids) + "\n")
+          print(len(ids), "entries in the benchmark table")
+          PY
+      - name: Cache structures
+        uses: actions/cache@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch structures
+        run: |
+          python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file bench/table_ids.txt \
+            --manifest bench/structure_manifest.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: redocking-inputs
+          path: |
+            bench/entries_grouped.csv
+            bench/table_ids.txt
+            bench/structure_manifest.json
+          retention-days: 90
+      - uses: actions/upload-artifact@v6
+        with:
+          name: redocking-table
+          path: bench/table.csv.gz
+          retention-days: 30
+
+  census:
+    name: Census ${{ matrix.shard }}
+    needs: [plan, inputs]
+    if: ${{ !inputs.census_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.census) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: redocking-inputs
+          path: bench
+      - uses: actions/download-artifact@v7
+        with:
+          name: redocking-table
+          path: bench
+      - name: Restore structures
+        uses: actions/cache/restore@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch anything the cache lacks
+        run: python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file bench/table_ids.txt
+      - name: Census
+        env:
+          OMP_NUM_THREADS: '1'
+        run: |
+          python scripts/redocking.py census --table bench/table.csv.gz --entries bench/entries_grouped.csv \
+            --structures-dir data/redock/structures --ccd-dir ccd \
+            --shard-index ${{ matrix.shard }} --shard-count ${{ strategy.job-total }} \
+            --output census/census_${{ matrix.shard }}.csv
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: redocking-census-${{ matrix.shard }}
+          path: |
+            census
+            ccd
+          retention-days: 30
+
+  merge:
+    name: Merge the census
+    needs: [inputs, census]
+    if: ${{ !cancelled() && needs.inputs.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install pandas==2.3.3
+      - name: Earlier census (re-dispatch)
+        if: ${{ inputs.census_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${{ inputs.census_run }}" --repo "$GITHUB_REPOSITORY" --name redocking-census --dir merged
+      - uses: actions/download-artifact@v7
+        if: ${{ !inputs.census_run }}
+        with:
+          pattern: redocking-census-*
+          path: parts
+          merge-multiple: true
+      - name: Merge
+        if: ${{ !inputs.census_run }}
+        run: |
+          mkdir -p merged
+          cp -r parts/ccd merged/ccd
+          python - <<'PY'
+          import glob, json
+          import pandas as pd
+          def read(p):
+              try:
+                  return pd.read_csv(p)
+              except pd.errors.EmptyDataError:
+                  return pd.DataFrame()
+          frames = [read(p) for p in sorted(glob.glob("parts/census/census_*.csv")) if "failures" not in p]
+          frames = [f for f in frames if len(f)]
+          census = pd.concat(frames, ignore_index=True)
+          census.to_csv("merged/census.csv", index=False)
+          fails = [read(p) for p in sorted(glob.glob("parts/census/census_*_failures.csv"))]
+          fails = pd.concat(fails, ignore_index=True) if fails else pd.DataFrame()
+          fails.to_csv("merged/census_failures.csv", index=False)
+          print(json.dumps({"copies": len(census), "entries": int(census["pdb_id"].nunique()),
+                            "entry_failures": len(fails), "selected": int(census["selected"].sum()),
+                            "primary_set": int(census["primary_set"].sum()),
+                            "status": census["status"].value_counts().to_dict(),
+                            "selected_by_class": census[census["selected"]]["burial_class"].value_counts().to_dict()},
+                           indent=1))
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: redocking-census
+          path: merged
+          retention-days: 90
+
+  dock-primary:
+    name: Dock primary ${{ matrix.shard }}
+    needs: [plan, inputs, merge]
+    if: ${{ !cancelled() && needs.merge.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.dock) }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge autogrid=4.2.9 fpocket=4.2.3 pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+          which autogrid4 fpocket pdb2pqr
+      - uses: actions/download-artifact@v7
+        with:
+          name: redocking-inputs
+          path: bench
+      - uses: actions/download-artifact@v7
+        with:
+          name: redocking-census
+          path: census
+      - name: Restore structures
+        uses: actions/cache/restore@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch anything the cache lacks
+        shell: bash -l {0}
+        run: python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file bench/table_ids.txt
+      - name: Earlier arms (re-dispatch docks only what they lack)
+        if: ${{ inputs.census_run }}
+        shell: bash -l {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${{ inputs.census_run }}" --repo "$GITHUB_REPOSITORY" --pattern 'redocking-arms-primary-*' --dir arms_earlier || true
+      - name: Dock
+        shell: bash -l {0}
+        env:
+          OMP_NUM_THREADS: '1'
+        run: |
+          python scripts/redocking.py dock --arm primary --census census/census.csv \
+            --structures-dir data/redock/structures --ccd-dir census/ccd --af-dir af_models \
+            --shard-index ${{ matrix.shard }} --shard-count 30 --out-dir arms --work-dir /tmp/redock_work \
+            $( [ -d arms_earlier ] && echo --skip-done arms_earlier )
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: redocking-arms-primary-${{ matrix.shard }}
+          path: arms
+          retention-days: 90
+
+  dock-secondary:
+    name: Dock secondary ${{ matrix.shard }}
+    needs: [plan, inputs, merge]
+    if: ${{ !cancelled() && needs.merge.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.dock) }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge autogrid=4.2.9 fpocket=4.2.3 pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+          which autogrid4 fpocket pdb2pqr
+      - uses: actions/download-artifact@v7
+        with:
+          name: redocking-inputs
+          path: bench
+      - uses: actions/download-artifact@v7
+        with:
+          name: redocking-census
+          path: census
+      - name: Restore structures
+        uses: actions/cache/restore@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch anything the cache lacks
+        shell: bash -l {0}
+        run: python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file bench/table_ids.txt
+      - name: Earlier arms (re-dispatch docks only what they lack)
+        if: ${{ inputs.census_run }}
+        shell: bash -l {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${{ inputs.census_run }}" --repo "$GITHUB_REPOSITORY" --pattern 'redocking-arms-secondary-*' --dir arms_earlier || true
+      - name: Dock
+        shell: bash -l {0}
+        env:
+          OMP_NUM_THREADS: '1'
+        run: |
+          python scripts/redocking.py dock --arm secondary --census census/census.csv \
+            --structures-dir data/redock/structures --ccd-dir census/ccd --af-dir af_models \
+            --shard-index ${{ matrix.shard }} --shard-count 30 --out-dir arms --work-dir /tmp/redock_work \
+            $( [ -d arms_earlier ] && echo --skip-done arms_earlier )
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: redocking-arms-secondary-${{ matrix.shard }}
+          path: arms
+          retention-days: 90
+
+  dock-pockets:
+    name: Dock pockets ${{ matrix.shard }}
+    needs: [plan, inputs, merge]
+    if: ${{ !cancelled() && needs.merge.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.dock) }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge autogrid=4.2.9 fpocket=4.2.3 pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+          which autogrid4 fpocket pdb2pqr
+      - uses: actions/download-artifact@v7
+        with:
+          name: redocking-inputs
+          path: bench
+      - uses: actions/download-artifact@v7
+        with:
+          name: redocking-census
+          path: census
+      - name: Restore structures
+        uses: actions/cache/restore@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch anything the cache lacks
+        shell: bash -l {0}
+        run: python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file bench/table_ids.txt
+      - name: Earlier arms (re-dispatch docks only what they lack)
+        if: ${{ inputs.census_run }}
+        shell: bash -l {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${{ inputs.census_run }}" --repo "$GITHUB_REPOSITORY" --pattern 'redocking-arms-pockets-*' --dir arms_earlier || true
+      - name: Dock
+        shell: bash -l {0}
+        env:
+          OMP_NUM_THREADS: '1'
+        run: |
+          python scripts/redocking.py dock --arm pockets --census census/census.csv \
+            --structures-dir data/redock/structures --ccd-dir census/ccd --af-dir af_models \
+            --shard-index ${{ matrix.shard }} --shard-count 30 --out-dir arms --work-dir /tmp/redock_work \
+            $( [ -d arms_earlier ] && echo --skip-done arms_earlier )
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: redocking-arms-pockets-${{ matrix.shard }}
+          path: arms
+          retention-days: 90
+
+  dock-alphafold:
+    name: Dock alphafold ${{ matrix.shard }}
+    needs: [plan, inputs, merge]
+    if: ${{ !cancelled() && needs.merge.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.dock) }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge autogrid=4.2.9 fpocket=4.2.3 pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+          which autogrid4 fpocket pdb2pqr
+      - uses: actions/download-artifact@v7
+        with:
+          name: redocking-inputs
+          path: bench
+      - uses: actions/download-artifact@v7
+        with:
+          name: redocking-census
+          path: census
+      - name: Restore structures
+        uses: actions/cache/restore@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch anything the cache lacks
+        shell: bash -l {0}
+        run: python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file bench/table_ids.txt
+      - name: AlphaFold models for this shard
+        shell: bash -l {0}
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, "scripts")
+          import pandas as pd
+          import redocking
+          c = pd.read_csv("census/census.csv")
+          c = c[c["primary_set"].astype(str).str.lower() == "true"]
+          mine = redocking.shard_entries(c["pdb_id"].unique().tolist(), ${{ matrix.shard }}, 30)
+          acc = sorted({a.strip() for v in c[c["pdb_id"].isin(mine)]["uniprot_ids"].dropna()
+                        for a in str(v).replace(",", ";").split(";") if a.strip()})
+          open("af_ids.txt", "w").write("\n".join(acc) + "\n")
+          print(len(acc), "accessions")
+          PY
+          python scripts/fetch_structures.py alphafold --out af_models --ids-file af_ids.txt || true
+      - name: Earlier arms (re-dispatch docks only what they lack)
+        if: ${{ inputs.census_run }}
+        shell: bash -l {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${{ inputs.census_run }}" --repo "$GITHUB_REPOSITORY" --pattern 'redocking-arms-alphafold-*' --dir arms_earlier || true
+      - name: Dock
+        shell: bash -l {0}
+        env:
+          OMP_NUM_THREADS: '1'
+        run: |
+          python scripts/redocking.py dock --arm alphafold --census census/census.csv \
+            --structures-dir data/redock/structures --ccd-dir census/ccd --af-dir af_models \
+            --shard-index ${{ matrix.shard }} --shard-count 30 --out-dir arms --work-dir /tmp/redock_work \
+            $( [ -d arms_earlier ] && echo --skip-done arms_earlier )
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: redocking-arms-alphafold-${{ matrix.shard }}
+          path: arms
+          retention-days: 90
+
+  report:
+    name: Report
+    needs: [dock-primary, dock-secondary, dock-pockets, dock-alphafold]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: redocking-census
+          path: census
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: redocking-arms-*
+          path: arms
+          merge-multiple: true
+      - name: Earlier arms (re-dispatch of not-reached copies)
+        if: ${{ inputs.census_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "${{ inputs.census_run }}" --repo "$GITHUB_REPOSITORY" --pattern 'redocking-arms-*' --dir arms_earlier || true
+      - name: Report
+        run: |
+          python scripts/redocking_report.py --census census/census.csv --results-dir arms \
+            $( [ -d arms_earlier ] && echo --earlier-dir arms_earlier ) --out-dir results/redocking
+          cat results/redocking/REPORT.md >> "$GITHUB_STEP_SUMMARY"
+          python scripts/extract_log_block.py emit REDOCKING_JSON results/redocking/redocking.json
+          python scripts/extract_log_block.py emit REDOCKING_COPIES_B64 results/redocking/copies.csv
+          python scripts/extract_log_block.py emit REDOCKING_CENSUS_B64 census/census.csv
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: redocking-report
+          path: results/redocking
+          retention-days: 90
