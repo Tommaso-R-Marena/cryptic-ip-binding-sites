@@ -191,6 +191,42 @@ therefore **not evaluable** from deposited structures. This is a limit of the
 crystallographic record, not of the method. Answering it needs new structures, or a
 transfer test from a broader class of buried polyanion sites.
 
+### Buried polyanion sites are learnable; depth to the hull does not help
+
+To ask the hull-depth question where it can be answered, we pre-registered a
+second dataset of buried **phosphate-dense** ligand sites. It holds nucleotide
+di- and triphosphates, PRPP, sugar bisphosphates and isoprenoid pyrophosphates,
+and no inositol phosphates.
+
+**Data.** 1,195 X-ray structures, 101,338 pockets, and 914 buried-site pockets in
+174 sequence families, 15 times more than the inositol set.
+
+**Recognition works.** A learned model recognises buried class-ligand sites with:
+
+- ROC-AUC **0.915** (0.901–0.943) under sequence-grouped cross-validation;
+- **0.983** (0.955–1.000) on a temporal holdout of 8 later-released families.
+
+The hand-built score, which was tuned on IP6, reaches 0.676 and 0.867.
+
+**Depth from the hull adds nothing.**
+
+- **All entries.** Adding it changes ROC-AUC by +0.002 (−0.008 to 0.023). The
+  pre-registered decision is nonetheless "not evaluable": one structural
+  super-group, where the nucleotide-binding folds from Ras GTPases to kinases,
+  ATP synthase and myosin join through transitive Foldseek links, holds 61 % of the
+  buried sites.
+- **Without that group.** The one secondary analysis we declared before seeing any
+  outcome removes it. There, hull depth lowers ROC-AUC under strict grouping, by
+  0.086 (0.047–0.131). The decision is "inconclusive" because the sequence-grouping
+  interval (−0.021 to 0.002) is not narrow enough to call "no effect".
+
+**A hint of transfer (descriptive).** A model trained only on these ligands, with
+no inositol phosphate and no family shared with the inositol set, ranks the inositol
+benchmark's buried IP sites at ROC-AUC 0.974 (0.839–0.993). The rule-based score
+reaches 0.923. With only five independent families of buried IP sites, this is
+consistent with shared physics for buried polyanion sites, but it is not evidence
+for it.
+
 ### A depth measure that fits the controls does not generalise
 
 On apo structures the rule-based score's depth term - distance to the nearest

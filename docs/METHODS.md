@@ -497,6 +497,105 @@ across all 82 tests.
   mostly size in disguise. Testing that needs a size-adjusted analysis, which is
   not yet pre-registered.
 
+### Transfer test: buried phosphate-dense ligand sites
+
+**Plan and runs.**
+
+- **Plan.** `docs/TRANSFER_PLAN.md`, with `docs/TRANSFER_PLAN_AMENDMENT_1.md`. The
+  amendment was written after Prepare and before any outcome was read.
+- **Main run.** Transfer run 35972729955.
+- **Secondary run.** Transfer-secondary run 35986927155 (T1b/T2b).
+
+**Why.** The inositol phosphate benchmark could not evaluate its hull-depth
+hypotheses: its buried positives come from about six families. So the same
+physical question was asked of a broader class of ligands, defined by a formula
+rule:
+
+- at least 2 phosphorus atoms;
+- at least 0.07 phosphorus per heavy atom;
+- no inositol phosphate;
+- not lipid-linked.
+
+Thirty-five components passed. Among them are the nucleotide di- and
+triphosphates and their analogues, PRPP, fructose-1,6-bisphosphate, isoprenoid
+pyrophosphates and pyrophosphate.
+
+**Data.**
+
+- **Sample.** X-ray entries at 2.5 Å or better that hold a class ligand: 8,434, of
+  which 38 also held an inositol phosphate and were removed. From the rest, a seeded
+  sample of 1,200 was drawn; 1,195 were measured, giving 101,338 pockets.
+- **Pipeline.** Descriptors, labels, homology groups and the temporal holdout come
+  from the benchmark's code, unchanged.
+- **Joint groups.** Homology groups were computed jointly with the inositol
+  benchmark's entries.
+- **Scale.** There are 914 buried (cryptic) class-ligand pockets in 174 sequence
+  families (51 strict groups). The inositol set has 60 in about 6.
+
+**The structural super-group.**
+
+- Under strict grouping (Foldseek TM ≥ 0.5 links, joined transitively), one group,
+  G:10JT, holds 61 % of the buried positives. It spans 688 of the 1,195 entries,
+  across the nucleotide-binding folds: Ras-family GTPases (KRAS, HRAS),
+  heterotrimeric G proteins, protein kinases (CDK2), HSP90, ATP synthase, myosin,
+  carbamoyl-phosphate synthetase and others.
+- Joining structural neighbours as connected components chains these folds together.
+  That makes the strict grouping very conservative for broad ligand classes.
+
+**Results.** All intervals are 95 % intervals from resampling whole homology groups.
+
+| task | learned ROC-AUC, sequence CV | strict CV | temporal holdout (8 families) | rule-based ROC-AUC |
+|---|---|---|---|---|
+| buried class-ligand site (`cryptic_ip_site`) | 0.915 [0.901, 0.943] | 0.941 [0.927, 0.970] | **0.983 [0.955, 1.000]** | 0.676 (CV), 0.867 (holdout) |
+| buried vs surface (`burial`) | 0.830 [0.799, 0.882] | 0.788 [0.750, 0.871] | 0.900 [0.754, 0.995] | 0.508 (CV), 0.806 (holdout) |
+| any class-ligand site (`ip_site`) | 0.905 [0.878, 0.925] | 0.892 [0.845, 0.916] | 0.917 [0.863, 0.962] | 0.681 (CV), 0.761 (holdout) |
+
+| hypothesis | hull depth added (paired ROC-AUC), sequence | strict | holdout | decision |
+|---|---|---|---|---|
+| T1 (all entries) | +0.002 [−0.008, 0.023] | +0.009 [−0.019, 0.015] | +0.004 [−0.003, 0.010] | **not evaluable** (largest strict group 61 %) |
+| T2 (all entries) | +0.001 [−0.006, 0.011] | +0.005 [−0.017, 0.010] | +0.002 [−0.036, 0.050] | **not evaluable** |
+| T1b (without G:10JT) | −0.010 [−0.021, 0.002] | **−0.086 [−0.131, −0.047]** | −0.000 | **inconclusive** |
+| T2b (without G:10JT) | −0.004 [−0.015, 0.008] | **−0.021 [−0.039, −0.006]** | +0.007 [−0.026, 0.036] | **inconclusive** |
+
+T1b/T2b use the remaining 507 entries: 359 buried positives in 96 sequence and 50 strict
+groups, with largest shares of 9 % and 20 %.
+
+**Controls.** The ten-permutation controls are at chance for every tested task:
+
+- `cryptic_ip_site`: 0.504 ± 0.013;
+- `burial`: 0.498 ± 0.018;
+- T1b: 0.507 ± 0.015;
+- T2b: 0.499 ± 0.028.
+
+The untested `ip_site` task's single-permutation control gave 0.511 [0.5004, 0.522].
+With about 99,000 pockets its interval is narrow. This is the single-permutation
+miscalibration that diagnostic D1 identified, and it is reported, not re-decided.
+
+**T3 (external, descriptive).**
+
+- **Training set.** The model was trained on this dataset only, after removing every
+  entry that shares a strict group with an inositol phosphate benchmark entry. That
+  left 279 buried positives in 46 groups.
+- **Buried IP sites.** On the inositol benchmark's buried IP sites it scores ROC-AUC
+  **0.974 [0.839, 0.993]**, against 0.923 for the rule-based score.
+- **Any IP site.** On all IP sites it scores 0.842 against 0.868.
+- **Status.** The buried IP positives lie in only 5 groups, so this is descriptive
+  and supports no claim of transfer.
+
+**What this settles.**
+
+1. **Recognition is learnable.** Buried phosphate-dense sites can be recognised by a
+   learned model in families it has never seen, far above the hand-built score. That
+   score was tuned on IP6 and is near chance at telling buried from surface sites
+   outside inositol phosphates.
+2. **Hull depth adds nothing.** Across 914 buried sites in 174 families, adding hull
+   depth to a learned model changes ROC-AUC by +0.002. Outside the super-group, under
+   strict grouping, it lowers it by 0.086.
+   - The pre-registered decisions are "not evaluable" and "inconclusive", not
+     "refuted", because the sequence-grouping intervals are not inside ±0.01.
+   - The evidence points one way: hull depth does not help, and the screen's
+     hull-depth gate should be reconsidered.
+
 ### Results on the deposited set (superseded)
 
 > **Superseded: these numbers overstate performance.** An audit found that the
