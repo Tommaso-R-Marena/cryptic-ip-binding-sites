@@ -95,7 +95,7 @@ def score_and_minimise(receptor: Receptor, ligand_pdbqt: str, centre: Sequence[f
     before = float(v.score()[0])
     minimised = v.optimize()
     after = float(minimised[0])
-    return before, after, v.poses(n_poses=1) if False else _current_pose(v)
+    return before, after, _current_pose(v)
 
 
 def _current_pose(v) -> str:
@@ -162,6 +162,7 @@ class PoseTable:
     rmsd: List[float]
     rmsd_p: List[float]
     centroid_distance: List[float] = field(default_factory=list)
+    centroids: List[List[float]] = field(default_factory=list)
 
 
 def pose_table(result: DockResult, crystal, site_centroid: Optional[np.ndarray] = None) -> PoseTable:
@@ -170,16 +171,17 @@ def pose_table(result: DockResult, crystal, site_centroid: Optional[np.ndarray] 
 
     poses = poses_from_pdbqt(result.poses_pdbqt)
     scores = [float(s) for s in result.scores[: len(poses)]]
-    rmsd, rmsd_p, dist = [], [], []
+    from rdkit import Chem
+
+    rmsd, rmsd_p, dist, centroids = [], [], [], []
     for pose in poses:
         rmsd.append(symmetric_rmsd(crystal, pose) if crystal is not None else float("nan"))
         rmsd_p.append(symmetric_rmsd(crystal, pose, phosphorus_only=True) if crystal is not None else float("nan"))
+        centroid = Chem.RemoveHs(pose, sanitize=False).GetConformer().GetPositions().mean(axis=0)
+        centroids.append([float(v) for v in centroid])
         if site_centroid is not None:
-            from rdkit import Chem
-
-            xyz = Chem.RemoveHs(pose).GetConformer().GetPositions()
-            dist.append(float(np.linalg.norm(xyz.mean(axis=0) - site_centroid)))
-    return PoseTable(scores, rmsd, rmsd_p, dist)
+            dist.append(float(np.linalg.norm(centroid - np.asarray(site_centroid, dtype=float))))
+    return PoseTable(scores, rmsd, rmsd_p, dist, centroids)
 
 
 def spearman(scores: Sequence[float], rmsd: Sequence[float]) -> float:

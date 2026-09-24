@@ -100,7 +100,10 @@ def heavy_coordinates(mol, conf_id: int = -1) -> Tuple[object, np.ndarray]:
     return graph, coords
 
 
-def atom_mappings(reference_graph, probe_graph) -> List[Tuple[Dict[int, int], Dict[int, List[int]], Dict[int, List[int]]]]:
+Mapping = Tuple[Dict[int, int], Dict[int, List[int]], Dict[int, List[int]]]
+
+
+def atom_mappings(reference_graph, probe_graph) -> List[Mapping]:
     """Every core mapping of reference onto probe, with each side's terminal oxygens.
 
     Returns a list of ``(core_map, ref_terminal, probe_terminal)`` where

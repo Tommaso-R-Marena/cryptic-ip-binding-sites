@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Dict, List, Mapping, Sequence, Tuple
 
 import numpy as np
 
@@ -84,7 +84,9 @@ def parent_molecule(smiles: str):
     if mol is None:
         raise LigandError(f"RDKit cannot parse the CCD SMILES {smiles!r}")
     centres = Chem.FindMolChiralCenters(mol, includeUnassigned=True, useLegacyImplementation=False)
-    unassigned = [idx for idx, label in centres if label == "?"]
+    # Phosphate phosphorus is not a stereocentre (its terminal oxygens are
+    # equivalent by resonance), although a graph-based perception may flag it.
+    unassigned = [idx for idx, label in centres if label == "?" and mol.GetAtomWithIdx(idx).GetAtomicNum() != 15]
     if unassigned:
         raise LigandError(f"CCD SMILES leaves {len(unassigned)} stereocentre(s) unassigned")
     return mol
@@ -171,6 +173,12 @@ def crystal_molecule(elements: Sequence[str], coords: np.ndarray, atom_names: Se
         assigned = AllChem.AssignBondOrdersFromTemplate(generic_template, mol)
     except (ValueError, RuntimeError) as exc:
         raise LigandError(f"crystal copy does not match the CCD template: {exc}") from exc
+    # Coordinates carry no hydrogens: let valence supply them, so stereocentres
+    # are perceived as in the template.
+    for atom in assigned.GetAtoms():
+        atom.SetNoImplicit(False)
+        atom.SetNumRadicalElectrons(0)
+    Chem.SanitizeMol(assigned)
     Chem.AssignStereochemistryFrom3D(assigned)
     return assigned, True
 
@@ -181,6 +189,9 @@ def _neutral_isomeric_smiles(mol) -> str:
 
     heavy = Chem.RemoveHs(mol)
     neutral = rdMolStandardize.Uncharger().uncharge(heavy)
+    for atom in neutral.GetAtoms():
+        if atom.GetAtomicNum() == 15:  # not a stereocentre: see parent_molecule
+            atom.SetChiralTag(Chem.ChiralType.CHI_UNSPECIFIED)
     return Chem.MolToSmiles(neutral, isomericSmiles=True)
 
 

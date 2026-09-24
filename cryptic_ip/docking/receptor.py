@@ -51,6 +51,7 @@ NUCLEOTIDES = frozenset({
 BASE_RING_CARBONS = frozenset({"C2", "C4", "C5", "C6", "C8"})
 BASE_RING_NITROGENS = frozenset({"N1", "N3", "N7", "N9"})
 H_BOND_MAX = 1.3
+CHAIN_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
 
 def _glycosidic_nitrogen(resname: str) -> str:
@@ -100,6 +101,14 @@ def write_polymer_pdb(arrays, out_path: Path) -> StripReport:
     removed = set()
     serial = 0
     last_chain = None
+    # PDB format holds one-character chain ids and four-digit residue numbers.
+    # Each polymer chain gets its own character, so chains are never merged; an
+    # entry that cannot be written faithfully is refused, not approximated.
+    chains = list(dict.fromkeys(str(c) for c in arrays.chain_ids[arrays.is_polymer]))
+    if len(chains) > len(CHAIN_LETTERS):
+        raise ReceptorError(f"{len(chains)} polymer chains: more than PDB format can hold")
+    letter = {c: (c if len(c) == 1 and all(len(x) == 1 for x in chains) else CHAIN_LETTERS[i])
+              for i, c in enumerate(chains)}
     for i in range(arrays.n_atoms):
         if not arrays.is_polymer[i]:
             report.removed_nonpolymer_atoms += 0 if arrays.is_solvent[i] else 1
@@ -117,7 +126,9 @@ def write_polymer_pdb(arrays, out_path: Path) -> StripReport:
         elif resname not in CANONICAL_AMINO_ACIDS and resname not in NUCLEOTIDES:
             removed.add(f"{arrays.chain_ids[i]}:{resname}{arrays.resseqs[i]}{arrays.icodes[i]}".strip())
             continue
-        chain = str(arrays.chain_ids[i])
+        chain = letter[str(arrays.chain_ids[i])]
+        if not -999 <= int(arrays.resseqs[i]) <= 9999:
+            raise ReceptorError(f"residue number {int(arrays.resseqs[i])} does not fit PDB format")
         if last_chain is not None and chain != last_chain:
             lines.append("TER")
         last_chain = chain
