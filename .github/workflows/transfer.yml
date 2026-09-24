@@ -96,6 +96,7 @@ jobs:
           cat data/transfer/comp_ids.txt
 
       - name: The inositol benchmark's entries
+        shell: bash -l {0}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
