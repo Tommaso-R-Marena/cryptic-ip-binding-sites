@@ -1,0 +1,91 @@
+name: Learned screen
+
+# docs/LEARNED_SCREEN_PLAN.md: lock the benchmark's ip_site model on its whole
+# table (run 35949588200), score every pocket of a finished proteome screen,
+# exclude proteins homologous to any benchmark protein, and test the ranking
+# against UniProt inositol phosphate annotations before listing candidates.
+# On demand only: it needs a finished screen run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      screen_run:
+        description: 'proteome-screen run id with shard-* and catalog-* artifacts'
+        default: '35935291031'
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  IP_BENCHMARK_RUN: '35949588200'
+  SCREEN_RUN: ${{ inputs.screen_run || '35935291031' }}
+
+jobs:
+  rank:
+    name: Train, score, evaluate
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda
+
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge -c bioconda mmseqs2 pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt tabulate
+          python -m pip install -e .
+
+      - name: Benchmark table, entries and screen outputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$IP_BENCHMARK_RUN" --repo "$GITHUB_REPOSITORY" --name benchmark-table --dir bench
+          gh run download "$IP_BENCHMARK_RUN" --repo "$GITHUB_REPOSITORY" --name benchmark-dataset --dir bench
+          gh run download "$SCREEN_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'shard-*' --dir screen/shards
+          gh run download "$SCREEN_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'catalog-*' --dir screen/catalog
+          sha256sum bench/table.csv.gz
+          find screen -name '*_pockets_part*.csv.gz' | wc -l
+
+      - name: Lock the model
+        shell: bash -l {0}
+        run: python scripts/learned_screen.py train --table bench/table.csv.gz --output model/ip_site_locked.joblib
+
+      - name: Sequences and homology to the benchmark
+        shell: bash -l {0}
+        run: |
+          python scripts/learned_screen.py fasta --accessions-csv bench/entries.csv --output seq/benchmark.fasta
+          python scripts/learned_screen.py fasta --accessions-csv $(find screen/shards -name '*_status.csv') \
+            --output seq/screened.fasta
+          mmseqs easy-search seq/screened.fasta seq/benchmark.fasta seq/hits.tsv /tmp/mm_search \
+            -e 1e-3 -s 7.5 --max-seqs 100000 --threads "$(nproc)" \
+            --format-output query,target,fident,qstart,qend,tstart,tend,qlen,tlen,evalue
+          mmseqs easy-cluster seq/screened.fasta seq/clusters /tmp/mm_cluster \
+            --min-seq-id 0.3 -c 0.5 --cov-mode 0 --threads "$(nproc)"
+
+      - name: Evaluate and rank
+        shell: bash -l {0}
+        run: |
+          python scripts/learned_screen.py evaluate --model model/ip_site_locked.joblib \
+            --shards-dir screen/shards --catalog-dir screen/catalog \
+            --seen-hits seq/hits.tsv --clusters seq/clusters_cluster.tsv \
+            --output-dir results/learned_screen
+          cat results/learned_screen/LEARNED_SCREEN.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: learned-screen
+          path: |
+            results/learned_screen
+            model/ip_site_locked.joblib
+          retention-days: 90
