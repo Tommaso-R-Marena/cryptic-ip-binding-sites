@@ -1,0 +1,293 @@
+name: Specificity
+
+# docs/SPECIFICITY_PLAN.md: can the 39 descriptors tell an inositol phosphate
+# site from another phosphate-dense ligand site?
+#
+#   prepare    IP pockets (benchmark run 35949588200) against other-polyanion
+#              pockets (transfer run 35972729955), joint homology groups, the
+#              temporal holdout; variants S1 (all), S1b (without the super-group),
+#              S1r (X-ray <= 2.5 A IP entries)
+#   evaluate   the benchmark's runs, unchanged: sequence r0-2 (+holdout), strict
+#              r0, ten permutations, per variant
+#   decide     comparison, the ten-permutation null, decisions and the gate
+#   rerank     only if the gate opens: P(site) x P(IP | site) over the screened
+#              proteomes, L3a/L3b, candidates
+#   report     printed between markers
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/SPECIFICITY_PLAN.md'
+      - 'scripts/specificity.py'
+      - '.github/workflows/specificity.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: specificity-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  IP_BENCHMARK_RUN: '35949588200'
+  TRANSFER_RUN: '35972729955'
+  LEARNED_SCREEN_RUN: '35992676292'
+  SCREEN_RUN: '35935291031'
+  TABLE_SHA256: 'a21d92fd0f57306848c260d1f163017f0bf1e82a5dfcf1f3be69e0c20b698a1d'
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$IP_BENCHMARK_RUN" --repo "$GITHUB_REPOSITORY" --name benchmark-table --dir ip
+          gh run download "$IP_BENCHMARK_RUN" --repo "$GITHUB_REPOSITORY" --name benchmark-dataset --dir ip
+          gh run download "$TRANSFER_RUN" --repo "$GITHUB_REPOSITORY" --name transfer-table --dir tr
+          gh run download "$TRANSFER_RUN" --repo "$GITHUB_REPOSITORY" --name transfer-dataset --dir tr
+          echo "$TABLE_SHA256  ip/table.csv.gz" | sha256sum -c -
+          sha256sum tr/table.csv.gz
+      - name: Tables
+        run: |
+          python scripts/specificity.py prepare --ip-table ip/table.csv.gz --transfer-table tr/table.csv.gz \
+            --joint-entries tr/joint_grouped.csv --ip-entries ip/entries_grouped.csv --out-dir prep
+      - uses: actions/upload-artifact@v6
+        with:
+          name: specificity-prepare
+          path: prep
+          retention-days: 90
+
+  evaluate:
+    name: ${{ matrix.variant }} ${{ matrix.part }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [all, no_supergroup, xray25]
+        part: [models, perm_a, perm_b]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: specificity-prepare
+          path: prep
+      - name: Runs
+        run: |
+          T=prep/table_${{ matrix.variant }}.csv.gz
+          run() { python scripts/benchmark.py run --table "$T" --task ip_site --arm full --n-draws 10 "$@"; }
+          case "${{ matrix.part }}" in
+            models)
+              run --grouping sequence --repeat 0 --holdout --out-dir pred
+              run --grouping sequence --repeat 1 --out-dir pred
+              run --grouping sequence --repeat 2 --out-dir pred
+              run --grouping strict --repeat 0 --out-dir pred ;;
+            perm_a)
+              for r in 0 1 2 3 4; do run --grouping sequence --repeat $r --permute --out-dir null; done ;;
+            perm_b)
+              for r in 5 6 7 8 9; do run --grouping sequence --repeat $r --permute --out-dir null; done ;;
+          esac
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: specificity-runs-${{ matrix.variant }}-${{ matrix.part }}
+          path: |
+            pred
+            null
+          retention-days: 90
+
+  decide:
+    name: Compare and decide
+    needs: evaluate
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    outputs:
+      gate: ${{ steps.gate.outputs.open }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: specificity-prepare
+          path: prep
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: specificity-runs-*
+          path: runs
+      - name: Compare each variant
+        run: |
+          for v in all no_supergroup xray25; do
+            mkdir -p "cmp/$v/pred" "cmp/$v/null"
+            for d in runs/specificity-runs-$v-*; do
+              [ -d "$d/pred" ] && cp -r "$d/pred/." "cmp/$v/pred/"
+              [ -d "$d/null" ] && cp -r "$d/null/." "cmp/$v/null/"
+            done
+            # the comparison sees the non-permuted runs and permutation r0, as the benchmark did
+            cp cmp/$v/null/*__r0__permuted.* "cmp/$v/pred/" 2>/dev/null || true
+            python scripts/benchmark.py compare --predictions-dir "cmp/$v/pred" \
+              --prepare-summary "prep/summary_$v.json" --out-dir "reports/$v" || true
+            python scripts/permutation_null.py --predictions-dir "cmp/$v/null" \
+              --output "reports/$v/permutation_null.json" || true
+          done
+          python scripts/specificity.py decide --reports-dir reports --prepare-dir prep --output reports/decisions.json
+      - id: gate
+        run: echo "open=$(python -c "import json; print(str(json.load(open('reports/decisions.json'))['gate']['open']).lower())")" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: specificity-decisions
+          path: reports
+          retention-days: 90
+
+  rerank:
+    name: Re-rank the screened proteomes
+    needs: [prepare, decide]
+    if: ${{ !cancelled() && needs.decide.outputs.gate == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge -c bioconda mmseqs2 pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: specificity-prepare
+          path: prep
+      - uses: actions/download-artifact@v7
+        with:
+          name: specificity-decisions
+          path: reports
+      - name: Screen, learned model, entries
+        shell: bash -l {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$LEARNED_SCREEN_RUN" --repo "$GITHUB_REPOSITORY" --name learned-screen --dir ls
+          gh run download "$SCREEN_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'shard-*' --dir screen/shards
+          gh run download "$SCREEN_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'catalog-*' --dir screen/catalog
+          gh run download "$IP_BENCHMARK_RUN" --repo "$GITHUB_REPOSITORY" --name benchmark-dataset --dir ip
+          gh run download "$TRANSFER_RUN" --repo "$GITHUB_REPOSITORY" --name transfer-dataset --dir tr
+      - name: Sequences, homology and clusters
+        shell: bash -l {0}
+        run: |
+          python scripts/learned_screen.py fasta --accessions-csv ip/entries.csv --output seq/benchmark.fasta
+          python scripts/learned_screen.py fasta --accessions-csv tr/entries.csv --output seq/transfer.fasta
+          python scripts/learned_screen.py fasta --accessions-csv $(find screen/shards -name '*_status.csv') \
+            --output seq/screened.fasta
+          for t in benchmark transfer; do
+            mmseqs easy-search seq/screened.fasta seq/$t.fasta seq/hits_$t.tsv /tmp/mm_$t \
+              -e 1e-3 -s 7.5 --max-seqs 100000 --threads "$(nproc)" \
+              --format-output query,target,fident,qstart,qend,tstart,tend,qlen,tlen,evalue
+          done
+          mmseqs easy-cluster seq/screened.fasta seq/clusters /tmp/mm_cluster \
+            --min-seq-id 0.3 -c 0.5 --cov-mode 0 --threads "$(nproc)"
+      - name: Re-rank
+        shell: bash -l {0}
+        run: |
+          python scripts/specificity.py rerank --decisions reports/decisions.json --prepare-dir prep \
+            --site-model "$(find ls -name 'ip_site_locked.joblib' | head -1)" \
+            --shards-dir screen/shards --catalog-dir screen/catalog \
+            --hits-benchmark seq/hits_benchmark.tsv --hits-transfer seq/hits_transfer.tsv \
+            --clusters seq/clusters_cluster.tsv --output rerank/rerank.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: specificity-rerank
+          path: rerank
+          retention-days: 90
+
+  report:
+    name: Report
+    needs: [decide, rerank]
+    if: ${{ !cancelled() && needs.decide.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: specificity-decisions
+          path: reports
+      - uses: actions/download-artifact@v7
+        if: ${{ needs.rerank.result == 'success' }}
+        with:
+          name: specificity-rerank
+          path: rerank
+      - name: Report
+        run: |
+          python scripts/specificity.py report --decisions reports/decisions.json \
+            $( [ -f rerank/rerank.json ] && echo --rerank rerank/rerank.json ) --out-dir results/specificity
+          cat results/specificity/SPECIFICITY.md >> "$GITHUB_STEP_SUMMARY"
+          for v in all no_supergroup xray25; do
+            [ -f "reports/$v/benchmark_report.json" ] && cp "reports/$v/benchmark_report.json" "results/specificity/benchmark_report_$v.json"
+            [ -f "reports/$v/permutation_null.json" ] && cp "reports/$v/permutation_null.json" "results/specificity/permutation_null_$v.json"
+          done
+          python scripts/extract_log_block.py emit SPECIFICITY_JSON results/specificity/specificity.json
+          for v in all no_supergroup xray25; do
+            f="results/specificity/benchmark_report_$v.json"
+            [ -f "$f" ] && python scripts/extract_log_block.py emit "SPECIFICITY_REPORT_${v^^}_JSON" "$f"
+            f="results/specificity/permutation_null_$v.json"
+            [ -f "$f" ] && python scripts/extract_log_block.py emit "SPECIFICITY_NULL_${v^^}_JSON" "$f"
+          done
+          [ -f rerank/candidates.csv ] && python scripts/extract_log_block.py emit SPECIFICITY_CANDIDATES_B64 rerank/candidates.csv || true
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: specificity-report
+          path: results/specificity
+          retention-days: 90
