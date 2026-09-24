@@ -38,7 +38,7 @@ jobs:
           python3 -c "import json; print(json.dumps(json.load(open('report/benchmark_report.json')), separators=(',', ':')))"
           echo "END_REPORT_JSON"
 
-  null:
+  permute:
     name: ${{ matrix.task }} permuted r${{ matrix.repeat }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -91,7 +91,7 @@ jobs:
 
   summarise:
     name: Summarise
-    needs: null
+    needs: permute
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
