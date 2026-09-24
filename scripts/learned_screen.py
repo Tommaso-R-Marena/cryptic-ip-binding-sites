@@ -17,9 +17,7 @@ import argparse
 import hashlib
 import json
 import sys
-import time
 import urllib.parse
-import urllib.request
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set
 
@@ -82,22 +80,32 @@ def parse_fasta(text: str) -> Dict[str, str]:
     return {k: "".join(v) for k, v in records.items() if v}
 
 
+def _validate_fasta(payload: bytes) -> None:
+    """A UniProt FASTA response: empty (every accession obsolete) or records."""
+    from cryptic_ip.database.async_fetch import ValidationError
+
+    text = payload.lstrip()
+    if text and not text.startswith(b">"):
+        raise ValidationError(f"not FASTA: {payload[:80]!r}")
+
+
 def fetch_uniprot_fasta(accessions: Sequence[str], batch: int = 150) -> Dict[str, str]:
-    out: Dict[str, str] = {}
+    """UniProt sequences for ``accessions``, through the project's verified, retrying fetcher."""
+    from cryptic_ip.database.async_fetch import FetchJob, fetch_all
+
     unique = sorted({a.strip().upper() for a in accessions if a and a.strip()})
+    jobs = []
     for start in range(0, len(unique), batch):
-        chunk = unique[start:start + batch]
-        query = " OR ".join(f"accession:{a}" for a in chunk)
+        query = " OR ".join(f"accession:{a}" for a in unique[start:start + batch])
         url = "https://rest.uniprot.org/uniprotkb/stream?" + urllib.parse.urlencode({"format": "fasta", "query": query})
-        for attempt in range(5):
-            try:
-                with urllib.request.urlopen(url, timeout=120) as response:
-                    out.update(parse_fasta(response.read().decode()))
-                break
-            except Exception:  # transient network error: back off and retry, then fail loudly
-                if attempt == 4:
-                    raise
-                time.sleep(2 ** attempt)
+        jobs.append(FetchJob(key=f"batch{start // batch}", url=url, validator=_validate_fasta))
+    results = fetch_all(jobs, concurrency=4, per_host=4)
+    failed = [r for r in results if not r.ok]
+    if failed:
+        raise RuntimeError(f"{len(failed)} of {len(results)} UniProt batches failed, e.g. {failed[0].error}")
+    out: Dict[str, str] = {}
+    for result in results:
+        out.update(parse_fasta((result.payload or b"").decode()))
     return out
 
 

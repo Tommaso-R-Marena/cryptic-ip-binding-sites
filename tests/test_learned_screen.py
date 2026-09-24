@@ -93,3 +93,12 @@ def test_low_confidence_pockets_are_ignored():
                             "pocket_id": [1, 2, 1]})
     table = ls.protein_table(pockets).set_index("uniprot_id")
     assert table.loc["A", "learned_score"] == 0.2 and table.loc["A", "rule_score"] == 0.3
+
+
+def test_fasta_validator_rejects_non_fasta():
+    from cryptic_ip.database.async_fetch import ValidationError
+
+    ls._validate_fasta(b">P1\nMKT\n")
+    ls._validate_fasta(b"")  # every accession in the batch obsolete
+    with pytest.raises(ValidationError):
+        ls._validate_fasta(b"<html>error</html>")
