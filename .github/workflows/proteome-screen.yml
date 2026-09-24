@@ -20,6 +20,10 @@ on:
   # statistics (proteome_stats.py) and the scorer are applied at aggregation,
   # so a change there is re-analysed with proteome-aggregate.yml instead.
   push:
+    # Analyses, not tests: on main they run on demand only, so merging
+    # does not re-derive every recorded result.
+    branches-ignore:
+      - main
     paths:
       - 'scripts/proteome_screen.py'
       - 'cryptic_ip/database/proteome_catalog.py'

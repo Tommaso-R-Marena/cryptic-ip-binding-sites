@@ -9,6 +9,10 @@ on:
   # A push registers the workflow (dispatch-only files on a non-default branch
   # cannot be dispatched until they have run) and runs it on the default table.
   push:
+    # Analyses, not tests: on main they run on demand only, so merging
+    # does not re-derive every recorded result.
+    branches-ignore:
+      - main
     paths:
       - 'scripts/transfer_secondary.py'
       - 'docs/TRANSFER_PLAN_AMENDMENT_1.md'

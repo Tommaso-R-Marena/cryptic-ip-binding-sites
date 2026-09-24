@@ -10,6 +10,10 @@ on:
   # A push registers the workflow; the gate job ends it quietly until the
   # screen run it reads has finished.
   push:
+    # Analyses, not tests: on main they run on demand only, so merging
+    # does not re-derive every recorded result.
+    branches-ignore:
+      - main
     paths:
       - 'scripts/learned_screen.py'
       - 'docs/LEARNED_SCREEN_PLAN.md'

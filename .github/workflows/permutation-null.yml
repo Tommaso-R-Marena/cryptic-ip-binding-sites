@@ -7,6 +7,10 @@ name: Permutation null
 
 on:
   push:
+    # Analyses, not tests: on main they run on demand only, so merging
+    # does not re-derive every recorded result.
+    branches-ignore:
+      - main
     paths:
       - 'scripts/permutation_null.py'
       - '.github/workflows/permutation-null.yml'

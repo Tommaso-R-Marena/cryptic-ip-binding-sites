@@ -17,6 +17,10 @@ name: Transfer
 
 on:
   push:
+    # Analyses, not tests: on main they run on demand only, so merging
+    # does not re-derive every recorded result.
+    branches-ignore:
+      - main
     paths:
       - 'docs/TRANSFER_PLAN.md'
       - 'scripts/build_polyanion_dataset.py'

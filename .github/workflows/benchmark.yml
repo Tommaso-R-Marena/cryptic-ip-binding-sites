@@ -19,6 +19,10 @@ name: Benchmark
 
 on:
   push:
+    # Analyses, not tests: on main they run on demand only, so merging
+    # does not re-derive every recorded result.
+    branches-ignore:
+      - main
     paths:
       - 'scripts/benchmark.py'
       - 'scripts/homology_groups.py'

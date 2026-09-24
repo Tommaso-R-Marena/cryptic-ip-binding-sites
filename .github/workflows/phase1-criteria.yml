@@ -9,6 +9,10 @@ name: Phase 1 Criteria
 
 on:
   push:
+    # Analyses, not tests: on main they run on demand only, so merging
+    # does not re-derive every recorded result.
+    branches-ignore:
+      - main
     paths:
       - 'scripts/phase1_criteria.py'
       - 'cryptic_ip/validation/phase1_criteria.py'
