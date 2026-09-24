@@ -206,6 +206,15 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Include free inositols (InsP0) as reference ligands",
     )
+    parser.add_argument(
+        "--metadata-only",
+        action="store_true",
+        help=(
+            "Write the entry table from search results and entry metadata alone: no "
+            "structure download and no burial measurement (the benchmark labels "
+            "pockets itself, from the structures, in its own step)"
+        ),
+    )
     parser.add_argument("--jobs", type=int, default=4, help="Parallel worker processes")
     parser.add_argument(
         "--download-workers", type=int, default=4, help="Concurrent download threads"
@@ -421,6 +430,9 @@ def build_dataset(args: argparse.Namespace) -> Dict[str, Any]:
     if not all_ids:
         raise RcsbUnavailableError("Search returned no entries; nothing to build.")
 
+    if getattr(args, "metadata_only", False):
+        return _write_metadata_only(args, client, ligands, ligand_provenance, entries, decoys, started)
+
     LOGGER.info("Downloading %d structures", len(all_ids))
     downloads = client.download_structures(
         all_ids, structures_dir, max_workers=args.download_workers
@@ -584,6 +596,48 @@ def build_dataset(args: argparse.Namespace) -> Dict[str, Any]:
         )
     if failures:
         LOGGER.warning("%d structures failed measurement; see the manifest.", len(failures))
+    return manifest
+
+
+def _write_metadata_only(args, client, ligands, ligand_provenance, entries, decoys, started) -> Dict[str, Any]:
+    """Entry table from search results and metadata alone (``--metadata-only``)."""
+    all_ids = list(entries) + list(decoys)
+    metadata = client.fetch_entry_metadata(all_ids)
+    decoy_set = set(decoys)
+    rows: List[Dict[str, Any]] = []
+    missing: List[str] = []
+    for pdb_id in all_ids:
+        if pdb_id not in metadata:
+            missing.append(pdb_id)
+        rows.append(
+            {
+                "pdb_id": pdb_id,
+                "classification": "decoy" if pdb_id in decoy_set else "",
+                "has_ip_ligand": pdb_id not in decoy_set,
+                **_entry_annotations(metadata.get(pdb_id)),
+            }
+        )
+    n_rows = write_csv(args.entry_csv, ENTRY_FIELDS, rows)
+    manifest = {
+        "generated_at_utc": started.isoformat(),
+        "completed_at_utc": datetime.now(timezone.utc).isoformat(),
+        "command": " ".join(sys.argv),
+        "mode": "metadata-only",
+        "ligand_registry": [lig.to_dict() for lig in ligands],
+        "ligand_discovery": ligand_provenance,
+        "search": {
+            "n_ligand_entries": len(entries),
+            "n_decoy_entries": len(decoys),
+            "experimental_methods": args.experimental_methods,
+            "max_resolution": args.max_resolution,
+        },
+        "entries_without_metadata": missing,
+        "api_statistics": client.stats.to_dict(),
+        "outputs": {"entry_csv": str(args.entry_csv), "entry_csv_sha256": sha256_file(args.entry_csv)},
+    }
+    args.manifest.parent.mkdir(parents=True, exist_ok=True)
+    args.manifest.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    LOGGER.info("Wrote %d entries (%d without metadata)", n_rows, len(missing))
     return manifest
 
 
