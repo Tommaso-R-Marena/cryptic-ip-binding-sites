@@ -142,18 +142,27 @@ def cmd_run(args: argparse.Namespace) -> int:
         args.task, args.arm, args.grouping, args.repeat, " (permuted)" if args.permute else "",
         len(y), int(y.sum()), len(np.unique(groups)),
     )
-    oof = protocol.run_cv(
-        X, y, groups, rule,
-        n_outer=args.n_outer, n_inner=args.n_inner, n_draws=args.n_draws,
-        fold_seed=args.repeat, model_seed=args.repeat, progress=LOGGER.info,
-    )
-    frames = [_prediction_frame(dev, y, groups, rule, oof, "cv", args)]
-
     meta: Dict[str, object] = {
         "task": args.task, "arm": args.arm, "grouping": args.grouping, "repeat": args.repeat,
         "permuted": bool(args.permute), "features": features,
         "n_outer": args.n_outer, "n_inner": args.n_inner, "n_draws": args.n_draws,
     }
+    stem = f"{args.task}__{args.arm}__{args.grouping}__r{args.repeat}{'__permuted' if args.permute else ''}"
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        oof = protocol.run_cv(
+            X, y, groups, rule,
+            n_outer=args.n_outer, n_inner=args.n_inner, n_draws=args.n_draws,
+            fold_seed=args.repeat, model_seed=args.repeat, progress=LOGGER.info,
+        )
+    except protocol.SplitError as exc:
+        # The grouping cannot support cross-validation for this task: recorded
+        # and reported as not evaluable, never silently dropped.
+        meta["not_evaluable"] = str(exc)
+        write_json_strict(args.out_dir / f"{stem}.json", meta, indent=2)
+        print(f"::warning::{stem}: not evaluable - {exc}")
+        return 0
+    frames = [_prediction_frame(dev, y, groups, rule, oof, "cv", args)]
     if args.holdout:
         hold = _task_rows(table, args.task, holdout=True)
         if len(hold) and len(np.unique(hold[f"label_{args.task}"])) == 2:
@@ -174,8 +183,6 @@ def cmd_run(args: argparse.Namespace) -> int:
         else:
             meta["locked_model"] = "holdout lacks both classes for this task"
 
-    args.out_dir.mkdir(parents=True, exist_ok=True)
-    stem = f"{args.task}__{args.arm}__{args.grouping}__r{args.repeat}{'__permuted' if args.permute else ''}"
     pd.concat(frames, ignore_index=True).to_csv(args.out_dir / f"{stem}.csv.gz", index=False)
     write_json_strict(args.out_dir / f"{stem}.json", meta, indent=2)
     return 0
@@ -277,11 +284,19 @@ def _paired_difference(full: pd.DataFrame, reduced: pd.DataFrame, metric: str, n
 
 def cmd_compare(args: argparse.Namespace) -> int:
     frames = [pd.read_csv(path, low_memory=False) for path in sorted(args.predictions_dir.rglob("*.csv.gz"))]
+    not_evaluable = {}
+    for path in sorted(args.predictions_dir.rglob("*.json")):
+        meta = json.loads(path.read_text())
+        if meta.get("not_evaluable"):
+            not_evaluable[path.stem] = meta["not_evaluable"]
     if not frames:
-        raise SystemExit(f"no predictions under {args.predictions_dir}")
+        raise SystemExit(f"no predictions under {args.predictions_dir}; not evaluable: {not_evaluable}")
     preds = pd.concat(frames, ignore_index=True)
     summary = json.loads(args.prepare_summary.read_text()) if args.prepare_summary else {}
-    report: Dict[str, object] = {"data": summary, "evaluations": {}, "hypotheses": {}, "permutation": {}}
+    report: Dict[str, object] = {
+        "data": summary, "evaluations": {}, "hypotheses": {}, "permutation": {},
+        "not_evaluable": not_evaluable,
+    }
     nb = args.n_bootstrap
 
     # A smoke run permutes every label, so it exercises the whole analysis
@@ -345,8 +360,16 @@ def cmd_compare(args: argparse.Namespace) -> int:
         unsupported = [g for g, share in largest.items() if share > MAX_GROUP_POSITIVE_SHARE]
         if unsupported:
             result["unsupported_groupings"] = unsupported
+        missing = [
+            stem for stem in not_evaluable
+            if stem.startswith(f"{result['task']}__") and "__permuted" not in stem
+        ]
+        if missing:
+            result["not_evaluable_runs"] = missing
         if not permutation_ok:
             result["decision"] = "not evaluable: permutation control failed"
+        elif missing:
+            result["decision"] = "not evaluable: a required grouping cannot be split (see not_evaluable_runs)"
         elif unsupported:
             result["decision"] = f"not evaluable: one group holds > {MAX_GROUP_POSITIVE_SHARE:.0%} of positives under {unsupported}"
         else:
@@ -399,6 +422,10 @@ def _markdown(report: Dict[str, object]) -> str:
             f"{_fmt(e['roc_auc'])} | {_fmt(e['pr_auc'])} | {_fmt(e['rule_roc_auc'])} | {_fmt(e['rule_pr_auc'])} | "
             f"{_fmt(e['ml_minus_rule_roc_auc'])} | {e['mcc']:.3f} / {e['rule_mcc']:.3f} | {e['families_chosen']} |"
         )
+    if report.get("not_evaluable"):
+        lines.append("\n### Not evaluable\n")
+        for stem, reason in report["not_evaluable"].items():
+            lines.append(f"- {stem}: {reason}")
     if report["permutation"]:
         lines.append("\n### Permutation control (ROC-AUC must include 0.5)\n")
         for task, p in report["permutation"].items():

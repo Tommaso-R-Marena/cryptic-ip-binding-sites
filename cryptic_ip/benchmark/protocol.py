@@ -145,21 +145,43 @@ def _scores(model, X: pd.DataFrame) -> np.ndarray:
     return model.predict_proba(X)[:, 1]
 
 
+class SplitError(ValueError):
+    """No grouped split gives every training fold both classes."""
+
+
+#: Seeded fold assignments tried at each fold count before trying fewer folds.
+SPLIT_ATTEMPTS = 50
+
+
 def _group_splits(y: np.ndarray, groups: np.ndarray, n_splits: int, seed: int) -> List[Tuple[np.ndarray, np.ndarray]]:
+    """Grouped, stratified folds in which every training fold holds both classes.
+
+    With few positive groups - or one large group holding most positives - a
+    single shuffled assignment can leave a training fold without positives.
+    Seeded reassignments are tried, then fewer folds. The result depends only
+    on the labels, the groups and the seed, so the paired arms of a comparison
+    receive identical folds.
+    """
     from sklearn.model_selection import StratifiedGroupKFold
 
     positive_groups = len(np.unique(groups[y == 1]))
     negative_groups = len(np.unique(groups[y == 0]))
-    k = min(n_splits, positive_groups, negative_groups)
-    if k < 2:
-        raise ValueError(
-            f"cannot split: {positive_groups} positive and {negative_groups} negative groups"
-        )
-    splitter = StratifiedGroupKFold(n_splits=k, shuffle=True, random_state=seed)
-    splits = list(splitter.split(np.zeros(len(y)), y, groups=groups))
-    for train, test in splits:
-        assert_disjoint(groups[train], groups[test])
-    return splits
+    k_max = min(n_splits, positive_groups, negative_groups)
+    if k_max < 2:
+        raise SplitError(f"cannot split: {positive_groups} positive and {negative_groups} negative groups")
+    for k in range(k_max, 1, -1):
+        for attempt in range(SPLIT_ATTEMPTS):
+            splitter = StratifiedGroupKFold(n_splits=k, shuffle=True, random_state=seed + 7919 * attempt)
+            splits = list(splitter.split(np.zeros(len(y)), y, groups=groups))
+            if all(len(np.unique(y[train])) == 2 for train, _ in splits):
+                for train, test in splits:
+                    assert_disjoint(groups[train], groups[test])
+                if k < n_splits:
+                    LOGGER.warning("using %d folds instead of %d: no valid %d-fold split", k, n_splits, k + 1)
+                return splits
+    raise SplitError(
+        f"no grouped split of {positive_groups} positive groups gives every training fold both classes"
+    )
 
 
 def _average_precision(y: np.ndarray, s: np.ndarray, w: Optional[np.ndarray] = None) -> float:

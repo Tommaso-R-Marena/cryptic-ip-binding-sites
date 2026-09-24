@@ -104,3 +104,18 @@ def test_run_and_compare(prepared):
     for task in ("cryptic_ip_site", "burial"):
         assert report["permutation"][task]["passes"] in (True, False)
     assert (out / "REPORT.md").read_text().startswith("## Benchmark")
+
+
+def test_a_task_that_cannot_be_split_is_reported_not_evaluable(prepared, monkeypatch):
+    tmp, table, summary = prepared
+
+    def refuse(*_a, **_k):
+        raise benchmark.protocol.SplitError("no grouped split gives every training fold both classes")
+
+    monkeypatch.setattr(benchmark.protocol, "run_cv", refuse)
+    preds = tmp / "preds_unsplittable"
+    common = ["--table", str(table), "--n-outer", "3", "--n-inner", "2", "--n-draws", "1", "--out-dir", str(preds)]
+    assert benchmark.main(["run", "--task", "burial", "--arm", "full", "--grouping", "strict", *common]) == 0
+    meta = json.loads((preds / "burial__full__strict__r0.json").read_text())
+    assert "not_evaluable" in meta
+    assert not list(preds.glob("*.csv.gz"))

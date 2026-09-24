@@ -179,3 +179,33 @@ class TestInference:
         assert protocol.decide(refuted, 0.01, None, 0) == "refuted"
         null = {"sequence": self._est(-0.004, 0.006), "strict": self._est(-0.008, 0.009)}
         assert protocol.decide(null, 0.6, None, 0) == "refuted"
+
+
+class TestSplitsWithFewPositiveGroups:
+    def test_every_training_fold_has_both_classes(self):
+        # Three positive groups, one holding most positives: a naive shuffle
+        # can leave a training fold with no positive at all.
+        rng = np.random.default_rng(0)
+        groups = np.repeat([f"G{i}" for i in range(12)], 20)
+        y = np.zeros(len(groups), dtype=int)
+        y[groups == "G0"] = 1
+        y[(groups == "G1") & (rng.random(len(groups)) < 0.2)] = 1
+        y[(groups == "G2") & (rng.random(len(groups)) < 0.1)] = 1
+        for seed in range(20):
+            splits = protocol._group_splits(y, groups, 5, seed)
+            assert all(len(np.unique(y[train])) == 2 for train, _ in splits)
+            for train, test in splits:
+                protocol.assert_disjoint(groups[train], groups[test])
+
+    def test_splits_depend_only_on_labels_groups_and_seed(self):
+        groups = np.repeat([f"G{i}" for i in range(10)], 10)
+        y = (np.arange(100) % 7 == 0).astype(int)
+        one = protocol._group_splits(y, groups, 5, 3)
+        two = protocol._group_splits(y, groups, 5, 3)
+        assert all((a[1] == b[1]).all() for a, b in zip(one, two))
+
+    def test_one_positive_group_cannot_be_split(self):
+        groups = np.repeat(["A", "B", "C"], 5)
+        y = (groups == "A").astype(int)
+        with pytest.raises(protocol.SplitError):
+            protocol._group_splits(y, groups, 5, 0)
