@@ -160,3 +160,26 @@ def test_census_dock_and_report_end_to_end(tmp_path, monkeypatch):
     assert rep["accounting"]["primary_set"] == 1
     assert rep["decisions"]["R1"]["decision"].startswith("not evaluable")  # one group only
     assert (out / "report.html").read_text().startswith("<!DOCTYPE html>")
+
+
+def test_audit_names_the_differing_centre():
+    from rdkit import Chem
+    from rdkit.Chem import AllChem
+
+    from cryptic_ip.docking import ligand as L
+
+    audit = _load("redocking_audit")
+    epimer = MYO_IP6.replace("[C@H]1", "[C@@H]1", 1)
+    mol = Chem.AddHs(Chem.MolFromSmiles(epimer))
+    AllChem.EmbedMolecule(mol, randomSeed=5)
+    mol = Chem.RemoveHs(mol)
+    template = L.parent_molecule(MYO_IP6)
+    crystal, complete = L.crystal_molecule([a.GetSymbol() for a in mol.GetAtoms()], mol.GetConformer().GetPositions(),
+                                           [str(i) for i in range(mol.GetNumAtoms())], template)
+    rows = audit.centre_report(crystal, template)
+    assert complete and len(rows) >= 4
+    assert sum(r["differs"] for r in rows) >= 1
+    assert all(r["abs_chiral_volume"] > 0.5 for r in rows)  # an embedded ring is not planar
+    same, _ = L.crystal_molecule([a.GetSymbol() for a in mol.GetAtoms()], mol.GetConformer().GetPositions(),
+                                 [str(i) for i in range(mol.GetNumAtoms())], L.parent_molecule(epimer))
+    assert not any(r["differs"] for r in audit.centre_report(same, L.parent_molecule(epimer)))
