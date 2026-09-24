@@ -1,0 +1,123 @@
+name: Permutation null
+
+# docs/ANALYSIS_PLAN.md, diagnostic D1: rerun the permutation control many times
+# on the full benchmark's table (one pinned full-mode run) to see whether the
+# burial control's single failure is within the null or a leak. Also prints the
+# full run's benchmark_report.json, which the report page is rendered from.
+
+on:
+  push:
+    paths:
+      - 'scripts/permutation_null.py'
+      - '.github/workflows/permutation-null.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: permutation-null-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  BENCHMARK_RUN: '35949588200'
+
+jobs:
+  report:
+    name: Full-run report JSON
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print benchmark_report.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$BENCHMARK_RUN" --repo "$GITHUB_REPOSITORY" --name benchmark-report --dir report
+          sha256sum report/*
+          echo "BEGIN_REPORT_JSON"
+          python3 -c "import json; print(json.dumps(json.load(open('report/benchmark_report.json')), separators=(',', ':')))"
+          echo "END_REPORT_JSON"
+
+  null:
+    name: ${{ matrix.task }} permuted r${{ matrix.repeat }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [burial]
+        repeat: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+                 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+        include:
+          - {task: cryptic_ip_site, repeat: 0}
+          - {task: cryptic_ip_site, repeat: 1}
+          - {task: cryptic_ip_site, repeat: 2}
+          - {task: cryptic_ip_site, repeat: 3}
+          - {task: cryptic_ip_site, repeat: 4}
+          - {task: cryptic_ip_site, repeat: 5}
+          - {task: cryptic_ip_site, repeat: 6}
+          - {task: cryptic_ip_site, repeat: 7}
+          - {task: cryptic_ip_site, repeat: 8}
+          - {task: cryptic_ip_site, repeat: 9}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+
+      - name: Fetch the benchmark table
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download "$BENCHMARK_RUN" --repo "$GITHUB_REPOSITORY" --name benchmark-table --dir table
+
+      - name: Permuted run
+        run: |
+          python scripts/benchmark.py run --table table/table.csv.gz --task ${{ matrix.task }} \
+            --arm full --grouping sequence --repeat ${{ matrix.repeat }} --n-draws 10 --permute \
+            --out-dir predictions
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: null-${{ matrix.task }}-${{ matrix.repeat }}
+          path: predictions
+          retention-days: 30
+
+  summarise:
+    name: Summarise
+    needs: null
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install pandas scikit-learn
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: null-*
+          path: predictions
+          merge-multiple: true
+
+      - name: Summarise
+        run: |
+          python scripts/permutation_null.py --predictions-dir predictions --output results/null/permutation_null.json
+          cat results/null/permutation_null.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: permutation-null
+          path: results/null
+          retention-days: 90

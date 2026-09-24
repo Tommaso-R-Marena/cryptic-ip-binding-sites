@@ -181,3 +181,41 @@ pipeline's technical one: an entry is excluded when its **polymer atoms exceed
 Every exclusion is still counted and reported. Smoke runs now draw a seeded
 random sample of entries rather than the first search hits, so they exercise
 structures of every size.
+
+## Post-hoc diagnostics (after the full run)
+
+These were written after the full run's results were seen, so they cannot
+change any decision above. They are recorded here, with their rules, before
+they are run.
+
+**D1. Null distribution of the permutation control (2026-09-24).** In the full
+run (benchmark run 35949588200, commit 72f1ae4), the burial task's permutation
+control gave a pooled out-of-fold ROC-AUC of 0.613 [0.506, 0.682]. So H2 was
+reported as not evaluable. H2 was also not evaluable under the 40% rule, because
+one group holds 87% of the positives.
+
+The control's interval resamples groups for **one** permutation, so it omits the
+variance between permutations. A single failure could be either:
+
+- chance: 1 in 3 tasks failing a 95% control happens about 14% of the time;
+- a leak.
+
+The diagnostic reruns the control with 30 permutations (repeats 0-29, `--permute`) for:
+
+- burial, full arm, sequence grouping;
+- cryptic_ip_site, full arm, sequence grouping, 10 permutations (repeats 0-9).
+
+It uses the code at the diagnostic's commit, which adds only the rare-class fitting
+guard: no early stopping inside gradient boosting, and a candidate that fails to fit
+is skipped. For each permutation it computes:
+
+- the pooled out-of-fold ROC-AUC;
+- the mean of the within-fold ROC-AUCs, which is immune to offsets between folds.
+
+- **Leak:** the mean pooled ROC-AUC over permutations exceeds 0.52, or more than 3
+  of 30 exceed 0.60. Any result that depends on the affected pipeline is then
+  withdrawn until the cause is found.
+- **Chance:** otherwise. The report then states that the control's criterion ignores
+  permutation variance, and that its single failure is within the null.
+
+Either way H2 stays not evaluable, and no hypothesis is re-decided.
