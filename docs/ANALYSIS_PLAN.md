@@ -219,3 +219,10 @@ is skipped. For each permutation it computes:
   permutation variance, and that its single failure is within the null.
 
 Either way H2 stays not evaluable, and no hypothesis is re-decided.
+
+*Outcome (run 35965940997):* **chance** for both tasks. Burial: mean pooled
+ROC-AUC 0.497 ± 0.051 over 30 permutations, with 1 of 30 above 0.60 (the full
+run's own permutation, reproduced at 0.613). cryptic_ip_site: 0.498 ± 0.049 over
+10, with none above 0.60. Details are in `results/null/permutation_null.md`.
+A future plan should judge its permutation control against a null distribution
+over several permutations, not against one permutation's group-bootstrap interval.

@@ -157,6 +157,11 @@ To test this without leakage we built a pre-registered benchmark (`docs/ANALYSIS
 - Holdout: the locked model reaches **0.871** (0.782–0.932) against 0.730 for the
   rule-based score, a paired difference of **+0.141** (0.033–0.200).
 - The same pipeline with shuffled labels scores 0.491 (0.477–0.509).
+- One task's shuffled-label control, burial, scored 0.613 and failed its
+  pre-registered check. We then reran it with 30 fresh shuffles: they average
+  0.497 ± 0.051, and the original shuffle is the most extreme of the 30.
+  The failure was chance, not a leak, and it shows that a control judged on a
+  single shuffle is miscalibrated.
 
 An earlier figure of 0.975 for this task came from a smaller evaluation (136 entries)
 that let homologues straddle folds and read B-factors. The sets differ, so the

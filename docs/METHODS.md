@@ -459,7 +459,15 @@ reported as a description, not a test.
 
 - `ip_site` and `cryptic_ip_site` pass their shuffled-label controls.
 - `burial` fails: 0.613 [0.506, 0.682]. Diagnostic D1 in the plan separates a chance
-  excursion from a leak with 30 further shuffles (run 35965940997; result pending).
+  excursion from a leak with 30 further shuffles (run 35965940997,
+  `results/null/permutation_null.md`). The verdict is **chance**: across 30 shuffles the
+  pooled ROC-AUC is 0.497 ± 0.051 (2.5–97.5 percentiles 0.406–0.600), and only one
+  shuffle exceeds 0.60. That one is the full run's own shuffle (repeat 0), which
+  reproduces 0.613 exactly. Ten `cryptic_ip_site` shuffles give 0.498 ± 0.049.
+  The control's criterion is too strict: its interval resamples groups within **one**
+  shuffle and so ignores the between-shuffle standard deviation of about 0.05, which is
+  as large as the interval's own half-width. A single failure is therefore not evidence
+  of a leak. As the plan fixed in advance, H2 stays not evaluable.
 
 **Which single descriptors carry the signal** (`docs/EXPLORATION_PLAN.md`, with
 every analysis in `results/exploration/ledger.jsonl`). Each descriptor was signed
