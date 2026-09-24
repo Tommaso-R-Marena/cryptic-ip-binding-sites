@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 ROW_HEIGHT = 30
-PLOT_WIDTH = 560
-LABEL_WIDTH = 330
-VALUE_WIDTH = 190
+PLOT_WIDTH = 470
+LABEL_WIDTH = 290
+VALUE_WIDTH = 400
 MARGIN = 14
 
 DECISION_CLASS = {"supported": "ok", "refuted": "no", "inconclusive": "meh"}
@@ -43,8 +43,10 @@ class Forest:
         null: float = 0.0,
         margin: Optional[float] = None,
         domain: Optional[Tuple[float, float]] = None,
+        excluded_class: str = "hit",
     ) -> None:
         self.rows = list(rows)
+        self.excluded_class = excluded_class
         self.null = null
         self.margin = margin
         values: List[float] = []
@@ -103,7 +105,7 @@ class Forest:
                 parts.append(f'<text x="{LABEL_WIDTH + 8}" y="{y + 4:.1f}" class="missing">not measured</text>')
                 continue
             excludes = low > self.null or high < self.null
-            klass = "hit" if excludes else "null"
+            klass = self.excluded_class if excludes else "null"
             parts.append(
                 f'<line x1="{self._x(low):.1f}" y1="{y:.1f}" x2="{self._x(high):.1f}" y2="{y:.1f}" '
                 f'class="ci {klass}"/>'
@@ -200,8 +202,10 @@ def permutation_section(report: Dict[str, object]) -> str:
     ]
     failed = [task for task, value in permutation.items() if not value.get("passes")]
     verdict = (
-        '<p class="note bad">A control failed: labels reach the model by some route other than the '
-        "descriptors, so results for that task are not evidence.</p>"
+        '<p class="note bad">A control failed: with its labels shuffled, the pipeline still scored '
+        "above chance for that task. That is either a chance excursion of the control or a leak; "
+        "until a null distribution over many shuffles settles which, results for that task are not "
+        "evidence.</p>"
         if failed
         else '<p class="note">Every control includes 0.5, as it must: with the labels shuffled the '
         "pipeline learns nothing, so no label information leaks through it.</p>"
@@ -209,7 +213,7 @@ def permutation_section(report: Dict[str, object]) -> str:
     return (
         '<article class="card"><h3>Leak control</h3>'
         '<p class="axis">The whole pipeline re-run with shuffled labels. Each interval must contain 0.5.</p>'
-        f"{Forest(rows, null=0.5).svg()}{verdict}</article>"
+        f"{Forest(rows, null=0.5, excluded_class='bad').svg()}{verdict}</article>"
     )
 
 
@@ -325,6 +329,7 @@ code {{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 
 .forest .band {{ fill: var(--band); }}
 .forest .ci {{ stroke-width: 2.5; stroke-linecap: round; }}
 .forest .ci.hit, .forest .pt.hit {{ stroke: var(--hit); fill: var(--hit); }}
+.forest .ci.bad, .forest .pt.bad {{ stroke: var(--bad); fill: var(--bad); }}
 .forest .ci.null, .forest .pt.null {{ stroke: var(--null); fill: var(--null); }}
 .tiles {{ display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 16px; }}
 .tile {{ border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; min-width: 104px; }}
