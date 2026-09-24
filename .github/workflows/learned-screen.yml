@@ -7,6 +7,13 @@ name: Learned screen
 # On demand only: it needs a finished screen run.
 
 on:
+  # A push registers the workflow; the gate job ends it quietly until the
+  # screen run it reads has finished.
+  push:
+    paths:
+      - 'scripts/learned_screen.py'
+      - 'docs/LEARNED_SCREEN_PLAN.md'
+      - '.github/workflows/learned-screen.yml'
   workflow_dispatch:
     inputs:
       screen_run:
@@ -22,8 +29,24 @@ env:
   SCREEN_RUN: ${{ inputs.screen_run || '35935291031' }}
 
 jobs:
+  gate:
+    name: Is the screen finished?
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=$(gh run view "$SCREEN_RUN" --repo "$GITHUB_REPOSITORY" --json status --jq .status)
+          echo "screen run $SCREEN_RUN: $status"
+          if [ "$status" = "completed" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"; else echo "ready=false" >> "$GITHUB_OUTPUT"; fi
+
   rank:
     name: Train, score, evaluate
+    needs: gate
+    if: needs.gate.outputs.ready == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:

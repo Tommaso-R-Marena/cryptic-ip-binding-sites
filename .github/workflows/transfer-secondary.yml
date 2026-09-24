@@ -6,6 +6,13 @@ name: Transfer secondary
 # largest-group share exceeds 40 %.
 
 on:
+  # A push registers the workflow (dispatch-only files on a non-default branch
+  # cannot be dispatched until they have run) and runs it on the default table.
+  push:
+    paths:
+      - 'scripts/transfer_secondary.py'
+      - 'docs/TRANSFER_PLAN_AMENDMENT_1.md'
+      - '.github/workflows/transfer-secondary.yml'
   workflow_dispatch:
     inputs:
       transfer_run:
@@ -15,6 +22,10 @@ on:
 permissions:
   contents: read
   actions: read
+
+concurrency:
+  group: transfer-secondary-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   TRANSFER_RUN: ${{ inputs.transfer_run || '35972729955' }}
