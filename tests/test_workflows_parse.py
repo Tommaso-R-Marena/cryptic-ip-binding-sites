@@ -33,3 +33,20 @@ def test_no_step_input_parses_to_null(path):
         for step in job.get("steps", []):
             for key, value in (step.get("with") or {}).items():
                 assert value is not None, f"{path.name}: job {name!r} step input {key!r} is YAML null"
+
+
+#: Workflows that run analyses (hours of compute) rather than tests.
+ANALYSES = {
+    "benchmark.yml", "burial-survey.yml", "explore.yml", "permutation-null.yml", "phase1-criteria.yml",
+    "proteome-screen.yml", "train-real-data.yml", "yeast-rescreen.yml", "transfer.yml",
+    "transfer-secondary.yml", "learned-screen.yml",
+}
+
+
+@pytest.mark.parametrize("path", [p for p in WORKFLOWS if p.name in ANALYSES], ids=lambda p: p.name)
+def test_analysis_workflows_never_auto_run_on_main(path):
+    data = yaml.safe_load(path.read_text())
+    on = data.get(True, data.get("on"))
+    push = on.get("push") if isinstance(on, dict) else None
+    assert push is None or "main" in push.get("branches-ignore", []), path.name
+    assert "workflow_dispatch" in on, f"{path.name} must stay runnable on demand"
