@@ -626,8 +626,17 @@ class RcsbClient:
             except RcsbUnavailableError as exc:
                 LOGGER.warning("GraphQL batch failed (%d ids): %s", len(chunk), exc)
                 continue
-            if data.get("errors"):
-                LOGGER.warning("GraphQL reported errors: %s", str(data["errors"])[:300])
+            errors = data.get("errors") or []
+            if any(
+                (error.get("extensions") or {}).get("classification") == "ValidationError"
+                for error in errors
+                if isinstance(error, dict)
+            ):
+                # The query no longer matches the schema: every batch would come
+                # back empty. That is a code defect to fix, not data to skip.
+                raise ValueError(f"RCSB GraphQL rejected the entry query: {str(errors)[:500]}")
+            if errors:
+                LOGGER.warning("GraphQL reported errors: %s", str(errors)[:300])
             for entry in (data.get("data") or {}).get("entries") or []:
                 if not entry:
                     continue
@@ -838,7 +847,6 @@ query EntryMetadata($ids: [String!]!) {
         reference_sequence_identifiers { database_name database_accession }
       }
       rcsb_entity_source_organism { ncbi_scientific_name ncbi_taxonomy_id }
-      rcsb_ec_lineage { id name }
     }
     nonpolymer_entities {
       rcsb_id

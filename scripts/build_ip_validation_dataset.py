@@ -599,6 +599,10 @@ def build_dataset(args: argparse.Namespace) -> Dict[str, Any]:
     return manifest
 
 
+#: Largest share of entries allowed to lack metadata in --metadata-only mode.
+MAX_MISSING_METADATA_FRACTION = 0.01
+
+
 def _write_metadata_only(args, client, ligands, ligand_provenance, entries, decoys, started) -> Dict[str, Any]:
     """Entry table from search results and metadata alone (``--metadata-only``)."""
     all_ids = list(entries) + list(decoys)
@@ -618,6 +622,12 @@ def _write_metadata_only(args, client, ligands, ligand_provenance, entries, deco
             }
         )
     n_rows = write_csv(args.entry_csv, ENTRY_FIELDS, rows)
+    if all_ids and len(missing) / len(all_ids) > MAX_MISSING_METADATA_FRACTION:
+        # Release dates place entries in the holdout and accessions describe
+        # them; a table mostly without metadata is not a dataset to analyse.
+        raise RcsbUnavailableError(
+            f"metadata missing for {len(missing)}/{len(all_ids)} entries, e.g. {missing[:5]}"
+        )
     manifest = {
         "generated_at_utc": started.isoformat(),
         "completed_at_utc": datetime.now(timezone.utc).isoformat(),

@@ -245,12 +245,18 @@ def run_mmseqs(fasta: Path, work_dir: Path, *, threads: int = 4) -> Path:
 def run_foldseek(structures: Sequence[Path], work_dir: Path, *, threads: int = 4) -> Path:
     """All-against-all Foldseek search over every chain; returns the hit table path."""
     work_dir.mkdir(parents=True, exist_ok=True)
-    listing = work_dir / "structures.txt"
-    listing.write_text("".join(f"{path}\n" for path in structures), encoding="utf-8")
+    # createdb reads a directory (a text file of paths is taken for a structure
+    # file); a directory of links holds exactly the entries being grouped.
+    inputs = work_dir / "inputs"
+    if inputs.exists():
+        shutil.rmtree(inputs)
+    inputs.mkdir()
+    for path in structures:
+        (inputs / Path(path).name).symlink_to(Path(path).resolve())
     db = work_dir / "db"
     foldseek = _require("foldseek")
     subprocess.run(
-        [foldseek, "createdb", str(listing), str(db), "--chain-name-mode", "1", "--threads", str(threads)],
+        [foldseek, "createdb", str(inputs), str(db), "--chain-name-mode", "1", "--threads", str(threads)],
         check=True,
     )
     aln, out = work_dir / "aln", work_dir / "foldseek_hits.tsv"
