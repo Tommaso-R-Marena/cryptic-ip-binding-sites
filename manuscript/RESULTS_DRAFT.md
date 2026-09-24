@@ -227,6 +227,45 @@ reaches 0.923. With only five independent families of buried IP sites, this is
 consistent with shared physics for buried polyanion sites, but it is not evidence
 for it.
 
+### A learned model finds inositol phosphate binders across whole proteomes
+
+We ranked every screened AlphaFold model of the yeast, human and Dictyostelium
+proteomes (37,384 proteins) with the benchmark's learned site model. Each protein's
+score is its best confident pocket.
+
+**Test.** Before naming any candidate, the pre-registered plan required that the
+ranking recover proteins UniProt annotates as inositol phosphate binders, using only
+proteins with no sequence homologue among the model's training proteins.
+
+**It does.**
+
+- Pooled ROC-AUC is **0.832** (0.760–0.890) over 35,158 unseen proteins with 35
+  annotated binders.
+- Human alone gives 0.805 (0.709–0.878).
+- The top 27 human proteins are about 50-fold enriched in annotated binders over the
+  0.14 % base rate.
+- The model does not significantly outperform the hand-built score (+0.053;
+  −0.026 to 0.127).
+
+**What the top candidates are.** Most are recognisable binders of other
+phosphate- or sulfate-dense ligands:
+
+- sulfotransferases that bind PAPS;
+- UDP-sugar glycosyltransferases;
+- nucleotide carriers;
+- ATP-driven motors and pumps;
+- sugar-phosphate enzymes.
+
+A second class is β-propeller channels. Pocket geometry and charge recognise buried
+polyanion sites, not inositol phosphates specifically. That matches the transfer
+experiment above.
+
+**One coherent lead.** The α-arrestins ARRDC2 (human, rank 5) and ART5 (yeast,
+rank 27) rank highly. They share the arrestin fold of the β-arrestins, which are
+established IP6 binders, but are too divergent in sequence to be excluded as
+homologues. We report them as hypotheses: the empirical precision at their depth is
+about 7–20 %, and that figure is a lower bound.
+
 ### A depth measure that fits the controls does not generalise
 
 On apo structures the rule-based score's depth term - distance to the nearest

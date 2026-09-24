@@ -596,6 +596,82 @@ miscalibration that diagnostic D1 identified, and it is reported, not re-decided
    - The evidence points one way: hull depth does not help, and the screen's
      hull-depth gate should be reconsidered.
 
+### Proteome screen and learned ranking
+
+**Scope.** The screen covers the yeast, human and Dictyostelium AlphaFold proteomes: 37,384
+proteins scored, from run 35935291031. The rule-based digest is in
+`results/proteome_screen/DIGEST_run35935291031.md`.
+
+**Known binders under the rule-based score.** All six rank near the top of the human
+proteome. The rank percentiles are:
+
+| protein | rank percentile |
+|---|---|
+| ADAR1 | 99.7 |
+| ADAR2 | 99.0 |
+| HDAC3 | 97.1 |
+| HDAC1 | 96.9 |
+| PDS5B | 93.7 |
+| ADAT1 | 92.8 |
+
+ADAR2 anchored the score threshold, so its rank is not independent evidence.
+
+**The rule-based score's top hits are explained.** They fall into two classes:
+
+- **Enzymes and carriers of other phosphate-dense anions:**
+  - BPGM and its phosphoglycerate-mutase relatives (GPM2, GPM3, gpmA);
+  - isopentenyl-diphosphate isomerase (IDI1, ipi);
+  - aconitase (ACO2) and sulfite oxidase (SUOX);
+  - mitochondrial carriers (SLC25A16, CTP1, mcfR).
+- **Kelch β-propellers**, whose central channel is buried and basic: HCFC1, HCFC2, KEL1,
+  KLHDC10 and ATRNL1.
+
+**Learned ranking** (`docs/LEARNED_SCREEN_PLAN.md`, run 35992676292; report in
+`results/learned_screen/LEARNED_SCREEN.md`).
+
+- **Model.** The `ip_site` model was locked on the whole benchmark table (extra trees,
+  selected by grouped inner CV).
+- **Protein score.** Each protein's score is its best confident pocket (pLDDT ≥ 70).
+- **Exclusion.** 2,226 proteins with an MMseqs2 homologue among the benchmark's UniProt
+  sequences were excluded (≥ 30 % identity, ≥ 50 % coverage of the shorter sequence,
+  E ≤ 1e-3).
+- **Truth.** UniProt inositol phosphate annotations.
+- **Intervals.** Resampled over proteome sequence clusters.
+
+| organism | unseen proteins | annotated binders | learned ROC-AUC | rule ROC-AUC | learned − rule |
+|---|---|---|---|---|---|
+| human | 18,668 | 27 | 0.805 [0.709, 0.878] | 0.734 [0.655, 0.807] | +0.071 [−0.029, 0.162] |
+| Dictyostelium | 11,117 | 4 | 0.900 [0.781, 0.963] | 0.943 [0.877, 0.997] | −0.043 [−0.131, 0.034] |
+| yeast | 5,373 | 4 | 0.877 [0.584, 0.999] | 0.863 [0.630, 0.975] | +0.014 [−0.296, 0.303] |
+| **pooled** | **35,158** | **35** | **0.832 [0.760, 0.890]** | 0.779 [0.716, 0.840] | +0.053 [−0.026, 0.127] |
+
+- **Decisions (Holm).** L1 is **supported**: the learned model ranks annotated IP binders
+  above other proteins across whole proteomes, on proteins homologous to nothing it was
+  trained on. L2 is **not supported**: it does not significantly beat the rule-based score.
+- **Precision of the candidates.**
+  - The base rate of annotated binders among unseen human proteins is 0.14 %.
+  - Among the top 27 human proteins it is 7.4 % (2 of 27): roughly 50-fold enrichment.
+    Yeast is about 100-fold. Dictyostelium's top 25 contains no annotated binder.
+  - These precisions are lower bounds, because unannotated true binders count as
+    negatives. A candidate is roughly a 1-in-10 to 1-in-15 hypothesis, not a finding.
+- **What the candidates are.** Most are explained by other phosphate- or sulfate-rich
+  ligands:
+  - PAPS-dependent sulfotransferases: CHST1, CHST4, HS3ST1, HS3ST5;
+  - UDP-sugar glycosyltransferases: EXT1, GYS1, GSY2;
+  - nucleotide and anion carriers: AAC3, YHM2, SLC25A27, mcfA/U/O;
+  - ATP-binding motors and pumps: myosins, P-type ATPases, TMEM94, ATP8B4;
+  - sugar-phosphate enzymes: PFK2, G6PD/ZWF1;
+  - prenyl pyrophosphate and polyphosphate enzymes: COQ1, ppkA.
+
+  WD40 and other β-propellers recur: COPA/COP1, WDR46, CSTF1, SEMA4A. So do known
+  phosphoinositide-headgroup binders: ASAP1 (PH domain), MTMR11 (myotubularin), RLBP1
+  (CRAL-TRIO).
+- **The one coherent unexplained lead.** Two α-arrestins rank high: human ARRDC2 (rank 5)
+  and yeast ART5 (rank 27). β-arrestins, which share the arrestin fold, are established
+  IP6 binders, and α-arrestins are too distant in sequence to be excluded as homologues.
+  Whether their top pocket corresponds to the β-arrestin IP6 site is the first thing to
+  check.
+
 ### Results on the deposited set (superseded)
 
 > **Superseded: these numbers overstate performance.** An audit found that the
