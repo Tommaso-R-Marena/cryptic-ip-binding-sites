@@ -672,6 +672,111 @@ ADAR2 anchored the score threshold, so its rank is not independent evidence.
   Whether their top pocket corresponds to the β-arrestin IP6 site is the first thing to
   check.
 
+### IP versus other polyanion sites (specificity)
+
+**Plan and run.** `docs/SPECIFICITY_PLAN.md`, specificity run 36020458866; results in
+`results/specificity/` (extracted from the run log).
+
+**Question.** The learned `ip_site` model recognises buried polyanion sites in general.
+Can the 39 descriptors tell an inositol phosphate (IP) site from a site for another
+phosphate-dense ligand?
+
+**Data.**
+
+- **Label 1:** pockets on an IP copy in the IP benchmark table (run 35949588200).
+- **Label 0:** pockets on a class ligand in the transfer table (run 35972729955).
+- **Excluded:** pockets on neither ligand. The question is conditional on a polyanion
+  site.
+- **Groups:** the joint MMseqs2 and sequence-plus-Foldseek groups computed over both
+  datasets.
+- **Holdout:** the latest 20 % of joint strict groups.
+- **Size:** 3,638 pockets in 1,522 entries. Development holds 734 IP pockets (64
+  sequence / 21 strict groups) and 2,763 other-polyanion pockets (391 / 97).
+- **Protocol:** the benchmark's runner, unchanged.
+
+**Variants.**
+
+- S1: all rows.
+- S1b: without the joint strict group holding the most other-polyanion pockets, G:10JT
+  (the nucleotide-binding folds).
+- S1r: IP rows restricted to X-ray entries at 2.5 Å or better, the transfer set's rule.
+  This checks that the model is not separating the two datasets instead of the
+  chemistry.
+
+| variant | sequence CV ROC-AUC | strict CV ROC-AUC | holdout ROC-AUC | largest IP group (seq / strict) | 10-permutation mean | decision |
+|---|---|---|---|---|---|---|
+| S1 | 0.862 [0.802, 0.905] | 0.818 [0.699, 0.886] | 0.843 [0.767, 0.931] | 25 % / **49 %** | 0.502 ± 0.013 | **not evaluable** (40 % rule, strict) |
+| S1b | 0.830 [0.731, 0.902] | 0.757 [0.580, 0.878] | 0.742 [0.624, 0.844] (8 IP groups) | 14 % / 17 % | 0.493 ± 0.022 | **learnable** |
+| S1r | 0.812 [0.704, 0.899] | 0.859 [0.680, 0.925] | 0.773 [0.693, 0.948] (3 IP groups: underpowered) | 15 % / 35 % | 0.506 ± 0.017 | **learnable** |
+
+- **S1.** Joining the two datasets merges IP families with nucleotide-binding folds into
+  one joint strict group holding 49 % of the IP pockets. By the plan's 40 % rule, S1 is
+  therefore not evaluable, although every interval sits well above 0.5.
+- **S1b and S1r.** Both clear 0.5 under both groupings, and S1b also on a powered
+  holdout.
+- **The gate.** The plan's gate opened on S1b: S1 was not evaluable only because of
+  the 40 % rule, S1b is learnable, and S1r's point estimate exceeds 0.5.
+
+**Re-ranking (conditional, run).**
+
+- **Model.** The specificity model was locked on S1b (extra trees). Each pocket's
+  combined score is P(site) × P(IP | site). Each protein's score is its best confident
+  pocket.
+- **Unseen proteins.** Proteins with an MMseqs2 homologue among either dataset's UniProt
+  sequences were excluded: 4,300 proteins. That left 33,084 unseen proteins, 34 of
+  them annotated IP binders.
+
+| ranking | ROC-AUC [95 %] (cluster bootstrap) | Holm p | decision |
+|---|---|---|---|
+| L1 learned `ip_site` (same proteins) | 0.844 [0.771, 0.902] | – | – |
+| L3a combined | 0.828 [0.756, 0.886] | < 0.001 | **supported** |
+| L3b combined − L1 | −0.015 [−0.044, 0.015] | 0.321 | **not supported** |
+
+**What this settles.**
+
+- **Specificity is learnable at the pocket level.** Among polyanion sites, the
+  descriptors separate IP sites from nucleotide and sugar-phosphate sites in families
+  held out by homology, and also on comparable X-ray data.
+- **It does not improve the proteome ranking.** L3b's interval is centred just below 0,
+  so this is not "no effect of any size". A candidate list re-weighted by P(IP | site)
+  should not be read as more trustworthy than the learned ranking.
+- **Candidates.** 75 candidates (the top 25 per proteome); 30 of them are "explained" by
+  the plan's keyword rule. The rule is crude. It misses "mitochondrial substrate
+  carrier" names (mcfA, mcfU) and matches some broad keywords. Its counts are an
+  approximate triage, not a classification.
+- **ARRDC2 again.** It moves to rank 1 among unseen human proteins under the combined
+  score, with P(IP | site) = 0.90.
+
+### The screen's hull-depth gate
+
+**Plan and run.** `docs/HULL_GATE_PLAN.md`, hull-gate run 36020459316; results in
+`results/hull_gate/`.
+
+**Arms.** The calibrated screen was re-aggregated from its 800 shards (2,845,762
+pockets) with the hull-depth gate at 10 Å (current), at 5 Å, and removed. Every other
+calibrated criterion was unchanged. Proteins were ranked by their best composite score
+among pockets passing the arm's non-score gates.
+
+**Evaluation.** 35,158 unseen proteins, 35 annotated IP binders, and 2,000 resamples of
+20,073 MMseqs2 clusters.
+
+| arm | ROC-AUC [95 %] | recall@546 | hits (annotated) |
+|---|---|---|---|
+| 10 Å gate | 0.701 [0.613, 0.789] | 0.114 | 546 (4) |
+| 5 Å gate | 0.738 [0.645, 0.817] | 0.114 | 554 (4) |
+| no gate | 0.747 [0.663, 0.821] | 0.114 | 554 (4) |
+
+**Decision.**
+
+- Removing the gate changes ROC-AUC by +0.046 [−0.015, 0.101], and relaxing it to 5 Å
+  by +0.037 [−0.018, 0.091].
+- Neither lower bound reaches the non-inferiority margin of −0.01.
+- By the plan's rule the 10 Å gate is **kept**. `CALIBRATED_CRITERIA` is unchanged and
+  cites the decision.
+- The point estimates favour removing the gate, and the recall of the top 546 proteins
+  is identical in all arms. The data do not show that the gate helps. They also do not
+  show, at the pre-registered margin, that it can be dropped without cost.
+
 ### Results on the deposited set (superseded)
 
 > **Superseded: these numbers overstate performance.** An audit found that the

@@ -266,6 +266,46 @@ established IP6 binders, but are too divergent in sequence to be excluded as
 homologues. We report them as hypotheses: the empirical precision at their depth is
 about 7–20 %, and that figure is a lower bound.
 
+### Inositol phosphate sites can be told from other polyanion sites, but that does not improve the ranking
+
+The learned model's top proteome candidates bind other polyanions, so we asked,
+under a pre-registered plan (`docs/SPECIFICITY_PLAN.md`), whether the pocket
+descriptors separate inositol phosphate (IP) sites from sites for nucleotides,
+sugar phosphates and pyrophosphates.
+
+- **Pocket level: learnable, with one caveat.** On all 3,638 polyanion-site pockets the
+  decision is *not evaluable*: under the joint strict grouping, one group holds 49 %
+  of the IP pockets, above the plan's 40 % limit, although every interval sits above
+  0.5.
+  - Without the nucleotide-fold super-group the task is *learnable*: ROC-AUC 0.830
+    [0.731, 0.902] by sequence group, 0.757 [0.580, 0.878] by strict group, and 0.742
+    [0.624, 0.844] on a temporal holdout of eight IP families.
+  - On IP entries restricted to X-ray structures at 2.5 Å or better it is also
+    *learnable*, so the signal is not a difference between the two datasets.
+  - Ten permutations of each variant sit at chance.
+- **Proteome level: no gain.** Multiplying the site probability by P(IP | site) ranks
+  annotated IP binders among 33,084 unseen proteins at ROC-AUC 0.828 [0.756, 0.886]
+  (L3a *supported*). The learned site model alone on the same proteins reaches 0.844,
+  so the combined score is not better (L3b *not supported*: −0.015 [−0.044, 0.015]).
+- **What this means.** The descriptors carry some information about which polyanion a
+  site holds, but not enough to change which proteins reach the top of a proteome
+  ranking. ARRDC2 is the top unseen human protein under the combined score.
+
+### The screen's hull-depth gate stays, by rule, though it does not help
+
+The calibrated screen requires a pocket 10 Å inside the convex hull. A
+pre-registered comparison (`docs/HULL_GATE_PLAN.md`) re-aggregated the screen with
+that gate, with a 5 Å gate and with none, on 35,158 unseen proteins.
+
+- **ROC-AUC.** Removing the gate raised the ROC-AUC of the ranking for annotated IP
+  binders from 0.701 to 0.747 (+0.046 [−0.015, 0.101]).
+- **Recall.** Recall among the top 546 proteins was unchanged.
+- **Decision.** A gate stays unless removing it is shown non-inferior at a margin of
+  0.01, and the interval's lower bound misses that margin. By the rule fixed in
+  advance, the decision is to **keep** the gate. Taken together with the transfer
+  result (hull depth adds +0.002 to a learned model), the evidence is that the gate
+  does not help. It has not been shown that it can be removed without cost.
+
 ### A depth measure that fits the controls does not generalise
 
 On apo structures the rule-based score's depth term - distance to the nearest
