@@ -209,3 +209,52 @@ class TestSplitsWithFewPositiveGroups:
         y = (groups == "A").astype(int)
         with pytest.raises(protocol.SplitError):
             protocol._group_splits(y, groups, 5, 0)
+
+
+class TestRareClassRobustness:
+    def test_boosting_does_not_hold_out_its_own_validation_slice(self):
+        """Its internal split is not grouped, and one positive cannot be stratified."""
+        spec = protocol.benchmark_specs()["hist_gradient_boosting"]
+        assert spec.build(0).early_stopping is False
+
+    def test_a_fold_with_a_single_positive_still_fits(self):
+        """60 positives among 70,000 pockets put one positive in an inner fold."""
+        rng = np.random.default_rng(0)
+        n = 12000
+        X = pd.DataFrame(rng.normal(size=(n, len(protocol.BENCHMARK_FEATURES))),
+                         columns=list(protocol.BENCHMARK_FEATURES))
+        y = np.zeros(n, dtype=int)
+        y[0] = 1
+        specs = protocol.benchmark_specs()
+        candidate = next(c for c in protocol.draw_candidates(1, 7, specs) if c.family == "hist_gradient_boosting")
+        model = protocol.fit_candidate(candidate, X, y, 0, specs)
+        assert model.predict_proba(X.iloc[:5]).shape == (5, 2)
+
+    def test_one_unfittable_family_does_not_lose_the_evaluation(self, monkeypatch):
+        X, y, groups, _ = _data()
+        specs = protocol.benchmark_specs()
+        real = protocol.fit_candidate
+
+        def flaky(candidate, X_, y_, seed, specs_):
+            if candidate.family == "logistic_regression":
+                raise ValueError("synthetic failure")
+            return real(candidate, X_, y_, seed, specs_)
+
+        monkeypatch.setattr(protocol, "fit_candidate", flaky)
+        selection = protocol.select_candidate(
+            X, y, groups, protocol.draw_candidates(1, 7, specs), n_inner=2, seed=0, specs=specs
+        )
+        assert selection.candidate.family != "logistic_regression"
+        assert any("synthetic failure" in reason for reason in selection.failures.values())
+
+    def test_every_family_failing_is_an_error_not_a_silent_pass(self, monkeypatch):
+        X, y, groups, _ = _data()
+        monkeypatch.setattr(
+            protocol, "fit_candidate",
+            lambda *a, **k: (_ for _ in ()).throw(ValueError("synthetic failure")),
+        )
+        with pytest.raises(protocol.SplitError, match="synthetic failure"):
+            protocol.select_candidate(
+                X, y, groups, protocol.draw_candidates(1, 7), n_inner=2, seed=0,
+                specs=protocol.benchmark_specs(),
+            )

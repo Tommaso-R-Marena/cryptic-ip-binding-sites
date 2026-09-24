@@ -95,11 +95,25 @@ def benchmark_specs() -> Dict[str, Any]:
     Extra trees are held to 300 trees: the benchmark fits each candidate many
     times, and more trees change the ranking of pockets very little.
     """
-    from sklearn.ensemble import ExtraTreesClassifier
+    from sklearn.ensemble import ExtraTreesClassifier, HistGradientBoostingClassifier
 
     from cryptic_ip.analysis.ml_classifier import ModelSpec, default_model_specs
 
     specs = {spec.name: spec for spec in default_model_specs(include_xgboost=False)}
+    # Early stopping is off. Above 10,000 samples the default turns it on, and
+    # it holds out an internal validation slice that is neither grouped nor
+    # stratified by homology group: it shares groups with the data it stops on,
+    # and with 60 positives among 70,000 pockets a fold can hold a single
+    # positive, which the stratified split cannot divide at all.
+    boosting = specs["hist_gradient_boosting"]
+    specs["hist_gradient_boosting"] = ModelSpec(
+        name=boosting.name,
+        build=lambda seed: HistGradientBoostingClassifier(
+            random_state=seed, class_weight="balanced", early_stopping=False
+        ),
+        param_distributions=dict(boosting.param_distributions),
+        description=boosting.description,
+    )
     specs["extra_trees"] = ModelSpec(
         name="extra_trees",
         build=lambda seed: ExtraTreesClassifier(
@@ -202,6 +216,8 @@ class Selection:
     threshold: float
     calibrator: Optional[Any]
     all_inner_ap: Dict[str, float] = field(default_factory=dict)
+    #: Candidates that could not be fitted at all, with the reason.
+    failures: Dict[str, str] = field(default_factory=dict)
 
 
 def select_candidate(
@@ -226,24 +242,33 @@ def select_candidate(
     splits = _group_splits(y, groups, n_inner, seed)
     best: Optional[Tuple[float, int, np.ndarray]] = None
     scores: Dict[str, float] = {}
+    failures: Dict[str, str] = {}
     for index, candidate in enumerate(candidates):
         oof = np.full(len(y), np.nan)
-        for train, valid in splits:
-            model = fit_candidate(candidate, X.iloc[train], y[train], seed, specs)
-            oof[valid] = _scores(model, X.iloc[valid])
+        try:
+            for train, valid in splits:
+                model = fit_candidate(candidate, X.iloc[train], y[train], seed, specs)
+                oof[valid] = _scores(model, X.iloc[valid])
+        except Exception as exc:  # one brittle family must not lose the evaluation
+            failures[str(candidate.as_dict())] = f"{type(exc).__name__}: {exc}"[:300]
+            LOGGER.warning("candidate %s could not be fitted: %s", candidate.as_dict(), exc)
+            continue
         ap = _average_precision(y, oof)
         scores[str(candidate.as_dict())] = ap
         # Ties go to the earlier candidate, so the choice is deterministic.
         if np.isfinite(ap) and (best is None or ap > best[0]):
             best = (ap, index, oof)
     if best is None:
-        raise ValueError("no candidate produced a finite inner average precision")
+        raise SplitError(
+            "no candidate produced a finite inner average precision"
+            + (f"; failures: {failures}" if failures else "")
+        )
     ap, index, oof = best
     threshold = float(select_threshold(y, oof, objective="mcc"))
     calibrator = None
     if len(np.unique(y)) == 2:
         calibrator = LogisticRegression(C=1e6, max_iter=1000).fit(oof.reshape(-1, 1), y)
-    return Selection(candidates[index], float(ap), oof, threshold, calibrator, scores)
+    return Selection(candidates[index], float(ap), oof, threshold, calibrator, scores, failures)
 
 
 def _calibrate(selection: Selection, scores: np.ndarray) -> np.ndarray:
