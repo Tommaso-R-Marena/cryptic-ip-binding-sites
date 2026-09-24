@@ -45,7 +45,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -88,6 +88,9 @@ class PocketAssignment:
         matched_comp_id: Component identifier of that copy.
         centroid_distance: Distance from the pocket centre to that copy's centroid.
         min_atom_distance: Closest pocket-to-ligand heavy-atom distance.
+        matched_burial_class: Burial class of that copy (``cryptic``,
+            ``semi_cryptic``, ``surface``, ``crystal_artifact`` or ``unknown``);
+            empty when the structure has no ligand.
         rank_within_structure: 0 for the best-matching pocket of the structure.
         reason: Human-readable explanation of the label.
     """
@@ -99,6 +102,7 @@ class PocketAssignment:
     matched_comp_id: Optional[str] = None
     centroid_distance: float = float("nan")
     min_atom_distance: float = float("nan")
+    matched_burial_class: str = ""
     rank_within_structure: int = -1
     reason: str = ""
 
@@ -113,6 +117,7 @@ class PocketAssignment:
             "matched_comp_id": self.matched_comp_id,
             "ligand_centroid_distance": self.centroid_distance,
             "ligand_min_atom_distance": self.min_atom_distance,
+            "matched_burial_class": self.matched_burial_class,
             "site_rank_within_structure": self.rank_within_structure,
             "label_reason": self.reason,
         }
@@ -262,6 +267,7 @@ def assign_pocket_labels(
                 matched_comp_id=best_site.comp_id,
                 centroid_distance=centroid_distance,
                 min_atom_distance=best_min_distance,
+                matched_burial_class=str(best_site.burial_class),
                 reason=reason,
             )
         )
@@ -365,3 +371,71 @@ def summarise_labels(
             summary.n_structures_with_ligand_but_no_site += 1
 
     return summary
+
+
+# ------------------------------------------------------------------ tasks
+#: Benchmark tasks, each a rule mapping one pocket's site overlap and the burial
+#: class of the copy it touches onto a label. Every task is derived from the
+#: same per-pocket record, so they cannot drift apart (docs/ANALYSIS_PLAN.md,
+#: section 4).
+TASKS: Tuple[str, ...] = ("ip_site", "cryptic_ip_site", "burial")
+
+#: A copy with too few protein contacts sits in a lattice contact, not a site:
+#: a pocket on it is neither a binding site nor evidence of absence.
+_EXCLUDED_CLASSES = frozenset({"crystal_artifact"})
+
+
+def task_label(task: str, site_label: int, burial_class: str) -> int:
+    """Label one pocket for a benchmark task.
+
+    Args:
+        task: One of :data:`TASKS`.
+        site_label: The pocket's overlap label: 1 on a ligand copy, 0 touching
+            none, -1 ambiguous overlap.
+        burial_class: Burial class of the copy the pocket overlaps most.
+
+    Returns:
+        1 positive, 0 negative, -1 excluded.
+    """
+    if task not in TASKS:
+        raise ValueError(f"unknown task {task!r}; expected one of {TASKS}")
+    burial_class = str(burial_class or "")
+    if site_label == PocketLabel.AMBIGUOUS.value:
+        return -1
+    on_site = site_label == PocketLabel.POSITIVE.value
+    if on_site and burial_class in _EXCLUDED_CLASSES:
+        return -1
+    if task == "ip_site":
+        return 1 if on_site else 0
+    if task == "cryptic_ip_site":
+        if not on_site:
+            return 0
+        return 1 if burial_class == "cryptic" else -1
+    # burial: among genuine sites, buried against exposed.
+    if not on_site:
+        return -1
+    if burial_class == "cryptic":
+        return 1
+    if burial_class == "surface":
+        return 0
+    return -1
+
+
+def task_labels(task: str, rows: "Sequence[Mapping[str, object]] | object") -> np.ndarray:
+    """Vectorised :func:`task_label` over a table with ``label`` and ``matched_burial_class``.
+
+    Args:
+        task: One of :data:`TASKS`.
+        rows: A DataFrame (or sequence of mappings) of extracted pockets.
+
+    Returns:
+        Integer labels, -1 for pockets the task excludes.
+    """
+    import pandas as pd
+
+    frame = pd.DataFrame(rows)
+    classes = frame.get("matched_burial_class", pd.Series("", index=frame.index)).fillna("")
+    return np.asarray(
+        [task_label(task, int(label), str(cls)) for label, cls in zip(frame["label"], classes)],
+        dtype=int,
+    )

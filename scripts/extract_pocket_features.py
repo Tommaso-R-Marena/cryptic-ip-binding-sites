@@ -25,6 +25,7 @@ Design points
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import shutil
@@ -123,6 +124,23 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         "--sasa-points", type=int, default=256, help="SASA sample points per atom"
     )
     parser.add_argument(
+        "--max-protein-atoms",
+        type=int,
+        default=None,
+        help=(
+            "Exclude structures with more protein heavy atoms than this; each "
+            "exclusion is recorded in the summary, never dropped silently"
+        ),
+    )
+    parser.add_argument(
+        "--ids-file",
+        type=Path,
+        default=None,
+        help="Process only the structures listed (one identifier per line)",
+    )
+    parser.add_argument("--shard-index", type=int, default=0, help="This shard (0-based)")
+    parser.add_argument("--shard-count", type=int, default=1, help="Number of shards")
+    parser.add_argument(
         "--max-structures", type=int, default=None, help="Cap structures processed"
     )
     parser.add_argument("--min-alpha-spheres", type=int, default=3, help="fpocket -m parameter")
@@ -203,6 +221,14 @@ def process_structure(
     diagnostics: Dict[str, Any] = {"structure_id": structure_id, "error": None}
 
     try:
+        cap = options.get("max_protein_atoms")
+        if cap:
+            arrays = load_structure_arrays(path)
+            n_protein = int(np.sum(arrays.is_polymer & (arrays.elements != "H")))
+            diagnostics["n_protein_heavy_atoms"] = n_protein
+            if n_protein > int(cap):
+                diagnostics["excluded"] = f"{n_protein} protein heavy atoms > {int(cap)}"
+                return structure_id, [], diagnostics
         # Labels always come from the deposited (holo) structure: they need to
         # know where the ligand sits.
         sites = _ligand_sites(path, comp_ids, int(options.get("sasa_points", 256)))
@@ -282,6 +308,7 @@ CACHE_KEY_OPTIONS = (
     "sasa_points",
     "min_alpha_spheres",
     "skip_electrostatics",
+    "max_protein_atoms",
 )
 
 
@@ -346,7 +373,15 @@ def group_key_for(structure_id: str, metadata: Dict[str, Any]) -> str:
     Returns:
         The group key.
     """
-    accessions = str(metadata.get("uniprot_ids", "") or "").strip()
+    # The builder writes ``uniprot_ids``; the legacy dataset wrote ``uniprot_id``.
+    # Reading only the first silently grouped every legacy entry by itself.
+    if metadata.get("homology_group"):
+        return str(metadata["homology_group"])
+    accessions = str(
+        metadata.get("uniprot_ids", "") or metadata.get("uniprot_id", "") or ""
+    ).strip()
+    if accessions.lower() == "nan":
+        accessions = ""
     if accessions:
         # Sorting makes the key deterministic for multi-chain complexes.
         return "|".join(sorted(accessions.split(";")))
@@ -371,6 +406,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             if path.suffix.lower() in {".pdb", ".cif", ".ent", ".mmcif"}
         ]
     )
+    if args.ids_file is not None:
+        wanted = {
+            line.strip().upper()
+            for line in args.ids_file.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        }
+        structures = [path for path in structures if path.stem.upper() in wanted]
+    if args.shard_count > 1:
+        # Deterministic by identifier, so shards are disjoint and cover everything.
+        structures = [
+            path
+            for path in structures
+            if int(hashlib.sha1(path.stem.upper().encode()).hexdigest(), 16) % args.shard_count
+            == args.shard_index
+        ]
     if args.max_structures:
         structures = structures[: args.max_structures]
     if not structures:
@@ -386,6 +436,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "min_alpha_spheres": args.min_alpha_spheres,
         "require_cryptic": args.require_cryptic,
         "apo": args.apo,
+        "max_protein_atoms": args.max_protein_atoms,
     }
 
     tasks: List[Tuple[str, str, Sequence[str], Dict[str, Any]]] = []
@@ -457,7 +508,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             row["structure_classification"] = entry_meta.get("classification", "")
             all_rows.append(row)
 
+    # Per-structure accounting, so every exclusion and failure is countable
+    # downstream rather than inferred from which structures have rows.
+    diagnostics_path = args.summary_json.with_name(args.summary_json.stem + "_structures.csv")
+    diagnostics_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(diagnostics).to_csv(diagnostics_path, index=False)
+
     if not all_rows:
+        if args.shard_count > 1 and all(d.get("excluded") or d.get("error") for d in diagnostics):
+            LOGGER.warning("Shard produced no pockets: every structure excluded or failed")
+            return 0
         LOGGER.error("No pockets were extracted; check that fpocket is installed and working.")
         return 3
 
@@ -488,6 +548,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         **summary.to_dict(),
         "n_structures_processed": len(cached_rows),
         "n_failures": sum(1 for diag in diagnostics if diag.get("error")),
+        "n_excluded": sum(1 for diag in diagnostics if diag.get("excluded")),
+        "excluded": {
+            diag["structure_id"]: diag["excluded"] for diag in diagnostics if diag.get("excluded")
+        },
         "failures": {
             diag["structure_id"]: diag["error"] for diag in diagnostics if diag.get("error")
         },

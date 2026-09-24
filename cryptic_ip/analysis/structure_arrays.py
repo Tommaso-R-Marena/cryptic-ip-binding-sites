@@ -547,9 +547,40 @@ def write_apo_structure(path: Path, out_path: Path, *, model_index: int = 0) -> 
             het_flag = residue.id[0]
             return is_polymer_residue(het_flag, residue.get_resname())
 
+    # The PDB format holds one-character chain identifiers; mmCIF entries of
+    # large assemblies use longer ones. Labels are matched by coordinates, never
+    # by chain name, so the apo copy may rename chains - but only when it must,
+    # and never so that two chains collide.
+    model = structure[keep_model_id]
+    kept_chains = [
+        chain for chain in model
+        if any(is_polymer_residue(r.id[0], r.get_resname()) for r in chain)
+    ]
+    if any(len(str(chain.id)) != 1 for chain in kept_chains):
+        alphabet = [c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"]
+        if len(kept_chains) > len(alphabet):
+            raise ValueError(f"{len(kept_chains)} polymer chains do not fit the PDB format")
+        for chain in list(model):
+            chain.id = f"__tmp_{chain.id}"  # free every name before reassigning
+        for chain, new_id in zip(kept_chains, alphabet):
+            chain.id = new_id
+    n_atoms = sum(
+        1
+        for chain in kept_chains
+        for residue in chain
+        if is_polymer_residue(residue.id[0], residue.get_resname())
+        for _ in residue
+    )
+    if n_atoms > 99999:
+        raise ValueError(f"{n_atoms} polymer atoms do not fit the PDB format")
+
+    class _PolymerOnlyNamed(_PolymerOnly):
+        def accept_chain(self, chain) -> bool:
+            return len(str(chain.id)) == 1
+
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     writer = PDBIO()
     writer.set_structure(structure)
-    writer.save(str(out_path), _PolymerOnly())
+    writer.save(str(out_path), _PolymerOnlyNamed())
     return out_path
