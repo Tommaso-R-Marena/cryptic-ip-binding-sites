@@ -266,6 +266,7 @@ def run_foldseek(structures: Sequence[Path], work_dir: Path, *, threads: int = 4
             "-e", str(MAX_EVALUE),
             "-s", "9.5",  # most sensitive preset
             "--max-seqs", "100000",
+            "-a",  # keep backtraces: the alignment TM-score is computed from them
             "--threads", str(threads),
         ],
         check=True,

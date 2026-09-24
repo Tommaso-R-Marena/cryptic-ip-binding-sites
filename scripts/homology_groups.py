@@ -14,6 +14,7 @@ import argparse
 import json
 import logging
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 from typing import List, Optional, Sequence
@@ -50,6 +51,13 @@ def _structure_files(directory: Path, entries: Sequence[str]) -> List[Path]:
     )
 
 
+def _sequences_or_error(path: Path):
+    try:
+        return homology.chain_sequences(path)
+    except Exception as exc:
+        return f"{type(exc).__name__}: {exc}"
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -65,11 +73,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     mmseqs_hits = args.mmseqs_hits
     if mmseqs_hits is None:
         records = {}
-        for path in files:
-            try:
-                records[path.stem.upper()] = homology.chain_sequences(path)
-            except Exception as exc:  # recorded: a parse failure must not hide an entry
-                LOGGER.warning("%s: no sequences (%s)", path.name, exc)
+        with ProcessPoolExecutor(max_workers=max(1, args.threads)) as pool:
+            for path, result in zip(files, pool.map(_sequences_or_error, files, chunksize=4)):
+                if isinstance(result, str):  # a parse failure must not hide an entry
+                    LOGGER.warning("%s: no sequences (%s)", path.name, result)
+                else:
+                    records[path.stem.upper()] = result
         fasta = args.work_dir / "chains.fasta"
         n_chains = homology.write_fasta(records, fasta)
         LOGGER.info("Searching %d protein chains from %d entries", n_chains, len(records))
