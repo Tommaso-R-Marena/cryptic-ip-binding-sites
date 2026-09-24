@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 import urllib.parse
 from pathlib import Path
@@ -89,23 +90,56 @@ def _validate_fasta(payload: bytes) -> None:
         raise ValidationError(f"not FASTA: {payload[:80]!r}")
 
 
-def fetch_uniprot_fasta(accessions: Sequence[str], batch: int = 150) -> Dict[str, str]:
-    """UniProt sequences for ``accessions``, through the project's verified, retrying fetcher."""
-    from cryptic_ip.database.async_fetch import FetchJob, fetch_all
+#: UniProtKB accession format (uniprot.org/help/accession_numbers), optional isoform suffix.
+ACCESSION = re.compile(r"(?:[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2})(?:-[0-9]+)?")
+
+
+def _uniprot_job(key: str, chunk: Sequence[str]):
+    from cryptic_ip.database.async_fetch import FetchJob
+
+    query = " OR ".join(f"accession:{a}" for a in chunk)
+    url = "https://rest.uniprot.org/uniprotkb/stream?" + urllib.parse.urlencode({"format": "fasta", "query": query})
+    return FetchJob(key=key, url=url, validator=_validate_fasta)
+
+
+def fetch_uniprot_fasta(accessions: Sequence[str], batch: int = 50, fetch=None) -> Dict[str, str]:
+    """UniProt sequences for ``accessions``, through the project's verified, retrying fetcher.
+
+    Tokens that are not UniProt accessions are dropped and counted. A batch the
+    server rejects as a bad request (HTTP 400) is split in half until the
+    offending accession is isolated and skipped, so one malformed identifier
+    cannot cost a whole batch. Any other failure stops the run.
+    """
+    if fetch is None:
+        from cryptic_ip.database.async_fetch import fetch_all
+
+        def fetch(jobs):
+            return fetch_all(jobs, concurrency=4, per_host=4)
 
     unique = sorted({a.strip().upper() for a in accessions if a and a.strip()})
-    jobs = []
-    for start in range(0, len(unique), batch):
-        query = " OR ".join(f"accession:{a}" for a in unique[start:start + batch])
-        url = "https://rest.uniprot.org/uniprotkb/stream?" + urllib.parse.urlencode({"format": "fasta", "query": query})
-        jobs.append(FetchJob(key=f"batch{start // batch}", url=url, validator=_validate_fasta))
-    results = fetch_all(jobs, concurrency=4, per_host=4)
-    failed = [r for r in results if not r.ok]
-    if failed:
-        raise RuntimeError(f"{len(failed)} of {len(results)} UniProt batches failed, e.g. {failed[0].error}")
+    valid = [a for a in unique if ACCESSION.fullmatch(a)]
+    dropped = len(unique) - len(valid)
+    pending = [valid[i:i + batch] for i in range(0, len(valid), batch)]
     out: Dict[str, str] = {}
-    for result in results:
-        out.update(parse_fasta((result.payload or b"").decode()))
+    rejected: List[str] = []
+    while pending:
+        results = fetch([_uniprot_job(f"b{i}", chunk) for i, chunk in enumerate(pending)])
+        split: List[List[str]] = []
+        for chunk, result in zip(pending, results):
+            if result.ok:
+                out.update(parse_fasta((result.payload or b"").decode()))
+            elif result.status == 400 and len(chunk) > 1:
+                half = len(chunk) // 2
+                split += [chunk[:half], chunk[half:]]
+            elif result.status == 400:
+                rejected.append(chunk[0])
+            else:
+                raise RuntimeError(f"UniProt batch failed: {result.error}")
+        pending = split
+    print(f"UniProt: {len(valid)} accessions requested, {dropped} tokens not accessions, "
+          f"{len(rejected)} rejected by the server, {len(out)} sequences returned")
+    if valid and len(rejected) > 0.05 * len(valid):
+        raise RuntimeError(f"UniProt rejected {len(rejected)} of {len(valid)} accessions, e.g. {rejected[:5]}")
     return out
 
 

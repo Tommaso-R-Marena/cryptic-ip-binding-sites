@@ -102,3 +102,39 @@ def test_fasta_validator_rejects_non_fasta():
     ls._validate_fasta(b"")  # every accession in the batch obsolete
     with pytest.raises(ValidationError):
         ls._validate_fasta(b"<html>error</html>")
+
+
+def test_uniprot_fetch_isolates_a_bad_accession_and_drops_non_accessions():
+    from types import SimpleNamespace
+    from urllib.parse import parse_qs, urlsplit
+
+    bad = "Q0BAD1"
+    calls = []
+
+    def fake_fetch(jobs):
+        out = []
+        for job in jobs:
+            query = parse_qs(urlsplit(job.url).query)["query"][0]
+            accs = [t.split(":")[1] for t in query.split(" OR ")]
+            calls.append(len(accs))
+            if bad in accs:
+                out.append(SimpleNamespace(ok=False, status=400, error="HTTP 400", payload=None))
+            else:
+                body = "".join(f">sp|{a}|X\nMKT\n" for a in accs).encode()
+                out.append(SimpleNamespace(ok=True, status=200, error="", payload=body))
+        return out
+
+    accessions = [f"P{i:05d}" for i in range(20)] + [bad, "nan", "not-an-id"]
+    records = ls.fetch_uniprot_fasta(accessions, batch=8, fetch=fake_fetch)
+    assert set(records) == {f"P{i:05d}" for i in range(20)}
+    assert max(calls) <= 8
+
+
+def test_uniprot_fetch_stops_on_a_non_400_failure():
+    from types import SimpleNamespace
+
+    def failing(jobs):
+        return [SimpleNamespace(ok=False, status=503, error="HTTP 503", payload=None) for _ in jobs]
+
+    with pytest.raises(RuntimeError):
+        ls.fetch_uniprot_fasta(["P12345"], fetch=failing)
