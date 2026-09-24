@@ -170,3 +170,17 @@ def test_invalid_protocol_makes_docking_criteria_not_evaluable(arrestin):
     assert d["verdict"] == "not supported" and set(d["failing"]) == {"3_convergence", "4_scores"}
     # ART5 has no tasks at all: every criterion fails, none silently passes
     assert arrestin.decide(tasks, results, mapping, {})["proteins"]["P53244"]["verdict"] == "not supported"
+
+
+def test_a_copy_counts_once_for_protocol_validity(arrestin):
+    tasks = _tasks() + [
+        {"task_id": 5, "protein": "P49407", "kind": "positive_crystal", "ligand": "IHP", "site": "x"},
+        {"task_id": 6, "protein": "P49407", "kind": "positive_crystal", "ligand": "IHP", "site": "z"},
+    ]
+    results = {0: {"best_score": -9.0, "convergence": {"converged": True}}, 1: {"best_score": -6.0},
+               2: {"best_score": -7.0}, 3: {"best_score": -8.0, "success": 1.0}, 4: {"best_score": -7.5},
+               5: {"best_score": -8.0, "success": 1.0}, 6: {"best_score": -5.0, "success": 0.0}}
+    out = arrestin.decide(tasks, results, {}, {})
+    # sites x (twice, success 1) and z (success 0): the duplicate of x must not tip the mean to 2/3
+    assert out["protocol_validity"]["crystal_sites"] == 2
+    assert out["protocol_validity"]["mean_top_pose_success"] == pytest.approx(0.5)

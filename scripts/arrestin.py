@@ -706,11 +706,14 @@ def decide(tasks: Sequence[dict], results: Mapping[int, dict], mapping: Mapping[
            conserve: Mapping[str, dict]) -> Dict[str, object]:
     by = pd.DataFrame([{**t, **{k: v for k, v in results.get(t["task_id"], {}).items() if k != "runs"}}
                        for t in tasks])
-    crystal = by[by["kind"] == "positive_crystal"]
+    # A copy contacting two arrestin chains yields one task per chain, with the
+    # same receptor and ligand; the plan counts each copy once.
+    crystal = by[by["kind"] == "positive_crystal"].drop_duplicates("site")
     validity_values = pd.to_numeric(crystal.get("success"), errors="coerce").dropna() if len(crystal) else []
     validity = float(np.mean(validity_values)) if len(validity_values) else float("nan")
     protocol_valid = bool(np.isfinite(validity) and validity >= 0.5)
-    positives = by[by["kind"].isin(["positive_crystal", "positive_af"]) & (by["ligand"] == "IHP")]
+    positives = pd.concat([crystal, by[by["kind"] == "positive_af"]])
+    positives = positives[positives["ligand"] == "IHP"]
     pos_scores = pd.to_numeric(positives.get("best_score"), errors="coerce").dropna()
     weakest_positive = float(pos_scores.max()) if len(pos_scores) else float("nan")
     out: Dict[str, object] = {"protocol_validity": {"crystal_sites": int(len(crystal)),
