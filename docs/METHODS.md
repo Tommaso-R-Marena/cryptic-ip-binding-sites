@@ -395,6 +395,18 @@ report says so.
 
 ### Results on the deposited set
 
+> **Superseded: these numbers overstate performance.** An audit found that the
+> protocol below leaks. Cross-validation groups fell back to the PDB entry
+> (the grouping read a column the dataset did not have), so the same protein -
+> ADAR2 has 12 entries - and its homologues sat on both sides of folds; the
+> `plddt_*` descriptors are crystallographic B-factors here and carry the removed
+> ligand's ordering back in; the decision threshold and the best of five models
+> were chosen on the out-of-fold predictions they were reported with; and the
+> DeLong tests treated pockets clustered within proteins as independent. The
+> pre-registered benchmark (`docs/ANALYSIS_PLAN.md`, `.github/workflows/benchmark.yml`)
+> corrects each of these, on every inositol phosphate complex in the PDB rather
+> than 136, and replaces this table when it reports.
+
 Trained in CI (`.github/workflows/train-real-data.yml`) on the 136 measurable
 RCSB entries; nested 5×3 grouped CV, intervals bootstrapped over proteins.
 Descriptors are computed on **apo** structures - the ligand and every

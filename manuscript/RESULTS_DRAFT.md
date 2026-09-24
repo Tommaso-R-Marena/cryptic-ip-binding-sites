@@ -128,6 +128,13 @@ class and labelled its pockets â€” including the true inositol phosphate sites â
 as negatives, leaving 5 positives among 12,190 pockets. It measured the
 labelling defect and says nothing about how learnable the problem is.
 
+*[To be replaced: the figures in this paragraph come from an evaluation later
+found to leak - cross-validation folds that did not separate entries of the same
+protein or its homologues, B-factor descriptors that encode the removed ligand,
+and thresholds and model choice fitted on the reported predictions. They
+overstate performance. The pre-registered benchmark (docs/ANALYSIS_PLAN.md)
+replaces them.]*
+
 Trained on the corrected labels, with descriptors computed on ligand-free
 structures and nested cross-validation grouped by protein, an extremely
 randomised trees classifier identifies the pocket that holds the inositol
