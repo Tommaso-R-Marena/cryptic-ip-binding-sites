@@ -1,0 +1,198 @@
+name: Sampling
+
+# docs/SAMPLING_PLAN.md: studies A and F both ran at exhaustiveness 32, where two
+# thirds of seed runs never sampled a near-native pose. This re-docks the same
+# sites at 128 (three seeds, every copy) and 512 (one seed, the pre-registered
+# 80-copy subset) and asks whether the 0.399 best-of-list ceiling is a property
+# of the search budget or of the problem.
+#
+#   dock     30 shards per arm: pose lists with Vina score, RMSD and E_el
+#   report   G1-G4; printed between markers
+#
+# The exhaustiveness-32 arm is NOT re-docked: the report reads study F's pose
+# lists, whose receptor, ligand, box, seeds and starting poses are identical.
+# The report code is deliberately not a trigger: a report-only fix is dispatched
+# with dock_run, which reuses this run's pose lists.
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/SAMPLING_PLAN.md'
+      - 'scripts/sampling.py'
+      - '.github/workflows/sampling.yml'
+  workflow_dispatch:
+    inputs:
+      census_run:
+        description: 'redocking run holding the redocking-census and redocking-inputs artifacts'
+        default: '36020459246'
+      rerank_run:
+        description: 'rerank run holding the exhaustiveness-32 pose lists'
+        default: '36055694750'
+      dock_run:
+        description: 'reuse the pose lists of this sampling run (empty = dock)'
+        default: ''
+
+concurrency:
+  group: sampling-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  CENSUS_RUN: ${{ inputs.census_run || '36020459246' }}
+  RERANK_RUN: ${{ inputs.rerank_run || '36055694750' }}
+  PY_DOCKING: 'rdkit==2026.3.6 vina==1.2.7 meeko==0.8.0 gemmi==0.7.5 pdb2pqr==3.6.1 propka==3.5.1'
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      e128: ${{ steps.plan.outputs.e128 }}
+      e512: ${{ steps.plan.outputs.e512 }}
+    steps:
+      - id: plan
+        run: |
+          echo "e128=$(python3 -c 'import json; print(json.dumps(list(range(20))))')" >> "$GITHUB_OUTPUT"
+          echo "e512=$(python3 -c 'import json; print(json.dumps(list(range(10))))')" >> "$GITHUB_OUTPUT"
+
+  dock-e128:
+    name: Dock 128 ${{ matrix.shard }}
+    needs: plan
+    if: ${{ !inputs.dock_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.e128) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+          which pdb2pqr
+      - name: Census and inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-census --dir census
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-inputs --dir bench
+      - name: Restore structures
+        uses: actions/cache/restore@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch anything the cache lacks
+        run: python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file bench/table_ids.txt
+      - name: Dock
+        env:
+          OMP_NUM_THREADS: '1'
+        run: |
+          python scripts/sampling.py dock --arm e128 --census census/census.csv \
+            --structures-dir data/redock/structures --ccd-dir census/ccd \
+            --shard-index ${{ matrix.shard }} --shard-count 20 --out-dir arms
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: sampling-arms-e128-${{ matrix.shard }}
+          path: arms
+          retention-days: 90
+
+  dock-e512:
+    name: Dock 512 ${{ matrix.shard }}
+    needs: plan
+    if: ${{ !inputs.dock_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.e512) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+          which pdb2pqr
+      - name: Census and inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-census --dir census
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-inputs --dir bench
+      - name: Restore structures
+        uses: actions/cache/restore@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch anything the cache lacks
+        run: python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file bench/table_ids.txt
+      - name: Dock
+        env:
+          OMP_NUM_THREADS: '1'
+        run: |
+          python scripts/sampling.py dock --arm e512 --census census/census.csv \
+            --structures-dir data/redock/structures --ccd-dir census/ccd \
+            --shard-index ${{ matrix.shard }} --shard-count 10 --out-dir arms
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: sampling-arms-e512-${{ matrix.shard }}
+          path: arms
+          retention-days: 90
+
+  report:
+    name: Report
+    needs: [dock-e128, dock-e512]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Census, this run's arms and study F's exhaustiveness-32 arm
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOCK_RUN: ${{ inputs.dock_run || github.run_id }}
+        run: |
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-census --dir census
+          gh run download "$DOCK_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'sampling-arms-*' --dir arms
+          gh run download "$RERANK_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'rerank-arms-*' --dir e32
+      - name: Report
+        run: |
+          python scripts/sampling_report.py --census census/census.csv --e32-dir e32 --arms-dir arms \
+            --out-dir results/sampling
+          cat results/sampling/SAMPLING.md >> "$GITHUB_STEP_SUMMARY"
+          python scripts/extract_log_block.py emit SAMPLING_JSON results/sampling/sampling.json
+          python scripts/extract_log_block.py emit SAMPLING_MD_B64 results/sampling/SAMPLING.md
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: sampling-report
+          path: results/sampling
+          retention-days: 90
