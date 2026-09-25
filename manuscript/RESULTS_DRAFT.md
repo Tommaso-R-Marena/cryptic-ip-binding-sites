@@ -302,6 +302,42 @@ A scoring failure on a ligand carrying 5 to 9 negative charges points at the mis
 electrostatics in Vina's function. That prediction is tested, pre-registered before this
 report was read, in `docs/RERANK_PLAN.md`.
 
+### The docking failure is not a search-budget artefact
+
+Studies A and F both used AutoDock Vina's default exhaustiveness of 32, on a ligand with
+12 rotatable bonds, and two thirds of runs never sampled a pose within 2 Å. A
+pre-registered test (`docs/SAMPLING_PLAN.md`) re-docked the same sites at four and sixteen
+times that budget to ask whether the ceiling belongs to the search or to the problem.
+
+- **The ceiling does not move.** Any-pose-within-2 Å goes from 0.385 [0.256, 0.516] at
+  exhaustiveness 32 to 0.404 [0.277, 0.534] at 128, a difference of +0.019
+  [−0.001, 0.047]. The pre-registered upper bound for calling the search saturated was
+  0.05, so the decision is *search-saturated* (G1).
+- **Nor does success.** Top-pose success is 0.092 against 0.094, a difference of +0.002
+  [−0.002, 0.009] (G2: *no gain*). The cost was 4.4 times the compute per copy.
+- **Sixteen times the budget is no better.** On the subset, one seed, the ceiling reads
+  0.348, 0.404 and 0.373 at 32, 128 and 512. The curve has flattened.
+- **Runs that miss keep missing.** Of 420 seed runs with no near-native pose at
+  exhaustiveness 32, 7.5 % [3.2, 13.3] find one at 128 and 7.7 % at 512.
+- **Electrostatic re-ranking replicates.** The best available protocol, more search plus
+  the frozen charge term, beats study A's registered one by +0.041 [0.004, 0.083]; Holm's
+  correction leaves p at 0.081, so G3 is *inconclusive*. Study F's independent estimate
+  was +0.054 [−0.001, 0.114]. Two runs agree on the effect and neither clears its bar.
+- **Burial helps sampling, not hurts it.** The ceiling is 0.279 for surface sites, 0.563
+  for semi-cryptic and 0.810 for cryptic ones (11 copies in 4 groups, below the minimum
+  and not evidence). An enclosed pocket constrains the ligand; an open surface site leaves
+  the search nothing to hold on to.
+
+Taken with study A, this locates the failure. It is not the sampler and, given study F,
+only partly the scoring function. What remains is the rigid receptor: crystal sidechain
+rotamers were fitted around the ligand that was present, so for most of these sites the
+native pose may simply not exist in the rigid box being searched. That is a prediction
+about receptor flexibility, and it is testable in the same framework.
+
+**Caveat.** 218 of 250 copies carry the comparison: 19 fail receptor preparation as in
+study A, and 32 did not fit the shard time budget at four times the search. The comparison
+is paired, so missing copies cost power rather than introducing bias.
+
 ### Adding electrostatics helps the ranking, but not by enough to call it
 
 Because the redocking failures are failures of ranking rather than of search, and the

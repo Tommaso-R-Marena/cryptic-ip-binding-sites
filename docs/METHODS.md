@@ -774,6 +774,99 @@ the same thing.
   minimum of 5. The point estimates run the other way from the usual expectation, with
   buried sites easier than surface ones, but the interval is wide and no claim is made.
 
+### The sampling ceiling
+
+**Plan and run.** `docs/SAMPLING_PLAN.md`, sampling run 36076556010; results in
+`results/sampling/`, extracted from the Report job's log. The plan was committed before
+any pose above exhaustiveness 32 existed.
+
+The report is attempt 2. One shard, Dock 128 13, was lost to a dead runner after 3 h
+52 min and was re-run once; the other 29 shards succeeded first time.
+
+**Why.** Studies A and F both ran at exhaustiveness 32, Vina's default for ligands far
+smaller than IP6 with its 12 rotatable bonds. Two thirds of study F's seed runs never
+produced a pose within 2 Å, capping any re-scoring at 0.399. Either that ceiling is a
+property of the search budget, in which case the pose-prediction failure is a
+configuration choice, or it is a property of the problem, in which case study F's partial
+gain is close to all that re-scoring can deliver.
+
+**Arms.** The exhaustiveness-32 arm is study F's pose lists, reused rather than re-docked:
+same receptor, ligand, box, seeds and starting poses, and a test pins the two docking
+routines to identical output on identical settings. New compute went to E128 (three seeds,
+every copy) and E512 (one seed, the plan's stratified 80-copy subset, selected by a rule
+that uses no docking outcome).
+
+**Accounting.** 218 copies in 29 strict groups are present in both the E32 and E128 arms
+and carry the comparison.
+
+- The E128 arm has 51 records without an outcome: the same 19 copies that fail receptor
+  preparation in studies A and F, plus 32 that did not fit the shard's time budget at
+  four times the search. The E512 arm has 11, one of them a budget overrun.
+- The comparison is paired, so a copy missing from one arm drops out of both rather than
+  biasing either. It does cost power: 218 copies against study F's 250.
+- Cost: the median copy took 448 s at E32, 1,987 s at E128 (4.4 times) and 2,253 s for a
+  single seed at E512.
+
+**Decisions (Holm across G1–G3).**
+
+| | question | difference (group) | Holm p | decision |
+|---|---|---|---|---|
+| G1 | sampling ceiling, E128 − E32 | +0.019 [−0.001, 0.047] | 0.152 | **search-saturated** |
+| G2 | top-pose success, E128 − E32 | +0.002 [−0.002, 0.009] | 0.715 | **no gain** |
+| G3 | re-ranked at E128 − Vina at E32 | +0.041 [0.004, 0.083] | 0.081 | **inconclusive** |
+
+**Levels (group estimand).**
+
+| arm | sampling ceiling | Vina top pose | re-ranked top pose |
+|---|---|---|---|
+| E32 | 0.385 [0.256, 0.516] | 0.092 [0.032, 0.172] | 0.140 [0.066, 0.224] |
+| E128 | 0.404 [0.277, 0.534] | 0.094 [0.035, 0.173] | 0.133 [0.064, 0.216] |
+
+- **G1 is the study's answer.** Quadrupling the search moves the ceiling by less than two
+  points, and the interval's upper bound of 0.047 sits below the plan's 0.05 margin, so
+  the pre-registered label is *search-saturated*. The ceiling is a property of the
+  problem, not of the budget.
+- **G2 confirms it end to end.** Top-pose success is unchanged at 0.094, and the interval
+  is tight around zero: ±0.009. Four times the compute buys nothing that reaches the top
+  of the ranking.
+- **G3 reproduces study F and stops at the same place.** The best protocol these studies
+  can assemble beats study A's registered one by +0.041 [0.004, 0.083]. The interval
+  excludes zero but Holm's correction leaves p at 0.081, so the label is *inconclusive*.
+  Study F's independent estimate of the same effect was +0.054 [−0.001, 0.114]: two
+  separate runs agree on the size and direction of the electrostatic gain and neither
+  clears its threshold.
+
+**G4 and the ladder (descriptive).**
+
+- Of the 420 seed runs whose E32 pose list held nothing within 2 Å, only 0.075
+  [0.032, 0.133] find one at E128, and 0.077 [0.000, 0.231] at E512. Runs that miss do
+  not miss for want of search.
+- The E512 ladder on the subset, one seed: ceiling 0.348 at E32, 0.404 at E128, 0.373 at
+  E512. Sixteen times the budget is flat against four times, within noise. The curve has
+  stopped climbing.
+
+**Strata (descriptive).** The ceiling is strongly burial-dependent, and in the opposite
+direction to the usual expectation: surface sites 0.279 at E32 and 0.316 at E128,
+semi-cryptic 0.563 and 0.572, cryptic 0.810 and 0.839 on 11 copies in 4 groups, which is
+below the plan's minimum and not evidence. An enclosed pocket constrains the ligand and
+the search finds a near-native pose; an open surface site does not.
+
+**What this settles.**
+
+- The pose-prediction failure in study A is not a search-budget artefact. Raising
+  exhaustiveness from 32 to 128, and to 512 on a subset, leaves both the ceiling and the
+  success rate where they were, at a 4.4-fold cost.
+- Two thirds of runs still fail to sample a near-native pose, and more search does not
+  rescue them. That points at the pose problem itself rather than at the sampler: the
+  receptor is rigid and its sidechain rotamers were fitted to the ligand that was present,
+  so the native pose may be geometrically unreachable in a rigid box. An ensemble or
+  flexible-sidechain receptor is the next thing to test, not a bigger search.
+- It also bounds the re-scoring work: with the ceiling fixed near 0.40, no re-ranking of
+  these pose lists can exceed it, and study F already reaches about a third of the way
+  from Vina's 0.09 to that ceiling.
+- Neither arm speaks to affinity, and none of these scores includes explicit
+  electrostatics except through study F's added term.
+
 ### Electrostatic re-ranking of docked poses
 
 **Plan and run.** `docs/RERANK_PLAN.md` with `docs/RERANK_PLAN_AMENDMENT_1.md`, rerank run
