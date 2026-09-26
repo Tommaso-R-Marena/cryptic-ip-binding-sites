@@ -164,7 +164,10 @@ jobs:
   report:
     name: Report
     needs: [disorder, motifs, dive]
-    if: ${{ !cancelled() }}
+    # always(), not !cancelled(): GitHub marks a job killed by timeout-minutes as
+    # CANCELLED, so !cancelled() skips the report exactly when a best-effort job
+    # (shark-dive) runs out of budget - which is when the report matters most.
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -197,10 +200,12 @@ jobs:
             --disorder out/disorder.json --motifs motifs.json --dive out/dive.json \
             --out-dir results/orthogonal
           cat results/orthogonal/ORTHOGONAL.md >> "$GITHUB_STEP_SUMMARY"
-          python scripts/extract_log_block.py emit ORTHOGONAL_JSON results/orthogonal/orthogonal.json
-          python scripts/extract_log_block.py emit ORTHOGONAL_MD_B64 results/orthogonal/ORTHOGONAL.md
+          # Largest block first: a log-reading tool returns a bounded tail, so the
+          # per-candidate table must not push the decisions out of reach.
           python scripts/extract_log_block.py emit ORTHOGONAL_CANDIDATES_B64 \
             results/orthogonal/orthogonal_candidates.csv
+          python scripts/extract_log_block.py emit ORTHOGONAL_MD_B64 results/orthogonal/ORTHOGONAL.md
+          python scripts/extract_log_block.py emit ORTHOGONAL_JSON results/orthogonal/orthogonal.json
       - uses: actions/upload-artifact@v6
         if: always()
         with:
