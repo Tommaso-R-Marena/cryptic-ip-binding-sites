@@ -1,0 +1,295 @@
+{
+  "plan": "docs/COEVOLUTION_PLAN.md",
+  "focus": "dictyostelium",
+  "min_plddt": 70.0,
+  "primary_fpr": 0.01,
+  "eligibility": {
+    "dictyostelium": {
+      "proteins": 11679,
+      "eligible": 11679,
+      "excluded_low_plddt": 0
+    },
+    "human": {
+      "proteins": 19899,
+      "eligible": 19899,
+      "excluded_low_plddt": 0
+    },
+    "yeast": {
+      "proteins": 5806,
+      "eligible": 5806,
+      "excluded_low_plddt": 0
+    }
+  },
+  "threshold": {
+    "score": "combined",
+    "fpr_anchor": 0.01,
+    "value": 0.5196041986036315
+  },
+  "rates": {
+    "dictyostelium": {
+      "proteins": 11679,
+      "hits": 106,
+      "estimate": {
+        "point": 0.009076119530781745,
+        "low": 0.00702426883033451,
+        "high": 0.011215492816620013,
+        "p_value": 0.0
+      },
+      "clusters": 8548
+    },
+    "human": {
+      "proteins": 19899,
+      "hits": 243,
+      "estimate": {
+        "point": 0.012211668928086838,
+        "low": 0.010175266598507596,
+        "high": 0.014235079959994582,
+        "p_value": 0.0
+      },
+      "clusters": 10588
+    },
+    "yeast": {
+      "proteins": 5806,
+      "hits": 85,
+      "estimate": {
+        "point": 0.014640027557698932,
+        "low": 0.011126365515896967,
+        "high": 0.018419794893499007,
+        "p_value": 0.0
+      },
+      "clusters": 4616
+    }
+  },
+  "C1_raw": {
+    "estimate": {
+      "point": -0.00434972871211114,
+      "low": -0.007136520244572017,
+      "high": -0.0015026210984000648,
+      "p_value": 0.005
+    },
+    "comparators": [
+      "human",
+      "yeast"
+    ],
+    "note": "unmatched and confounded by model confidence, length and composition; reported so the reader can see how much the matching removes"
+  },
+  "C2_matched": {
+    "estimate": {
+      "point": -0.00017406697254842378,
+      "low": -0.0034138550774683073,
+      "high": 0.0026929426369454584,
+      "p_value": 0.834
+    },
+    "bins": 722,
+    "clusters": 20080,
+    "focus_proteins": 11679,
+    "comparator_proteins": 25698,
+    "contributing_proteins": 36362,
+    "decision": "inconclusive",
+    "question": "hit rate, dictyostelium - comparators, matched on pLDDT, length and basic fraction"
+  },
+  "C3_plddt_deciles": {
+    "70.0-75.0": {
+      "proteins": 3739,
+      "clusters": 3073,
+      "estimate": {
+        "point": 0.00027675318272326303,
+        "low": -0.004251149976524854,
+        "high": 0.005317748174528263,
+        "p_value": 0.966
+      },
+      "decision": "inconclusive"
+    },
+    "75.0-79.3": {
+      "proteins": 3738,
+      "clusters": 3019,
+      "estimate": {
+        "point": 0.0007337477994739064,
+        "low": -0.004842351514623433,
+        "high": 0.006779999714255751,
+        "p_value": 0.798
+      },
+      "decision": "inconclusive"
+    },
+    "79.3-83.2": {
+      "proteins": 3738,
+      "clusters": 2874,
+      "estimate": {
+        "point": 6.674331079527325e-05,
+        "low": -0.006123324447283162,
+        "high": 0.006161259427825557,
+        "p_value": 0.978
+      },
+      "decision": "inconclusive"
+    },
+    "83.2-86.3": {
+      "proteins": 3739,
+      "clusters": 2861,
+      "estimate": {
+        "point": 0.00026801261848801214,
+        "low": -0.009364509197000928,
+        "high": 0.010781575812690446,
+        "p_value": 0.993
+      },
+      "decision": "inconclusive"
+    },
+    "86.3-88.9": {
+      "proteins": 3739,
+      "clusters": 2839,
+      "estimate": {
+        "point": 0.0021476348084474503,
+        "low": -0.008446339263566019,
+        "high": 0.012619478016228591,
+        "p_value": 0.791
+      },
+      "decision": "inconclusive"
+    },
+    "88.9-91.3": {
+      "proteins": 3739,
+      "clusters": 2880,
+      "estimate": {
+        "point": 0.002601245233817262,
+        "low": -0.007919170528201446,
+        "high": 0.01589068469681402,
+        "p_value": 0.593
+      },
+      "decision": "inconclusive"
+    },
+    "91.3-93.3": {
+      "proteins": 3739,
+      "clusters": 2940,
+      "estimate": {
+        "point": 0.003149056427696602,
+        "low": -0.009134060363500281,
+        "high": 0.013245097589324123,
+        "p_value": 0.726
+      },
+      "decision": "inconclusive"
+    },
+    "93.3-95.2": {
+      "proteins": 3738,
+      "clusters": 2899,
+      "estimate": {
+        "point": 0.0022884609140637127,
+        "low": -0.006816133374559085,
+        "high": 0.011848201571756471,
+        "p_value": 0.766
+      },
+      "decision": "inconclusive"
+    },
+    "95.2-97.0": {
+      "proteins": 3738,
+      "clusters": 2707,
+      "estimate": {
+        "point": -0.006378073987491761,
+        "low": -0.017238436976146736,
+        "high": 0.004393113561635792,
+        "p_value": 0.24
+      },
+      "decision": "inconclusive"
+    },
+    "97.0-98.9": {
+      "proteins": 3739,
+      "clusters": 2173,
+      "estimate": {
+        "point": -0.00927522049348211,
+        "low": -0.013836226838570446,
+        "high": -0.005258248175315776,
+        "p_value": 0.0
+      },
+      "decision": "lower in dictyostelium"
+    }
+  },
+  "C4_rule_only": {
+    "estimate": {
+      "point": 0.0018295664447896991,
+      "low": -0.0008115828264750621,
+      "high": 0.004334150354800308,
+      "p_value": 0.185
+    },
+    "bins": 722,
+    "clusters": 20080,
+    "focus_proteins": 11679,
+    "comparator_proteins": 25698,
+    "contributing_proteins": 36362,
+    "decision": "inconclusive",
+    "threshold": 0.5807224961371181
+  },
+  "robust": false,
+  "holm": {
+    "C4": 0.37,
+    "C2": 0.834
+  },
+  "C5_deep_pockets": {
+    "estimate": {
+      "point": 0.00208885571911284,
+      "low": -0.004391017930751655,
+      "high": 0.009057785893047775,
+      "p_value": 0.547
+    },
+    "bins": 304,
+    "clusters": 6319,
+    "focus_proteins": 2831,
+    "comparator_proteins": 6514,
+    "contributing_proteins": 8783,
+    "decision": "inconclusive",
+    "hull_depth_cutoff": 18.86908775576861
+  },
+  "sensitivity_fpr": {
+    "0.001": {
+      "threshold": 0.6602412892865768,
+      "estimate": {
+        "point": 0.00034782006041846926,
+        "low": -0.0005693210484428059,
+        "high": 0.0013260197395034892,
+        "p_value": 0.445
+      },
+      "decision": "no material difference"
+    },
+    "0.005": {
+      "threshold": 0.5775195341042537,
+      "estimate": {
+        "point": -0.0005800247726191152,
+        "low": -0.0024746890232344543,
+        "high": 0.001250137121275918,
+        "p_value": 0.49
+      },
+      "decision": "inconclusive"
+    },
+    "0.01": {
+      "threshold": 0.5196041986036315,
+      "estimate": {
+        "point": -0.00017406697254842378,
+        "low": -0.002965809916089842,
+        "high": 0.0026671456083544884,
+        "p_value": 0.84
+      },
+      "decision": "inconclusive"
+    },
+    "0.02": {
+      "threshold": 0.4491744617131793,
+      "estimate": {
+        "point": -0.0007357349259523553,
+        "low": -0.006183582118870366,
+        "high": 0.0039493451650689125,
+        "p_value": 0.66
+      },
+      "decision": "inconclusive"
+    },
+    "0.05": {
+      "threshold": 0.32908630327967386,
+      "estimate": {
+        "point": -0.006381955477538447,
+        "low": -0.013729845938168986,
+        "high": 0.0005444089399312552,
+        "p_value": 0.075
+      },
+      "decision": "inconclusive"
+    }
+  },
+  "notes": [
+    "The primary test is C2, the matched comparison. C1 is reported only to show how much of the raw difference is model confidence, length and composition.",
+    "Three organisms give two contrasts and no replication, so even a clean positive is a correlation across three points, not a demonstration of co-evolution.",
+    "If C2 and C4 disagree in direction the primary is not robust to the learned model's training distribution and no co-evolution claim is made."
+  ]
+}

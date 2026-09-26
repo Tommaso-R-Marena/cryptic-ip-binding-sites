@@ -1,0 +1,251 @@
+{
+  "plan": "docs/KINASE_PLAN.md",
+  "cofactor_distance": 6.0,
+  "qualifying": 33,
+  "cofactor_residues": {
+    "ADP": 15,
+    "ATP": 9,
+    "ANP": 8,
+    "ACP": 1
+  },
+  "copies_compared": 32,
+  "accounting": {
+    "holo_records": 33,
+    "holo_errors": 1
+  },
+  "K0_family": {
+    "copies": 18,
+    "with_outcome": 18,
+    "successes": 0,
+    "proteins": [
+      "EhIP6KA",
+      "IPMK",
+      "ITPKA",
+      "ITPKC",
+      "PPIP5K2"
+    ],
+    "burial_classes": {
+      "surface": 18
+    },
+    "failure_kinds": {
+      "scoring": 18
+    },
+    "note": "descriptive: this slice was read before the plan was written"
+  },
+  "K3_pyrophosphates": {
+    "PP-IP (InsP7 + InsP8)": {
+      "copies": 6,
+      "estimate": {
+        "copies": 6,
+        "groups": 5,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.0,
+          "low": 0.0,
+          "high": 0.0,
+          "p_value": 1.0
+        },
+        "per_group": {
+          "point": 0.0,
+          "low": 0.0,
+          "high": 0.0,
+          "p_value": 1.0
+        }
+      }
+    },
+    "InsP6": {
+      "copies": 154,
+      "estimate": {
+        "copies": 154,
+        "groups": 19,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.10606060606060605,
+          "low": 0.057469667943805876,
+          "high": 0.18018547959724426,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.11370091896407687,
+          "low": 0.04260303536619326,
+          "high": 0.1964961013645224,
+          "p_value": 0.0
+        }
+      }
+    },
+    "note": "descriptive: read before the plan was written"
+  },
+  "groups": 4,
+  "levels": {
+    "apo": {
+      "ceiling": {
+        "copies": 32,
+        "groups": 4,
+        "evidence": false,
+        "per_copy": {
+          "point": 0.40625,
+          "low": 0.35294117647058826,
+          "high": 0.5333333333333333,
+          "p_value": 0.122
+        },
+        "per_group": {
+          "point": 0.5416666666666667,
+          "low": 0.35416666666666663,
+          "high": 0.8541666666666666,
+          "p_value": 0.639
+        }
+      },
+      "vina": {
+        "copies": 32,
+        "groups": 4,
+        "evidence": false,
+        "per_copy": {
+          "point": 0.06249999999999999,
+          "low": 0.0,
+          "high": 0.2857142857142857,
+          "p_value": 0.012
+        },
+        "per_group": {
+          "point": 0.2727272727272727,
+          "low": 0.0,
+          "high": 0.7505681818181787,
+          "p_value": 0.549
+        }
+      },
+      "reranked": {
+        "copies": 32,
+        "groups": 4,
+        "evidence": false,
+        "per_copy": {
+          "point": 0.22916666666666663,
+          "low": 0.08695652173913043,
+          "high": 0.3859649122807018,
+          "p_value": 0.012
+        },
+        "per_group": {
+          "point": 0.3631628787878788,
+          "low": 0.06770833333333333,
+          "high": 0.7960108901515122,
+          "p_value": 0.549
+        }
+      }
+    },
+    "holo": {
+      "ceiling": {
+        "copies": 32,
+        "groups": 4,
+        "evidence": false,
+        "per_copy": {
+          "point": 0.38541666666666663,
+          "low": 0.3469387755102041,
+          "high": 0.5333333333333333,
+          "p_value": 0.084
+        },
+        "per_group": {
+          "point": 0.5312499999999999,
+          "low": 0.35416666666666663,
+          "high": 0.8437500000000001,
+          "p_value": 0.639
+        }
+      },
+      "vina": {
+        "copies": 32,
+        "groups": 4,
+        "evidence": false,
+        "per_copy": {
+          "point": 0.05208333333333333,
+          "low": 0.0,
+          "high": 0.21428571428571427,
+          "p_value": 0.012
+        },
+        "per_group": {
+          "point": 0.26041666666666663,
+          "low": 0.0,
+          "high": 0.7502604166666653,
+          "p_value": 0.549
+        }
+      },
+      "reranked": {
+        "copies": 32,
+        "groups": 4,
+        "evidence": false,
+        "per_copy": {
+          "point": 0.19791666666666666,
+          "low": 0.1111111111111111,
+          "high": 0.3508771929824561,
+          "p_value": 0.012
+        },
+        "per_group": {
+          "point": 0.3584280303030303,
+          "low": 0.10227272727272727,
+          "high": 0.7809777462121176,
+          "p_value": 0.549
+        }
+      }
+    }
+  },
+  "K1": {
+    "question": "top-pose success, holo - apo",
+    "estimate": {
+      "point": -0.012310606060606064,
+      "low": -0.06818181818181818,
+      "high": 0.03125,
+      "p_value": 0.655
+    },
+    "per_copy": {
+      "point": -0.010416666666666666,
+      "low": -0.08333333333333333,
+      "high": 0.0392156862745098,
+      "p_value": 0.842
+    },
+    "copies": 32,
+    "groups": 4,
+    "holm_p": 0.655,
+    "decision": "not evaluable: 4 strict groups (fewer than 5)"
+  },
+  "K2": {
+    "question": "best-of-list ceiling, holo - apo",
+    "estimate": {
+      "point": -0.010416666666666668,
+      "low": -0.03125,
+      "high": 0.0,
+      "p_value": 0.119
+    },
+    "per_copy": {
+      "point": -0.020833333333333336,
+      "low": -0.03921568627450981,
+      "high": 0.0,
+      "p_value": 0.176
+    },
+    "copies": 32,
+    "groups": 4,
+    "holm_p": 0.238,
+    "decision": "not evaluable: 4 strict groups (fewer than 5)"
+  },
+  "holm": {
+    "K2": 0.238,
+    "K1": 0.655
+  },
+  "K4_electrostatics": {
+    "question": "re-ranked (w = 0.1) minus Vina top-pose, both on the holo receptor",
+    "estimate": {
+      "point": 0.09801136363636363,
+      "low": 0.030303030303030307,
+      "high": 0.16145833333333331,
+      "p_value": 0.012
+    },
+    "copies_with_cofactor_charges": 0,
+    "note": "no copy carried cofactor charges, so this repeats study G's re-ranking on a receptor whose cofactor is uncharged and is not evidence about electrostatics"
+  },
+  "metals_only": {
+    "copies": 12,
+    "mean": 0.16666666666666666,
+    "note": "study A's metals-only arm on the same copies, quoted not re-docked, so the cofactor's contribution can be separated from the metals'"
+  },
+  "notes": [
+    "The IPK slice of study A was read before this plan was written, so K0 and K3 are a re-analysis of data in hand, not a test. K1, K2 and K4 are blind.",
+    "Vina's scoring function does not read partial charges, so in K1 and K2 the cofactor is a shaped, typed occluder: it restores the site's shape and hydrogen bonding, not its electrostatics.",
+    "The holo arm adds the cofactor and the catalytic metals together. Study A's metals-only arm is quoted on the same copies so the two contributions are not confounded.",
+    "A win here would narrow where the protocol may be trusted; it would not rescue the proteome ranking, whose candidate pockets are not catalytic sites."
+  ]
+}
