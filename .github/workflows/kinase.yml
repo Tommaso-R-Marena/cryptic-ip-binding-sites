@@ -1,0 +1,179 @@
+name: Kinase
+
+# docs/KINASE_PLAN.md: every inositol-phosphate kinase copy in study A's census
+# fails, all as scoring failures, often with a near-native pose sitting in the
+# list. They are catalytic sites: the crystal holds the inositol phosphate against
+# an ATP analogue and its metals, and the protocol deletes both. This puts them
+# back and asks whether the answer changes.
+#
+#   cofactors  which primary-set copies carry a nucleotide within 6 A of the ligand
+#   dock       the holo arm, 20 shards
+#   report     K0-K4; printed between markers
+#
+# The apo arm is NOT re-docked: the report reads study F's pose lists, whose
+# receptor, ligand, box, seeds and starting poses are identical.
+# The report code is deliberately not a trigger: a report-only fix is dispatched
+# with dock_run, which reuses that run's pose lists.
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/KINASE_PLAN.md'
+      - 'scripts/kinase.py'
+      - '.github/workflows/kinase.yml'
+  workflow_dispatch:
+    inputs:
+      census_run:
+        description: 'redocking run holding the redocking-census and redocking-inputs artifacts'
+        default: '36020459246'
+      rerank_run:
+        description: 'rerank run holding the apo pose lists'
+        default: '36055694750'
+      dock_run:
+        description: 'reuse the holo pose lists of this kinase run (empty = dock)'
+        default: ''
+
+concurrency:
+  group: kinase-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  CENSUS_RUN: ${{ inputs.census_run || '36020459246' }}
+  RERANK_RUN: ${{ inputs.rerank_run || '36055694750' }}
+  PY_DOCKING: 'rdkit==2026.3.6 vina==1.2.7 meeko==0.8.0 gemmi==0.7.5 pdb2pqr==3.6.1 propka==3.5.1'
+
+jobs:
+  cofactors:
+    name: Cofactor census
+    if: ${{ !inputs.dock_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+      - name: Census and inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-census --dir census
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-inputs --dir bench
+      - name: Restore structures
+        uses: actions/cache/restore@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch anything the cache lacks
+        run: python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file bench/table_ids.txt
+      - name: Which copies carry a nucleotide cosubstrate
+        run: |
+          python scripts/kinase.py cofactors --census census/census.csv \
+            --structures-dir data/redock/structures --out cofactors.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: kinase-cofactors
+          path: cofactors.json
+          retention-days: 90
+
+  dock:
+    name: Dock holo ${{ matrix.shard }}
+    needs: cofactors
+    if: ${{ !inputs.dock_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+          which pdb2pqr
+      - name: Census, inputs and the cofactor census
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-census --dir census
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-inputs --dir bench
+          gh run download "${{ github.run_id }}" --repo "$GITHUB_REPOSITORY" --name kinase-cofactors --dir cof
+      - name: Restore structures
+        uses: actions/cache/restore@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch anything the cache lacks
+        run: python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file bench/table_ids.txt
+      - name: Dock the holo receptor
+        env:
+          OMP_NUM_THREADS: '1'
+        run: |
+          python scripts/kinase.py dock --census census/census.csv --cofactors cof/cofactors.json \
+            --structures-dir data/redock/structures --ccd-dir census/ccd \
+            --work-dir work --out-dir arms --shard ${{ matrix.shard }} --shards 20
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: kinase-arms-${{ matrix.shard }}
+          path: arms
+          retention-days: 90
+
+  report:
+    name: Report
+    needs: dock
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: The apo pose lists, the cofactor census and this run's holo arms
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOCK_RUN: ${{ inputs.dock_run || github.run_id }}
+        run: |
+          gh run download "$RERANK_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'rerank-arms-*' --dir apo
+          gh run download "$DOCK_RUN" --repo "$GITHUB_REPOSITORY" --name kinase-cofactors --dir cof
+          gh run download "$DOCK_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'kinase-arms-*' --dir holo
+      - name: Report
+        run: |
+          python scripts/kinase.py report --census results/redocking/census.csv \
+            --cofactors cof/cofactors.json --copies results/redocking/copies.csv \
+            --apo-dir apo --holo-dir holo --out-dir results/kinase
+          cat results/kinase/KINASE.md >> "$GITHUB_STEP_SUMMARY"
+          python scripts/extract_log_block.py emit KINASE_JSON results/kinase/kinase.json
+          python scripts/extract_log_block.py emit KINASE_MD_B64 results/kinase/KINASE.md
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: kinase-report
+          path: results/kinase
+          retention-days: 90

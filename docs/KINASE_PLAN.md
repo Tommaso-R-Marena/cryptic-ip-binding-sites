@@ -56,10 +56,26 @@ The two are independent and this study does not test the other.
 | holo | the same, plus the nucleotide cofactor as rigid receptor atoms | 1, 2, 3 | the qualifying copies |
 
 **How the cofactor enters the receptor.** Its heavy atoms are appended to the receptor
-PDBQT as rigid HETATM records with AutoDock types assigned by element, the same mapping
-the protein atoms use. `cryptic_ip/docking/receptor.py` is **not edited** — a finished
-study's module — so the appending lives in this study's own code, with a test pinning the
-apo output to byte-identical agreement with the existing path.
+PDBQT as rigid HETATM records. `cryptic_ip/docking/receptor.py` is **not edited** — a
+finished study's module — so the appending lives in this study's own code, with a test
+pinning the no-cofactor case to a byte-identical copy of the apo receptor.
+
+**Atom typing, fixed here.** C→C, N→NA, O→OA, P→P, S→SA, halogens and metals to their
+own types. Nitrogen and oxygen are typed as hydrogen-bond acceptors, which is what they
+overwhelmingly are in a nucleotide. Aromatic carbons of the base are typed C rather than
+A, so the base's stacking contribution is slightly under-rewarded; this is a stated
+approximation, not a tuned choice.
+
+**Charges, fixed here.** Gasteiger charges computed from the cofactor's CCD template and
+matched to the crystal atoms by name; 0.0 where no template is available. Vina ignores
+charges, so K1 and K2 are unaffected either way, and K4 reports how many copies carried
+real charges — with none, K4 is declared not evidence about electrostatics.
+
+**What the holo arm changes, and the decomposition.** The apo arm reused from study F has
+neither the cofactor nor the metals. The holo arm adds **both**, because that is the
+complex the crystal actually holds. To keep the two contributions separate the report
+quotes study A's existing **metals-only** arm (`metals_success`) on the same copies rather
+than re-docking it.
 
 **A stated limitation of the primary engine.** Vina's scoring function is typed and
 distance-based; it does **not** read partial charges. So in the Vina arm the cofactor acts
