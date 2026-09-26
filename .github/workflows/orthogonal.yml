@@ -1,0 +1,209 @@
+name: Orthogonal
+
+# docs/ORTHOGONAL_PLAN.md: study H ranked the candidates with AlphaFold pLDDT and a
+# MAFFT alignment. This asks what two tools that use neither add: metapredict v3
+# (sequence disorder, so a pocket predicted in a disordered region can be demoted)
+# and SHARK (alignment-free, so conservation does not depend on the alignment being
+# right, and the 19 candidates without UniRef50 homologues can be asked about).
+#
+#   disorder   metapredict over every candidate, control and annotated binder
+#   motifs     shark-capture on each protein's homologue set, 25 shards
+#   dive       shark-dive for the candidates study H could not evaluate
+#   report     I1-I4; printed between markers
+#
+# The SHARK jobs are best-effort: they record a per-protein error rather than fail,
+# because I1 (the only hypothesis test) rests on metapredict alone.
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/ORTHOGONAL_PLAN.md'
+      - 'scripts/orthogonal.py'
+      - '.github/workflows/orthogonal.yml'
+  workflow_dispatch:
+    inputs:
+      specificity_run:
+        description: 'specificity run holding proteins_combined.csv.gz (the specificity-rerank artifact)'
+        default: '36020458866'
+      triage_run:
+        description: 'triage run holding conservation.json (the triage-conservation artifact)'
+        default: '36222552458'
+      analysis_run:
+        description: 'reuse the disorder, motif and dive outputs of this run (empty = compute them)'
+        default: ''
+
+concurrency:
+  group: orthogonal-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  SPECIFICITY_RUN: ${{ inputs.specificity_run || '36020458866' }}
+  TRIAGE_RUN: ${{ inputs.triage_run || '36222552458' }}
+  MOTIF_SHARDS: '25'
+
+jobs:
+  disorder:
+    name: Disorder
+    if: ${{ !inputs.analysis_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+          python -m pip install 'metapredict==3.0.2'
+      - name: Study C's scored proteins, which carry the matching columns
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$SPECIFICITY_RUN" --repo "$GITHUB_REPOSITORY" --name specificity-rerank --dir screen
+          find screen -name 'proteins_combined.csv.gz' | head -1
+      - name: Pocket disorder for every candidate, control and annotated binder
+        run: |
+          python scripts/orthogonal.py disorder --candidates results/specificity/candidates.csv \
+            --proteins "$(find screen -name 'proteins_combined.csv.gz' | head -1)" --out disorder.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: orthogonal-disorder
+          path: disorder.json
+          retention-days: 90
+
+  motifs:
+    name: Motifs ${{ matrix.shard }}
+    if: ${{ !inputs.analysis_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+                13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+          python -m pip install 'bio-shark==2.0.6'
+      - name: Study C's scored proteins, which carry the matching columns
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$SPECIFICITY_RUN" --repo "$GITHUB_REPOSITORY" --name specificity-rerank --dir screen
+      - name: SHARK-capture motif support for this shard
+        run: |
+          python scripts/orthogonal.py motifs --candidates results/specificity/candidates.csv \
+            --proteins "$(find screen -name 'proteins_combined.csv.gz' | head -1)" \
+            --work work --out "motifs_${{ matrix.shard }}.json" \
+            --shard ${{ matrix.shard }} --shards "$MOTIF_SHARDS"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: orthogonal-motifs-${{ matrix.shard }}
+          path: motifs_${{ matrix.shard }}.json
+          retention-days: 90
+
+  dive:
+    name: Remote homology
+    if: ${{ !inputs.analysis_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+          python -m pip install 'bio-shark==2.0.6'
+      - name: Study C's proteins and study H's conservation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$SPECIFICITY_RUN" --repo "$GITHUB_REPOSITORY" --name specificity-rerank --dir screen
+          gh run download "$TRIAGE_RUN" --repo "$GITHUB_REPOSITORY" --name triage-conservation --dir cons
+      - name: The seeded proteome sample SHARK-dive searches
+        run: |
+          python scripts/orthogonal.py targets \
+            --proteins "$(find screen -name 'proteins_combined.csv.gz' | head -1)" --out targets.fasta
+      - name: SHARK-dive for the candidates study H could not evaluate
+        run: |
+          python scripts/orthogonal.py dive --conservation cons/conservation.json \
+            --targets targets.fasta --work dive --out dive.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: orthogonal-dive
+          path: dive.json
+          retention-days: 90
+
+  report:
+    name: Report
+    needs: [disorder, motifs, dive]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: The outputs of this run, or of the run being reused
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANALYSIS_RUN: ${{ inputs.analysis_run || github.run_id }}
+        run: |
+          gh run download "$ANALYSIS_RUN" --repo "$GITHUB_REPOSITORY" --name orthogonal-disorder --dir out
+          gh run download "$ANALYSIS_RUN" --repo "$GITHUB_REPOSITORY" --name orthogonal-dive --dir out || true
+          for i in $(seq 0 24); do
+            gh run download "$ANALYSIS_RUN" --repo "$GITHUB_REPOSITORY" \
+              --name "orthogonal-motifs-$i" --dir shards || true
+          done
+          mkdir -p shards
+          python scripts/orthogonal.py merge --inputs shards --out motifs.json
+          test -f out/dive.json || echo '{}' > out/dive.json
+      - name: Report
+        run: |
+          python scripts/orthogonal.py report --candidates results/specificity/candidates.csv \
+            --disorder out/disorder.json --motifs motifs.json --dive out/dive.json \
+            --out-dir results/orthogonal
+          cat results/orthogonal/ORTHOGONAL.md >> "$GITHUB_STEP_SUMMARY"
+          python scripts/extract_log_block.py emit ORTHOGONAL_JSON results/orthogonal/orthogonal.json
+          python scripts/extract_log_block.py emit ORTHOGONAL_MD_B64 results/orthogonal/ORTHOGONAL.md
+          python scripts/extract_log_block.py emit ORTHOGONAL_CANDIDATES_B64 \
+            results/orthogonal/orthogonal_candidates.csv
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: orthogonal-report
+          path: results/orthogonal
+          retention-days: 90

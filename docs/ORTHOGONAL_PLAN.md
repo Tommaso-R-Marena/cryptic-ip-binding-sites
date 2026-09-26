@@ -52,7 +52,7 @@ anything the screen or the docking used.
   A residue is disordered at a score > 0.5, and a pocket is **disordered** when its mean
   exceeds 0.5.
 - **Motif support**: with `shark-capture` run on the protein's homologue set
-  (`--k_min 3 --k_max 8`, defaults otherwise, and at most **40** homologues per protein —
+  (`--k_min 3 --k_max 8`, defaults otherwise, and at most **25** homologues per protein —
   a runtime cap fixed here, since capture is superlinear in set size), the fraction of the
   pocket's basic positions that fall inside a captured consensus motif's match in the
   target sequence. A match span is SHARK's own 1-based inclusive `start`/`end`.
