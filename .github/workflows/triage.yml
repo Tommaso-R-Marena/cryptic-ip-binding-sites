@@ -23,9 +23,9 @@ on:
       - '.github/workflows/triage.yml'
   workflow_dispatch:
     inputs:
-      screen_run:
-        description: 'learned-screen run holding the scored proteins table'
-        default: '35992676292'
+      specificity_run:
+        description: 'specificity run holding proteins_combined.csv.gz (the specificity-rerank artifact)'
+        default: '36020458866'
       conserve_run:
         description: 'reuse the conservation of this triage run (empty = compute it)'
         default: ''
@@ -39,7 +39,7 @@ permissions:
   actions: read
 
 env:
-  SCREEN_RUN: ${{ inputs.screen_run || '35992676292' }}
+  SPECIFICITY_RUN: ${{ inputs.specificity_run || '36020458866' }}
 
 jobs:
   conserve:
@@ -64,18 +64,18 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install -e .
           which mafft
-      - name: The scored proteins of the learned screen
+      - name: Study C's scored proteins, which carry the matching columns
         shell: bash -l {0}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh run download "$SCREEN_RUN" --repo "$GITHUB_REPOSITORY" --name learned-screen --dir screen
-          find screen -name 'proteins.csv.gz' | head -1
+          gh run download "$SPECIFICITY_RUN" --repo "$GITHUB_REPOSITORY" --name specificity-rerank --dir screen
+          find screen -name 'proteins_combined.csv.gz' | head -1
       - name: Conservation of every candidate, positive and matched control
         shell: bash -l {0}
         run: |
           python scripts/triage.py conserve --candidates results/specificity/candidates.csv \
-            --proteins "$(find screen -name 'proteins.csv.gz' | head -1)" \
+            --proteins "$(find screen -name 'proteins_combined.csv.gz' | head -1)" \
             --out-dir work --out conservation.json
       - uses: actions/upload-artifact@v6
         if: always()

@@ -140,3 +140,22 @@ def test_report_writes_its_outputs(triage, tmp_path):
     text = (tmp_path / "out" / "TRIAGE.md").read_text()
     assert "**H1:** enriched" in text and "H2 (filter calibration)" in text
     assert (tmp_path / "out" / "triaged_candidates.csv").exists()
+
+
+def test_a_table_without_the_matching_columns_fails_loudly(triage):
+    """The run that produced a silent empty control arm must now stop with a named cause."""
+    thin = _proteins().drop(columns=["combined", "hull_depth"])
+    with pytest.raises(ValueError) as err:
+        triage.matched_controls(_candidates(), thin)
+    assert "combined" in str(err.value) and "proteins_combined.csv.gz" in str(err.value)
+
+
+def test_conserve_refuses_to_run_without_a_control_arm(triage, tmp_path, monkeypatch):
+    monkeypatch.setattr(triage, "matched_controls", lambda c, p: pd.DataFrame())
+    cands = _candidates()
+    cands.to_csv(tmp_path / "c.csv", index=False)
+    _proteins().to_csv(tmp_path / "p.csv", index=False)
+    args = type("A", (), {"candidates": tmp_path / "c.csv", "proteins": tmp_path / "p.csv",
+                          "out_dir": tmp_path / "w", "out": tmp_path / "o.json"})()
+    with pytest.raises(RuntimeError, match="no matched control"):
+        triage.cmd_conserve(args)

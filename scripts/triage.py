@@ -45,9 +45,16 @@ def parse_positions(text: object) -> List[int]:
 
 def matched_controls(candidates: pd.DataFrame, proteins: pd.DataFrame) -> pd.DataFrame:
     """One pLDDT- and depth-matched, low-ranking protein per candidate (the plan's rule)."""
+    required = ("uniprot_id", "organism_key", "top_pocket_residues", "plddt_mean", "hull_depth", "combined")
+    missing = [c for c in required if c not in proteins.columns]
+    if missing:
+        raise ValueError(
+            f"the proteins table lacks {missing}; the matching needs study C's proteins_combined.csv.gz "
+            f"(the specificity-rerank artifact), not the learned screen's proteins.csv.gz. "
+            f"Columns present: {sorted(proteins.columns)[:20]}")
     pool = proteins[~proteins["uniprot_id"].isin(set(candidates["uniprot_id"]))].copy()
     for col in ("plddt_mean", "hull_depth", "combined"):
-        pool[col] = pd.to_numeric(pool.get(col), errors="coerce")
+        pool[col] = pd.to_numeric(pool[col], errors="coerce")
     pool = pool.dropna(subset=["plddt_mean", "hull_depth", "combined"])
     rows, used = [], set()
     for _, cand in candidates.sort_values("uniprot_id").iterrows():
@@ -112,6 +119,9 @@ def cmd_conserve(args: argparse.Namespace) -> int:
                          & ~proteins.get("seen", False).astype(bool)].copy()
     positives["role"] = "positive"
     controls = matched_controls(cands, proteins)
+    if controls.empty:
+        raise RuntimeError("no matched control could be built, so H1 would have no comparison arm; "
+                           "refusing to run a triage whose only hypothesis test is empty")
     frame = pd.concat([cands[["uniprot_id", "organism_key", "top_pocket_residues", "cluster", "role"]],
                        positives[["uniprot_id", "organism_key", "top_pocket_residues", "cluster", "role"]],
                        controls], ignore_index=True)
