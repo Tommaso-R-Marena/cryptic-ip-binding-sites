@@ -9,5 +9,7 @@
   that also appears in the markdown was cross-checked against the CRC-verified markdown.
 
 A second run (36265022079) was triggered by the plan-text correction touching
-`docs/KINASE_PLAN.md`, which is one of the workflow's path triggers. It recomputes the
-same arms and its outputs are not kept.
+`docs/KINASE_PLAN.md`, which is one of the workflow's path triggers. It recomputed the
+same arms from the same inputs, so its outputs are not kept, and it was **cancelled**
+part-way to return runner capacity to study I, which was still docking. Its cancellation
+is an operational act, not a result: nothing in study K depends on it.
