@@ -1,0 +1,821 @@
+{
+  "plan": "docs/TRIAGE_PLAN.md",
+  "roles": {
+    "candidate": 75,
+    "control": 75,
+    "positive": 34
+  },
+  "rates": {
+    "candidate": {
+      "n": 75,
+      "evaluable": 48,
+      "not_evaluable": 27,
+      "estimate": {
+        "copies": 48,
+        "groups": 40,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.9375,
+          "low": 0.8571428571428571,
+          "high": 1.0,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.925,
+          "low": 0.825,
+          "high": 1.0,
+          "p_value": 0.0
+        }
+      }
+    },
+    "control": {
+      "n": 75,
+      "evaluable": 39,
+      "not_evaluable": 36,
+      "estimate": {
+        "copies": 39,
+        "groups": 37,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.38461538461538464,
+          "low": 0.23062500000000002,
+          "high": 0.5366322701688553,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.36486486486486486,
+          "low": 0.21621621621621623,
+          "high": 0.5135135135135135,
+          "p_value": 0.0
+        }
+      }
+    },
+    "positive": {
+      "n": 34,
+      "evaluable": 26,
+      "not_evaluable": 8,
+      "estimate": {
+        "copies": 26,
+        "groups": 21,
+        "evidence": true,
+        "per_copy": {
+          "point": 0.7692307692307693,
+          "low": 0.5714285714285714,
+          "high": 0.9285714285714286,
+          "p_value": 0.0
+        },
+        "per_group": {
+          "point": 0.7142857142857144,
+          "low": 0.5238095238095238,
+          "high": 0.9047619047619048,
+          "p_value": 0.0
+        }
+      }
+    }
+  },
+  "H1": {
+    "question": "conserved-basic rate, candidates - matched controls",
+    "pairs": 38,
+    "clusters": 33,
+    "estimate": {
+      "point": 0.6464646464646464,
+      "low": 0.48484848484848486,
+      "high": 0.808080808080808,
+      "p_value": 0.0
+    },
+    "per_copy": {
+      "point": 0.6052631578947368,
+      "low": 0.4418604651162791,
+      "high": 0.7878787878787878,
+      "p_value": 0.0
+    },
+    "decision": "enriched"
+  },
+  "holm": {
+    "H1": 0.0
+  },
+  "H2": {
+    "positive_controls": 34,
+    "evaluable": 26,
+    "conserved_rate": {
+      "point": 0.7142857142857144,
+      "low": 0.5238095238095238,
+      "high": 0.9047619047619048,
+      "p_value": 0.0
+    },
+    "informative": true,
+    "note": "the filter keeps most annotated binders, so it can triage"
+  },
+  "H3_counts": {
+    "explained": 30,
+    "conserved basic pocket": 24,
+    "not evaluable: 2 homologues (fewer than 10)": 4,
+    "not evaluable: 6 homologues (fewer than 10)": 3,
+    "not evaluable: 0 homologues (fewer than 10)": 2,
+    "not evaluable: 9 homologues (fewer than 10)": 2,
+    "not evaluable: 7 homologues (fewer than 10)": 2,
+    "not evaluable: 1 homologues (fewer than 10)": 2,
+    "not conserved": 2,
+    "not evaluable: 5 homologues (fewer than 10)": 1,
+    "not evaluable: 4 homologues (fewer than 10)": 1,
+    "not evaluable: 3 homologues (fewer than 10)": 1,
+    "not evaluable: 8 homologues (fewer than 10)": 1
+  },
+  "H3_shortlist": [
+    {
+      "uniprot_id": "Q8TBH0",
+      "gene": "ARRDC2",
+      "protein_name": "Arrestin domain-containing protein 2",
+      "organism_key": "human",
+      "rank": 1,
+      "combined": 0.7515302307669759,
+      "p_ip_given_site": 0.8979259738196392,
+      "hull_depth": 12.347633755952302,
+      "plddt_mean": 96.11142857142856,
+      "homologues": 119,
+      "basic_positions": [
+        50,
+        52,
+        54,
+        56,
+        128,
+        132,
+        144,
+        146
+      ],
+      "conserved_positions": [
+        128,
+        132,
+        144,
+        146
+      ]
+    },
+    {
+      "uniprot_id": "P12271",
+      "gene": "RLBP1",
+      "protein_name": "Retinaldehyde-binding protein 1 (Cellular retinaldehyde-binding protein)",
+      "organism_key": "human",
+      "rank": 2,
+      "combined": 0.7423325140060034,
+      "p_ip_given_site": 0.8863825777305036,
+      "hull_depth": 14.88132155064736,
+      "plddt_mean": 96.975,
+      "homologues": 360,
+      "basic_positions": [
+        101,
+        103,
+        104,
+        109,
+        234,
+        236,
+        259,
+        261,
+        265
+      ],
+      "conserved_positions": [
+        101,
+        103,
+        104,
+        109,
+        234,
+        236,
+        259,
+        261,
+        265
+      ]
+    },
+    {
+      "uniprot_id": "Q5TC63",
+      "gene": "GRTP1",
+      "protein_name": "Growth hormone-regulated TBC protein 1 (TBC1 domain family member 6)",
+      "organism_key": "human",
+      "rank": 4,
+      "combined": 0.7095004013366202,
+      "p_ip_given_site": 0.8565216253266226,
+      "hull_depth": 4.778552077265813,
+      "plddt_mean": 96.9975,
+      "homologues": 22,
+      "basic_positions": [
+        41,
+        42,
+        45,
+        59,
+        62,
+        63,
+        66,
+        67,
+        249,
+        303
+      ],
+      "conserved_positions": [
+        41,
+        59,
+        62,
+        63,
+        66,
+        67,
+        249,
+        303
+      ]
+    },
+    {
+      "uniprot_id": "Q8N271",
+      "gene": "PROM2",
+      "protein_name": "Prominin-2 (PROM-2) (Prominin-like protein 2) (hPROML2)",
+      "organism_key": "human",
+      "rank": 8,
+      "combined": 0.6969643370152026,
+      "p_ip_given_site": 0.8591864795566784,
+      "hull_depth": 18.033752707384902,
+      "plddt_mean": 72.68684210526317,
+      "homologues": 145,
+      "basic_positions": [
+        139,
+        141,
+        472,
+        804,
+        807
+      ],
+      "conserved_positions": [
+        139,
+        141,
+        472,
+        804,
+        807
+      ]
+    },
+    {
+      "uniprot_id": "Q05048",
+      "gene": "CSTF1",
+      "protein_name": "Cleavage stimulation factor subunit 1 (CF-1 50 kDa subunit) (Cleavage stimulation factor 50 kDa subunit) (CSTF 50 kDa subunit) (CstF-50)",
+      "organism_key": "human",
+      "rank": 13,
+      "combined": 0.6711004450346851,
+      "p_ip_given_site": 0.8107423289714809,
+      "hull_depth": 7.758748031389343,
+      "plddt_mean": 97.0958823529412,
+      "homologues": 112,
+      "basic_positions": [
+        112,
+        193,
+        221,
+        282,
+        326,
+        355,
+        356,
+        401
+      ],
+      "conserved_positions": [
+        112,
+        193,
+        221,
+        282,
+        355,
+        401
+      ]
+    },
+    {
+      "uniprot_id": "O15213",
+      "gene": "WDR46",
+      "protein_name": "WD repeat-containing protein 46 (WD repeat-containing protein BING4)",
+      "organism_key": "human",
+      "rank": 15,
+      "combined": 0.6681834265285415,
+      "p_ip_given_site": 0.8272044622726169,
+      "hull_depth": 7.936023035127283,
+      "plddt_mean": 94.67357142857142,
+      "homologues": 62,
+      "basic_positions": [
+        200,
+        215,
+        240,
+        280,
+        319,
+        363,
+        406,
+        451
+      ],
+      "conserved_positions": [
+        200,
+        215,
+        240,
+        280,
+        319,
+        363,
+        406,
+        451
+      ]
+    },
+    {
+      "uniprot_id": "Q13621",
+      "gene": "SLC12A1",
+      "protein_name": "Solute carrier family 12 member 1 (Bumetanide-sensitive sodium-(potassium)-chloride cotransporter 1) (BSC1) (Kidney-specific Na-K-Cl symporter) (Na-K-2Cl cotransporter 2) (NKCC2)",
+      "organism_key": "human",
+      "rank": 20,
+      "combined": 0.6538407737420764,
+      "p_ip_given_site": 0.8336169801856937,
+      "hull_depth": 16.68845479962141,
+      "plddt_mean": 91.00333333333332,
+      "homologues": 420,
+      "basic_positions": [
+        702,
+        706,
+        933,
+        934,
+        935
+      ],
+      "conserved_positions": [
+        702,
+        706,
+        933,
+        934,
+        935
+      ]
+    },
+    {
+      "uniprot_id": "Q5JTH9",
+      "gene": "RRP12",
+      "protein_name": "RRP12-like protein",
+      "organism_key": "human",
+      "rank": 21,
+      "combined": 0.6505662435382029,
+      "p_ip_given_site": 0.831962666462819,
+      "hull_depth": 20.492931111250687,
+      "plddt_mean": 90.94941176470589,
+      "homologues": 500,
+      "basic_positions": [
+        718,
+        789,
+        793,
+        834,
+        838
+      ],
+      "conserved_positions": [
+        718,
+        789,
+        793,
+        834,
+        838
+      ]
+    },
+    {
+      "uniprot_id": "Q8IZ81",
+      "gene": "ELMOD2",
+      "protein_name": "ELMO domain-containing protein 2",
+      "organism_key": "human",
+      "rank": 22,
+      "combined": 0.6500975067113612,
+      "p_ip_given_site": 0.8803840440528656,
+      "hull_depth": 8.183345712440712,
+      "plddt_mean": 90.9785714285714,
+      "homologues": 419,
+      "basic_positions": [
+        12,
+        15,
+        19,
+        23,
+        28,
+        33,
+        55,
+        81
+      ],
+      "conserved_positions": [
+        15,
+        19,
+        23,
+        28,
+        33,
+        81
+      ]
+    },
+    {
+      "uniprot_id": "P49683",
+      "gene": "PRLHR",
+      "protein_name": "Prolactin-releasing peptide receptor (PrRP receptor) (PrRPR) (G protein-coupled receptor 10) (hGR3)",
+      "organism_key": "human",
+      "rank": 23,
+      "combined": 0.6495598490357032,
+      "p_ip_given_site": 0.8841794182836902,
+      "hull_depth": 13.482244895995272,
+      "plddt_mean": 81.394375,
+      "homologues": 114,
+      "basic_positions": [
+        159,
+        272,
+        273,
+        339
+      ],
+      "conserved_positions": [
+        159,
+        272,
+        273,
+        339
+      ]
+    },
+    {
+      "uniprot_id": "P0C7X1",
+      "gene": "TBC1D3H",
+      "protein_name": "TBC1 domain family member 3H",
+      "organism_key": "human",
+      "rank": 24,
+      "combined": 0.6491028508417713,
+      "p_ip_given_site": 0.8776810013404716,
+      "hull_depth": 12.968732547079842,
+      "plddt_mean": 91.60785714285716,
+      "homologues": 34,
+      "basic_positions": [
+        74,
+        77,
+        92,
+        93,
+        97,
+        100
+      ],
+      "conserved_positions": [
+        74,
+        77,
+        93,
+        97,
+        100
+      ]
+    },
+    {
+      "uniprot_id": "B9A6J9",
+      "gene": "TBC1D3L",
+      "protein_name": "TBC1 domain family member 3L",
+      "organism_key": "human",
+      "rank": 25,
+      "combined": 0.6443166144930365,
+      "p_ip_given_site": 0.8825093374897812,
+      "hull_depth": 18.257125118317504,
+      "plddt_mean": 92.08235294117648,
+      "homologues": 34,
+      "basic_positions": [
+        74,
+        77,
+        93,
+        97,
+        100
+      ],
+      "conserved_positions": [
+        74,
+        77,
+        93,
+        97,
+        100
+      ]
+    },
+    {
+      "uniprot_id": "Q86WG3",
+      "gene": "ATCAY",
+      "protein_name": "Caytaxin (Ataxia cayman type protein) (BNIP-2-homology) (BNIP-H)",
+      "organism_key": "human",
+      "rank": 26,
+      "combined": 0.6429126834620817,
+      "p_ip_given_site": 0.878244119827137,
+      "hull_depth": 13.913268321970648,
+      "plddt_mean": 90.43357142857144,
+      "homologues": 112,
+      "basic_positions": [
+        259,
+        262,
+        263,
+        291,
+        295
+      ],
+      "conserved_positions": [
+        259,
+        262,
+        263,
+        291,
+        295
+      ]
+    },
+    {
+      "uniprot_id": "P53622",
+      "gene": "COP1",
+      "protein_name": "Coatomer subunit alpha (Alpha-coat protein) (Alpha-COP) (Retrieval from endoplasmic reticulum protein 1) (Secretory protein 22) (Suppressor of osmo-sensitivity 1)",
+      "organism_key": "yeast",
+      "rank": 5,
+      "combined": 0.6673585815369751,
+      "p_ip_given_site": 0.839682713395619,
+      "hull_depth": 24.49051423398045,
+      "plddt_mean": 87.2653846153846,
+      "homologues": 500,
+      "basic_positions": [
+        2,
+        6,
+        41,
+        289,
+        322,
+        325,
+        327,
+        374,
+        433,
+        458,
+        496,
+        512,
+        513,
+        533,
+        535,
+        576,
+        587
+      ],
+      "conserved_positions": [
+        6,
+        41,
+        322,
+        325,
+        327,
+        374,
+        496,
+        512,
+        513,
+        533,
+        535,
+        576,
+        587
+      ]
+    },
+    {
+      "uniprot_id": "Q03162",
+      "gene": "MUB1",
+      "protein_name": "MYND-type zinc finger protein MUB1 (Multi-budding protein)",
+      "organism_key": "yeast",
+      "rank": 6,
+      "combined": 0.6598503105293294,
+      "p_ip_given_site": 0.8469177794289259,
+      "hull_depth": 8.78398368230416,
+      "plddt_mean": 91.622,
+      "homologues": 19,
+      "basic_positions": [
+        307,
+        498,
+        502,
+        503,
+        510,
+        535
+      ],
+      "conserved_positions": [
+        307,
+        498,
+        502,
+        503,
+        510,
+        535
+      ]
+    },
+    {
+      "uniprot_id": "P46970",
+      "gene": "NMD5",
+      "protein_name": "Nonsense-mediated mRNA decay protein 5 (Karyopherin-119)",
+      "organism_key": "yeast",
+      "rank": 7,
+      "combined": 0.6517861301524942,
+      "p_ip_given_site": 0.8288716720219961,
+      "hull_depth": 23.11567311735028,
+      "plddt_mean": 91.56000000000002,
+      "homologues": 45,
+      "basic_positions": [
+        164,
+        167,
+        217,
+        220
+      ],
+      "conserved_positions": [
+        164,
+        167,
+        217,
+        220
+      ]
+    },
+    {
+      "uniprot_id": "P25626",
+      "gene": "IMG1",
+      "protein_name": "Large ribosomal subunit protein bL19m (54S ribosomal protein IMG1, mitochondrial) (Integrity of mitochondrial genome protein 1) (PetCR46)",
+      "organism_key": "yeast",
+      "rank": 8,
+      "combined": 0.6514567476603386,
+      "p_ip_given_site": 0.8781335453717165,
+      "hull_depth": 7.469549292922025,
+      "plddt_mean": 97.48470588235294,
+      "homologues": 32,
+      "basic_positions": [
+        64,
+        69,
+        71,
+        99,
+        139,
+        143,
+        145,
+        147,
+        148
+      ],
+      "conserved_positions": [
+        64,
+        99,
+        143,
+        145,
+        147,
+        148
+      ]
+    },
+    {
+      "uniprot_id": "P53273",
+      "gene": "VSB1",
+      "protein_name": "Vacuolar basic amino acid transporter VSB1 (Vacuolar storage of basic amino acids 1)",
+      "organism_key": "yeast",
+      "rank": 9,
+      "combined": 0.645884171956378,
+      "p_ip_given_site": 0.8425645751957042,
+      "hull_depth": 9.671307890094614,
+      "plddt_mean": 75.55588235294118,
+      "homologues": 43,
+      "basic_positions": [
+        705,
+        708,
+        740,
+        741,
+        849
+      ],
+      "conserved_positions": [
+        705,
+        708,
+        740,
+        741,
+        849
+      ]
+    },
+    {
+      "uniprot_id": "P52918",
+      "gene": "MSN5",
+      "protein_name": "Protein MSN5",
+      "organism_key": "yeast",
+      "rank": 15,
+      "combined": 0.6234312210051698,
+      "p_ip_given_site": 0.8205187383850778,
+      "hull_depth": 22.383968602282195,
+      "plddt_mean": 93.9088888888889,
+      "homologues": 46,
+      "basic_positions": [
+        450,
+        451,
+        454,
+        458
+      ],
+      "conserved_positions": [
+        450,
+        451,
+        454,
+        458
+      ]
+    },
+    {
+      "uniprot_id": "P25374",
+      "gene": "NFS1",
+      "protein_name": "Cysteine desulfurase (EC 2.8.1.7) (tRNA-splicing protein SPL1)",
+      "organism_key": "yeast",
+      "rank": 17,
+      "combined": 0.6083340323086054,
+      "p_ip_given_site": 0.8829347184515034,
+      "hull_depth": 7.983447072357428,
+      "plddt_mean": 97.4925,
+      "homologues": 107,
+      "basic_positions": [
+        160,
+        312,
+        313,
+        314,
+        316,
+        318,
+        330
+      ],
+      "conserved_positions": [
+        160,
+        312,
+        313,
+        314,
+        316,
+        318,
+        330
+      ]
+    },
+    {
+      "uniprot_id": "P36144",
+      "gene": "UTP30",
+      "protein_name": "Ribosome biogenesis protein UTP30 (U3 snoRNP-associated protein UTP30)",
+      "organism_key": "yeast",
+      "rank": 18,
+      "combined": 0.6063911531214097,
+      "p_ip_given_site": 0.8729405926637029,
+      "hull_depth": 6.087407684853829,
+      "plddt_mean": 93.60214285714284,
+      "homologues": 39,
+      "basic_positions": [
+        66,
+        68,
+        177,
+        181,
+        185
+      ],
+      "conserved_positions": [
+        66,
+        177,
+        181,
+        185
+      ]
+    },
+    {
+      "uniprot_id": "Q06538",
+      "gene": "CSC1",
+      "protein_name": "Calcium permeable stress-gated cation channel 1 (ScCSC1)",
+      "organism_key": "yeast",
+      "rank": 20,
+      "combined": 0.603065826135348,
+      "p_ip_given_site": 0.8253708105199319,
+      "hull_depth": 9.58303780124902,
+      "plddt_mean": 90.395,
+      "homologues": 53,
+      "basic_positions": [
+        227,
+        407,
+        412,
+        429,
+        430,
+        432
+      ],
+      "conserved_positions": [
+        227,
+        407,
+        412,
+        429,
+        430,
+        432
+      ]
+    },
+    {
+      "uniprot_id": "Q06142",
+      "gene": "KAP95",
+      "protein_name": "Importin subunit beta-1 (Importin-95) (Karyopherin subunit beta-1) (Karyopherin-95)",
+      "organism_key": "yeast",
+      "rank": 21,
+      "combined": 0.6014225142627176,
+      "p_ip_given_site": 0.882126800699505,
+      "hull_depth": 3.9397155077323767,
+      "plddt_mean": 96.86625,
+      "homologues": 49,
+      "basic_positions": [
+        832,
+        835,
+        849,
+        852,
+        856
+      ],
+      "conserved_positions": [
+        832,
+        835,
+        849,
+        852,
+        856
+      ]
+    },
+    {
+      "uniprot_id": "Q12462",
+      "gene": "PEX11",
+      "protein_name": "Peroxisomal membrane protein PMP27 (Peroxin-11)",
+      "organism_key": "yeast",
+      "rank": 24,
+      "combined": 0.5934925874987681,
+      "p_ip_given_site": 0.7448614602724236,
+      "hull_depth": 17.246161816549435,
+      "plddt_mean": 96.84000000000002,
+      "homologues": 37,
+      "basic_positions": [
+        27,
+        30,
+        59,
+        60,
+        63,
+        66,
+        70,
+        95,
+        192
+      ],
+      "conserved_positions": [
+        27,
+        30,
+        59,
+        60,
+        63,
+        66,
+        70,
+        95,
+        192
+      ]
+    }
+  ],
+  "notes": [
+    "A conserved basic pocket is not evidence of binding: study C showed these descriptors do not separate IP from other polyanions well enough to change a ranking.",
+    "The candidate list was read before this plan was written, so this is a filter, not a test of the screen."
+  ]
+}

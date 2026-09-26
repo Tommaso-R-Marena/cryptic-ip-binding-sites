@@ -302,6 +302,33 @@ A scoring failure on a ligand carrying 5 to 9 negative charges points at the mis
 electrostatics in Vina's function. That prediction is tested, pre-registered before this
 report was read, in `docs/RERANK_PLAN.md`.
 
+### The screen's top pockets are conserved, which narrows but does not confirm the candidates
+
+The screen ranks a pocket from one AlphaFold model and never asks whether it is
+conserved. A pre-registered filter (`docs/TRIAGE_PLAN.md`) applied study B's conservation
+criterion, unchanged, to all 75 candidates against pLDDT- and depth-matched pockets from
+the bottom half of the same ranking.
+
+- **Candidate pockets are conserved-basic far more often than matched controls:** 0.925
+  [0.825, 1.000] against 0.365 [0.216, 0.514], a paired difference of +0.646
+  [0.485, 0.808] over 38 pairs in 33 clusters (H1 *enriched*, Holm p < 0.001).
+- **The filter is calibrated, not vacuous.** It keeps 0.714 [0.524, 0.905] of annotated
+  IP binders, so it is informative for triage, and its control rate of 0.37 shows it is
+  not simply passing every basic pocket.
+- **24 candidates survive** with a conserved basic pocket, 30 are attributed to another
+  ligand by study C's rule, and 19 cannot be evaluated for want of orthologues.
+- **The filter cannot reach *Dictyostelium*.** All 25 of its candidates are explained or
+  unevaluable, because the species has too few UniRef50 orthologues. That is a limit of
+  the method, not evidence against those proteins, and it leaves the shortlist human and
+  yeast only.
+
+This is the first evidence in the project that the proteome ranking tracks something
+under evolutionary selection rather than model noise, and it is evidence about the
+*ranking*, since it is established against matched controls. It is not evidence that any
+candidate binds inositol phosphate: study C showed these descriptors separate IP from
+other polyanions too weakly to change a ranking, so a conserved basic pocket remains a
+conserved basic pocket.
+
 ### The docking failure is not a search-budget artefact
 
 Studies A and F both used AutoDock Vina's default exhaustiveness of 32, on a ligand with

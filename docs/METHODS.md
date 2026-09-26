@@ -774,6 +774,75 @@ the same thing.
   minimum of 5. The point estimates run the other way from the usual expectation, with
   buried sites easier than surface ones, but the interval is wide and no claim is made.
 
+### Triaging the candidates by pocket conservation
+
+**Plan and run.** `docs/TRIAGE_PLAN.md`, triage run 36222552458; results in
+`results/triage/`, extracted from the Report job's log.
+
+The plan was written after the candidate list had been read, so this is a **filter
+applied to a list already in hand, not a test of the screen**, and it is reported as
+such.
+
+A first run (36219671246) is superseded and its outputs are not kept. It fetched the
+learned screen's `proteins.csv.gz`, which lacks the `combined`, `hull_depth` and
+`plddt_mean` columns the matching needs, so the control pool was silently emptied and H1
+had no comparison arm. The code now raises with the missing columns named and refuses to
+run without a control arm; two regression tests cover both paths.
+
+**Method.** Study B's criterion, imported from `scripts/arrestin.py` rather than
+reimplemented: at each top-pocket position that is K, R or H in the target, the fraction
+of UniRef50 homologues carrying K, R or H in that column after a MAFFT alignment. A
+pocket is **conserved-basic** with at least 3 basic pocket positions and at least 3 of
+them at a basic fraction ≥ 0.80. Controls are one protein per candidate from the same
+organism, matched on mean pLDDT within 5 and hull depth within 3 Å, drawn from below the
+median combined score. Positive controls are the annotated IP binders the screen also
+scored.
+
+**Results.**
+
+| role | n | evaluable | conserved-basic rate (group estimand) |
+|---|---|---|---|
+| candidates | 75 | 48 | 0.925 [0.825, 1.000] |
+| matched controls | 75 | 39 | 0.365 [0.216, 0.514] |
+| annotated binders | 34 | 26 | 0.714 [0.524, 0.905] |
+
+- **H1: enriched.** The paired difference is +0.646 [0.485, 0.808] over 38 matched pairs
+  in 33 clusters, Holm p < 0.001. Candidate pockets are conserved-basic about two and a
+  half times as often as pockets of the same model quality and burial drawn from the
+  bottom half of the ranking.
+- **H2: the filter is informative.** It keeps 0.714 [0.524, 0.905] of annotated IP
+  binders, above the plan's 0.5 threshold, so it is used for triage rather than declared
+  uninformative.
+- **H3.** 24 candidates have a conserved basic pocket, 30 are explained by another ligand
+  under study C's rule, 2 are not conserved, and 19 are not evaluable for want of
+  homologues.
+
+**What the enrichment does and does not mean.**
+
+- The screen's top pockets are under selection for basic residues in a way that matched
+  pockets of the same model quality are not, so the ranking is picking up something real
+  rather than AlphaFold surface noise. That is a property of the *ranking*, established
+  against controls.
+- It says nothing about *which* polyanion binds. Study C measured that directly and found
+  the descriptors too weak to change a proteome ranking, and study C's own S1b gate is
+  what the "explained" label rests on.
+- The candidates are *more* conserved-basic (0.925) than the annotated binders (0.714).
+  Two readings, neither settled here: the top of the ranking may be extreme on this axis,
+  or an annotated binder's IP site need not be its top-ranked pocket.
+
+**What the filter cannot reach.** Every *Dictyostelium* candidate is either explained (9)
+or not evaluable (15, plus 1 not conserved): the species has too few sequenced
+orthologues in UniRef50 for the criterion to apply. The shortlist is therefore human and
+yeast only, and this is a limitation of the filter, not evidence against the
+*Dictyostelium* candidates. Of the 45 unexplained candidates, 26 were evaluable.
+
+**ARRDC2 is on the shortlist and this is not a contradiction with study B.** Study B
+tested the site *mapped from the β-arrestin IP6 site*, which has no basic residue at all
+and failed. This tests ARRDC2's *top-ranked pocket*, a different set of residues; study B
+already reported that the two do not overlap (Jaccard 0.0). Passing here says its top
+pocket is a conserved basic pocket. It says nothing about the β-arrestin site hypothesis,
+which remains not supported.
+
 ### The sampling ceiling
 
 **Plan and run.** `docs/SAMPLING_PLAN.md`, sampling run 36076556010; results in
