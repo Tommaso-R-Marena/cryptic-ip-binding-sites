@@ -28,6 +28,66 @@ MARGIN = 14
 
 DECISION_CLASS = {"supported": "ok", "refuted": "no", "inconclusive": "meh"}
 
+#: The page style, shared by every study page (scripts/study_report_page.py).
+PAGE_CSS = """:root {
+  --bg: #fbfbfa; --card: #fff; --ink: #1c1b19; --dim: #6b6862; --line: #e4e1dc;
+  --hit: #1a7f5a; --null: #8a8681; --bad: #b3261e; --band: #f0efeb; --accent: #2f5d8a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17181a; --card: #1e2022; --ink: #e9e7e4; --dim: #9a978f; --line: #303336;
+    --hit: #4cc38a; --null: #7d7a75; --bad: #f2645a; --band: #26292c; --accent: #7fb2e5;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17181a; --card: #1e2022; --ink: #e9e7e4; --dim: #9a978f; --line: #303336;
+  --hit: #4cc38a; --null: #7d7a75; --bad: #f2645a; --band: #26292c; --accent: #7fb2e5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 1120px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+h2 { font-size: 1.1rem; margin: 34px 0 12px; color: var(--dim); text-transform: uppercase;
+  letter-spacing: 0.08em; font-weight: 600; }
+h3 { font-size: 1.02rem; margin: 0 0 6px; font-weight: 650; }
+.sub { color: var(--dim); margin: 0 0 8px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 18px 20px; margin: 14px 0; overflow-x: auto; }
+.meta { color: var(--dim); font-size: 0.9rem; margin-bottom: 6px; }
+.axis { color: var(--dim); font-size: 0.9rem; margin: 2px 0 10px; }
+.note { color: var(--dim); font-size: 0.88rem; margin: 10px 0 0; }
+.note.bad { color: var(--bad); }
+.banner { background: var(--bad); color: #fff; padding: 10px 14px; border-radius: 10px; font-weight: 600; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.82rem;
+  font-weight: 650; border: 1px solid currentColor; }
+.badge.ok { color: var(--hit); } .badge.no { color: var(--bad); } .badge.meh { color: var(--dim); }
+.forest { width: 100%; min-width: 760px; height: auto; display: block; }
+.forest .rowlabel { fill: var(--ink); font-size: 12.5px; text-anchor: end; }
+.forest .value { fill: var(--ink); font-size: 12.5px; font-family: ui-monospace, Menlo, monospace; }
+.forest .dim { fill: var(--dim); }
+.forest .missing { fill: var(--dim); font-size: 12.5px; font-style: italic; }
+.forest .tick { fill: var(--dim); font-size: 11px; }
+.forest .mid { text-anchor: middle; }
+.forest .grid { stroke: var(--line); stroke-width: 1; }
+.forest .nullline { stroke: var(--dim); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.forest .band { fill: var(--band); }
+.forest .ci { stroke-width: 2.5; stroke-linecap: round; }
+.forest .ci.hit, .forest .pt.hit { stroke: var(--hit); fill: var(--hit); }
+.forest .ci.bad, .forest .pt.bad { stroke: var(--bad); fill: var(--bad); }
+.forest .ci.null, .forest .pt.null { stroke: var(--null); fill: var(--null); }
+.tiles { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 16px; }
+.tile { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; min-width: 104px; }
+.tile .n { font-size: 1.35rem; font-weight: 650; }
+.tile .k { color: var(--dim); font-size: 0.82rem; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+th { color: var(--dim); font-weight: 600; }
+footer { color: var(--dim); font-size: 0.85rem; margin-top: 30px; }
+@media (max-width: 640px) { main { padding: 20px 16px 48px; } }
+"""
+
 
 def _finite(*values: float) -> List[float]:
     return [v for v in values if v is not None and isinstance(v, (int, float)) and math.isfinite(v)]
@@ -283,64 +343,7 @@ def render(report: Dict[str, object], title: str) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)}</title>
 <style>
-:root {{
-  --bg: #fbfbfa; --card: #fff; --ink: #1c1b19; --dim: #6b6862; --line: #e4e1dc;
-  --hit: #1a7f5a; --null: #8a8681; --bad: #b3261e; --band: #f0efeb; --accent: #2f5d8a;
-}}
-@media (prefers-color-scheme: dark) {{
-  :root:not([data-theme="light"]) {{
-    --bg: #17181a; --card: #1e2022; --ink: #e9e7e4; --dim: #9a978f; --line: #303336;
-    --hit: #4cc38a; --null: #7d7a75; --bad: #f2645a; --band: #26292c; --accent: #7fb2e5;
-  }}
-}}
-:root[data-theme="dark"] {{
-  --bg: #17181a; --card: #1e2022; --ink: #e9e7e4; --dim: #9a978f; --line: #303336;
-  --hit: #4cc38a; --null: #7d7a75; --bad: #f2645a; --band: #26292c; --accent: #7fb2e5;
-}}
-* {{ box-sizing: border-box; }}
-body {{ margin: 0; background: var(--bg); color: var(--ink);
-  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }}
-main {{ max-width: 1120px; margin: 0 auto; padding: 32px 16px 64px; }}
-h1 {{ font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }}
-h2 {{ font-size: 1.1rem; margin: 34px 0 12px; color: var(--dim); text-transform: uppercase;
-  letter-spacing: 0.08em; font-weight: 600; }}
-h3 {{ font-size: 1.02rem; margin: 0 0 6px; font-weight: 650; }}
-.sub {{ color: var(--dim); margin: 0 0 8px; }}
-.card {{ background: var(--card); border: 1px solid var(--line); border-radius: 12px;
-  padding: 18px 20px; margin: 14px 0; overflow-x: auto; }}
-.meta {{ color: var(--dim); font-size: 0.9rem; margin-bottom: 6px; }}
-.axis {{ color: var(--dim); font-size: 0.9rem; margin: 2px 0 10px; }}
-.note {{ color: var(--dim); font-size: 0.88rem; margin: 10px 0 0; }}
-.note.bad {{ color: var(--bad); }}
-.banner {{ background: var(--bad); color: #fff; padding: 10px 14px; border-radius: 10px; font-weight: 600; }}
-code {{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }}
-.badge {{ display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.82rem;
-  font-weight: 650; border: 1px solid currentColor; }}
-.badge.ok {{ color: var(--hit); }} .badge.no {{ color: var(--bad); }} .badge.meh {{ color: var(--dim); }}
-.forest {{ width: 100%; min-width: 760px; height: auto; display: block; }}
-.forest .rowlabel {{ fill: var(--ink); font-size: 12.5px; text-anchor: end; }}
-.forest .value {{ fill: var(--ink); font-size: 12.5px; font-family: ui-monospace, Menlo, monospace; }}
-.forest .dim {{ fill: var(--dim); }}
-.forest .missing {{ fill: var(--dim); font-size: 12.5px; font-style: italic; }}
-.forest .tick {{ fill: var(--dim); font-size: 11px; }}
-.forest .mid {{ text-anchor: middle; }}
-.forest .grid {{ stroke: var(--line); stroke-width: 1; }}
-.forest .nullline {{ stroke: var(--dim); stroke-width: 1.5; stroke-dasharray: 4 3; }}
-.forest .band {{ fill: var(--band); }}
-.forest .ci {{ stroke-width: 2.5; stroke-linecap: round; }}
-.forest .ci.hit, .forest .pt.hit {{ stroke: var(--hit); fill: var(--hit); }}
-.forest .ci.bad, .forest .pt.bad {{ stroke: var(--bad); fill: var(--bad); }}
-.forest .ci.null, .forest .pt.null {{ stroke: var(--null); fill: var(--null); }}
-.tiles {{ display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 16px; }}
-.tile {{ border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; min-width: 104px; }}
-.tile .n {{ font-size: 1.35rem; font-weight: 650; }}
-.tile .k {{ color: var(--dim); font-size: 0.82rem; }}
-table {{ border-collapse: collapse; width: 100%; font-size: 0.9rem; }}
-th, td {{ text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }}
-th {{ color: var(--dim); font-weight: 600; }}
-footer {{ color: var(--dim); font-size: 0.85rem; margin-top: 30px; }}
-@media (max-width: 640px) {{ main {{ padding: 20px 16px 48px; }} }}
-</style></head>
+{PAGE_CSS}</style></head>
 <body><main>
 <h1>{html.escape(title)}</h1>
 <p class="sub">Pre-registered in <code>docs/ANALYSIS_PLAN.md</code>. Every interval is a 95 % percentile
