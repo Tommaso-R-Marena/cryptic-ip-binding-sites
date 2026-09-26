@@ -1241,6 +1241,108 @@ on the same code, to measure that leak.
   proteins already known to bind an inositol phosphate, so neither number is a
   proteome-screen precision.
 
+### The inositol-phosphate kinases and the missing cosubstrate
+
+**Plan and run.** `docs/KINASE_PLAN.md`, kinase run 36264528692; results in
+`results/kinase/`, extracted from the Report job's log.
+
+**Why.** The census holds 18 copies of the inositol-phosphate kinase (IPK) superfamily —
+*Entamoeba* IP6KA, PPIP5K2, IPMK, ITPKA, ITPKC — and study A recovers none of them. Every
+failure is a *scoring* failure, 10 of the 18 sampled a near-native pose and then ranked a
+wrong one above it, and all 18 sit at sites the pipeline calls `surface`. These are
+**catalytic** sites: the crystal holds the inositol phosphate against a nucleotide and its
+metals, and the protocol deletes both. That slice was read before the plan was written, so
+it is a re-analysis and is reported as K0, not as a test.
+
+**The 0 of 18 is 0 of 2.** Those 18 copies fall into two strict homology groups, because
+the superfamily shares a fold. The family rate is therefore **not evaluable** under the
+five-group rule, and a zero is unremarkable regardless: at the overall 0.096 success rate,
+P(no success) is 0.16 across copies and 0.82 across groups. Only the mechanism — scoring,
+not sampling — motivates the study.
+
+**Method.** A blind cofactor census: every primary-set copy whose structure carries ATP,
+ADP, AMP, ANP, ACP, AGS, GTP, GDP, GNP or ADX with a heavy atom within 6.0 Å of the ligand.
+The holo receptor is the apo receptor with those atoms plus the catalytic metals appended as
+rigid HETATM records (C→C, N→NA, O→OA, P→P). `cryptic_ip/docking/receptor.py` is not edited;
+a test pins the no-cofactor case to a byte-identical copy of the apo receptor. The apo arm is
+study F's pose lists at the same exhaustiveness, seeds and starting poses, not a re-dock.
+
+**Results.** The census found **33 qualifying copies** (ADP 15, ATP 9, ANP 8, ACP 1), 32 with
+both arms — but spanning only **4 strict homology groups**.
+
+| arm | ceiling | Vina top pose | re-ranked |
+|---|---|---|---|
+| apo | 0.542 [0.354, 0.854] | 0.273 [0.000, 0.751] | 0.363 [0.068, 0.796] |
+| holo | 0.531 [0.354, 0.844] | 0.260 [0.000, 0.750] | 0.358 [0.102, 0.781] |
+
+- **K1: not evaluable** (4 groups, fewer than 5). Top-pose success holo − apo is
+  −0.012 [−0.068, 0.031], Holm p 0.655.
+- **K2: not evaluable** on the same ground. Ceiling holo − apo −0.010 [−0.031, 0.000].
+- **K3 (descriptive, 5 groups, evaluable).** The pyrophosphates pooled are
+  0.000 [0.000, 0.000] over 6 copies, against InsP6's 0.114 [0.043, 0.196] over 154.
+- **K4 could not run as designed.** No cofactor CCD template was available, so no copy
+  carried charges. The arm self-reports as not evidence about electrostatics, and its
+  +0.098 [0.030, 0.161] is study G's re-ranking repeated on an uncharged cofactor.
+- **Metals only**, quoted from study A on the same copies rather than re-docked: mean 0.167
+  over 12 copies.
+
+**What this does and does not say.** It does not say the cosubstrate hypothesis is wrong. It
+says the **deposited structures cannot test it**: only four independent folds in the whole
+census carry a bound nucleotide beside an inositol phosphate, and no re-analysis of them will
+reach the five-group bar. Testing this needs structures the PDB does not currently hold, not
+more compute. The point estimates lean very slightly negative, which is at least no hint of a
+large rescue being missed for want of power.
+
+### Does buried IP-site frequency track IP concentration?
+
+**Plan and run.** `docs/COEVOLUTION_PLAN.md`, coevolution run 36264528735; results in
+`results/coevolution/`, extracted from the Report job's log.
+
+**Why it had never been asked.** Every earlier study took candidates as a **rank cutoff per
+organism** (the top 25–27 of each), which fixes the count by construction and cannot produce
+a rate. A rate needs one absolute threshold applied to all three proteomes.
+
+**Method.** The threshold is the `combined` score at a 1 % false-positive rate among
+**pooled** non-annotated, unseen proteins — pooling leaves the per-organism rates free to
+differ, where anchoring within organism would force them equal — with the founding document's
+pLDDT ≥ 70 floor. The **primary test is the matched comparison**: proteins are binned on mean
+pLDDT (width 5), log₂ length (0.5) and basic-residue fraction (0.02); only bins holding both
+arms contribute; the estimand is the bin-weighted mean of within-bin differences, resampling
+MMseqs2 clusters whole. A rule-only arm repeats it with a score carrying no training
+distribution.
+
+**Results.** Threshold `combined` ≥ 0.519604; no protein was excluded by the pLDDT floor.
+
+| organism | proteins | hits | hit rate |
+|---|---|---|---|
+| *Dictyostelium* | 11,679 | 106 | 0.908 % [0.702, 1.122] |
+| human | 19,899 | 243 | 1.221 % [1.018, 1.424] |
+| yeast | 5,806 | 85 | 1.464 % [1.113, 1.842] |
+
+- **C1 (raw, not the test): −0.435 [−0.714, −0.150] pp.** *Dictyostelium* is **lower**, not
+  higher — the opposite of the co-evolution prediction, and the interval clears zero.
+- **C2 (primary, matched): inconclusive**, −0.017 [−0.341, 0.269] pp over 722 shared bins and
+  20,080 clusters, Holm p 0.834. Matching on model confidence, length and composition removes
+  essentially all of the raw difference, which is what the design anticipated.
+- **C4 (rule-only): inconclusive**, +0.183 [−0.081, 0.433] pp. **C2 and C4 disagree in
+  direction**, so by the pre-registered rule the primary is **not robust** and no
+  co-evolution claim is made in either direction.
+- **C5 (deepest quartile, the pyrophosphate prediction): inconclusive**,
+  +0.209 [−0.439, 0.906] pp.
+- **C3.** Nine of ten pLDDT deciles are inconclusive. The top decile (97.0–98.9) reads
+  "lower in *Dictyostelium*" at −0.928 [−1.384, −0.526] pp — a single decile out of ten with
+  no correction applied, and it points away from the hypothesis, so it is reported rather
+  than interpreted.
+- **Sensitivity.** Across anchors 0.1 %–5 % the matched difference stays inside
+  ±0.7 pp; the 0.1 % anchor reads "no material difference" and the rest inconclusive.
+
+**Conclusion.** The IP-concentration hypothesis is **not supported by this screen**. The
+raw comparison runs against it, the matched comparison is null, and the two score variants
+disagree, so the honest statement is that this screen detects no relationship — not that
+none exists. With three organisms there are two contrasts and no replication, and phylogeny
+is not controlled and cannot be at n = 3, so even the negative is weak evidence about
+co-evolution itself rather than about this screen's output.
+
 ---
 
 ## 5. Rule-based score
