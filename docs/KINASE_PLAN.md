@@ -14,9 +14,14 @@ Read first, and the reason this plan exists:
 - The census holds **18 copies in the inositol-phosphate kinase (IPK) superfamily** —
   *Entamoeba* IP6KA (N9UNA8, the IP6 kinase itself), human PPIP5K2 (O43314), IPMK
   (Q8NFU5), ITPKA (P23677) and ITPKC (Q96DU7).
-- **Every one of the 18 fails**: top-pose success 0 of 18, against 0.110 [0.046, 0.193]
-  overall. Every failure is classified `scoring`, not sampling, and several have a
-  near-native pose somewhere in the list (best-of-20 up to 1.0).
+- **Every one of the 18 fails**: top-pose success 0 of 18. **This is 0 of 2 independent
+  strict homology groups** (`G:1W2C`, `G:1Z2P`) — the superfamily shares a fold, so the
+  18 copies are not 18 pieces of evidence. Under this project's own rule (fewer than 5
+  groups is no evidence) the family rate is **not evaluable**, and P(0 successes) at the
+  overall rate of 0.096 is 0.16 across copies and 0.82 across groups. The zero is a
+  motivation, not a result, and K0 reports it with the group count attached.
+- What does survive as description: every failure is classified `scoring`, not sampling,
+  and **10 of the 18 sampled a near-native pose** and then ranked a wrong one above it.
 - **Every one is classified `surface`**, which is the burial class with the lowest
   best-of-list ceiling in study A (0.279).
 - The diphosphoinositols are in the census too and also fail: InsP7 0 of 4, InsP8 0 of 2.
@@ -93,6 +98,9 @@ phosphate oxygens carry the same formal charges the IP ligands are given.
   - **inconclusive** otherwise. **Not evaluable** below 5 groups.
   - Because the apo arm is known to be 0 of 18 on the IPK stratum, on that stratum the
     difference is simply the holo success rate. This is stated rather than hidden.
+  - **The IPK stratum holds 2 strict groups, so it cannot reach a verdict on its own** and
+    is reported as not evaluable whatever it shows. K1 rests on the blind, broader set of
+    cofactor-bearing copies, whose group count is an output of the census.
 - **K2, the ceiling (secondary).** Best-of-list rate in each arm and their paired
   difference. A cofactor that raises the ceiling has changed what is *sampled*; one that
   raises top-pose success without moving the ceiling has changed what is *ranked*. These
