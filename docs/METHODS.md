@@ -1241,6 +1241,63 @@ on the same code, to measure that leak.
   proteins already known to bind an inositol phosphate, so neither number is a
   proteome-screen precision.
 
+### Sequence disorder and alignment-free conservation on the candidates
+
+**Plan and runs.** `docs/ORTHOGONAL_PLAN.md`; analysis run 36259814742, report run
+36279873788; results in `results/orthogonal/`, extracted from the Report job's log.
+
+**Why.** Study H ranked the candidates with AlphaFold pLDDT and a MAFFT alignment. Two
+tools use neither: **metapredict v3** scores disorder from sequence alone, and **SHARK**
+finds conserved motifs without an alignment. The arms are study H's arms, through study
+H's own matching code, so the two studies are commensurable.
+
+**The question I1 actually asks.** The controls are *already* matched on pLDDT, so I1 is
+not "are candidate pockets ordered" — AlphaFold confidence would answer that. It is
+whether sequence disorder carries information **beyond** what pLDDT already encodes. A
+null was pre-registered as a real and reportable answer.
+
+**Results.**
+
+- **I1: candidates more ordered.** The paired difference in mean pocket disorder is
+  **−0.093 [−0.149, −0.040]** over 75 matched pairs in 65 clusters, Holm p 0.001. At
+  matched model confidence, candidate pockets are measurably more ordered than controls,
+  so metapredict is not restating pLDDT.
+- **I2, the same result as a rate.** Predicted-disordered pockets:
+
+| role | n | disordered-pocket rate |
+|---|---|---|
+| candidates | 75 | 0.015 [0.000, 0.046] |
+| matched controls | 75 | 0.111 [0.042, 0.181] |
+| annotated binders | 34 | 0.000 [0.000, 0.000] |
+
+  The QC passes its own calibration guard — no annotated binder is flagged — so it is used,
+  and it demotes exactly one candidate: **P53244 (yeast ART5)**, one of study B's two
+  original α-arrestin leads. Study B already found ART5 not supported on the site-overlap
+  criterion; this is an independent reason to set it aside.
+- **I3, motif support: weak, and reported as weak.** −0.132 [−0.348, 0.053] over only 16
+  pairs in 15 clusters, because **74 of the 150 proteins produced no shark-capture result**.
+  The interval spans zero and the coverage is under a fifth of the arms. Nothing is
+  concluded from it.
+- **I4, remote homology: did not run to completion.** shark-dive was killed by its
+  340-minute job timeout, so it reports **0 queries**. This is the search not finishing, not
+  an absence of remote homologues, and the 19 candidates study H could not evaluate remain
+  unevaluated.
+
+**What I1 does and does not license.** It says the ranking is not simply tracking
+low-confidence regions of AlphaFold models, which is one of the more plausible ways a
+pocket screen can fool itself, and it says so against matched controls. It says nothing
+about *which* ligand binds: study C measured that directly and found the descriptors too
+weak to change a ranking. An ordered pocket is a necessary condition for a real binding
+site, not evidence of one.
+
+**A workflow fault this run exposed.** The analysis run concluded `cancelled`, because
+GitHub marks a job killed by `timeout-minutes` as cancelled and the report job was gated
+on `if: !cancelled()` — so the report was skipped even though the disorder job and all 25
+SHARK-capture shards had succeeded. The report was recovered by dispatching the
+report-only path against the same artifacts, and the gate is now `always()`. The same
+gate is the convention in twelve workflows here and is left alone in the finished studies;
+the hazard applies wherever a best-effort job carries a timeout.
+
 ### The inositol-phosphate kinases and the missing cosubstrate
 
 **Plan and run.** `docs/KINASE_PLAN.md`, kinase run 36264528692; results in
