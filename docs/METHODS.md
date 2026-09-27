@@ -670,7 +670,531 @@ ADAR2 anchored the score threshold, so its rank is not independent evidence.
   and yeast ART5 (rank 27). β-arrestins, which share the arrestin fold, are established
   IP6 binders, and α-arrestins are too distant in sequence to be excluded as homologues.
   Whether their top pocket corresponds to the β-arrestin IP6 site is the first thing to
-  check.
+  check. It does not (next section).
+
+### Redocking benchmark
+
+**Plan and run.** `docs/REDOCKING_PLAN.md`, redocking run 36020459246.
+
+- The report is attempt 2. Dock alphafold 21 was re-run once: its first attempt docked
+  all 9 copies but lost the artifact upload to a connection reset.
+- Results are in `results/redocking/`: `redocking.json`, `copies.csv` (one row per
+  selected copy), `census.csv`, `REPORT.md` and `report.html`. All were extracted from
+  the Report job's log with `scripts/extract_log_block.py`.
+- `configuration_audit.csv` holds the audit of the configuration exclusions (run
+  36029338442).
+
+**Census.**
+
+- 662 IP copies were found in 367 benchmark entries; 462 copies are eligible.
+- Exclusions: 167 whose configuration differs from the CCD template (the audit shows the
+  difference is real, with a median absolute chiral volume of 2.36 Å³ at the differing
+  centres, and 153 of the 167 are IHP), 32 crystal artefacts, and 1 copy that fails the
+  CCD template on valence.
+- 272 copies were selected, one per entry and burial class; 269 form the primary set, and
+  the 3 incomplete copies are a flagged stratum.
+
+**Accounting.**
+
+- No copy went unreached: every shard finished inside its time budget.
+- 19 of the 269 primary copies (7.1 %, in 5 strict groups) failed receptor preparation
+  and have no docking outcome. 14 are PDB2PQR exceptions, 11 of them hydrogen-placement
+  errors. The other 5 are large cryo-EM assemblies (7T3P, 7T3Q, 7T3R, 9YKY, 9YLI, each
+  130,000–140,000 atoms) whose PQR and PDB outputs disagree in atom count, which is a
+  limit of the receptor reader at that size.
+- 17 of the 19 are surface copies, so the estimates below are conditional on a receptor
+  that can be prepared.
+- Repairing the reader would have re-run the whole workflow and the plan has no rule for
+  it, so these failures are reported rather than fixed.
+- 250 copies in 31 strict groups have an outcome.
+
+**Decisions (Holm across R1–R4).**
+
+| | question | estimate (group estimand) | Holm p | decision |
+|---|---|---|---|---|
+| R1 | protocol reliability | 0.110 [0.046, 0.193] | < 0.001 | **unreliable** |
+| R2 | success(cryptic) − success(surface) | 0.299 [−0.056, 0.942] | – | **not evaluable** (4 cryptic groups) |
+| R3 | AlphaFold cross-docking success | 0.045 [0.000, 0.122] | < 0.001 | **not trustworthy** |
+| R4 | Vina score separates true site from decoy (ROC-AUC) | 0.744 [0.658, 0.873] | < 0.001 | **discriminates** |
+
+**Outcomes on the primary set** (250 copies, 31 groups; per copy and per group).
+
+| outcome | per copy | per group |
+|---|---|---|
+| top-pose success at 2 Å | 0.096 [0.056, 0.141] | 0.110 [0.046, 0.193] |
+| best of 20 poses at 2 Å | 0.295 [0.236, 0.419] | 0.324 [0.221, 0.441] |
+| success at 1 Å | 0.012 [0.002, 0.025] | 0.016 [0.001, 0.039] |
+| success at 3 Å | 0.199 [0.135, 0.317] | 0.202 [0.115, 0.302] |
+| phosphorus-only success at 2 Å | 0.100 [0.059, 0.143] | 0.111 [0.046, 0.194] |
+| Spearman (score vs RMSD) within runs | 0.072 [0.013, 0.134] | 0.058 [−0.025, 0.146] |
+
+**Where the failures are.** Of the 242 copies whose seed-1 top pose misses 2 Å, 230 are
+scoring failures: the minimised crystal pose scores worse than the top docked pose, so
+the search reached a near-native pose region and the function preferred something else.
+Only 12 are sampling failures. The best-of-20 rate, three times the top-pose rate, says
+the same thing.
+
+**Strata (top-pose success, group estimand).**
+
+- Burial: surface 0.044 [0.010, 0.084]; semi-cryptic 0.175 [0.085, 0.285]; cryptic 0.343
+  [0.000, 0.750] in 4 groups, which is not evidence.
+- Interface 0.041 [0.000, 0.103] against single-chain 0.124 [0.050, 0.223].
+- Metal within 3 Å 0.202 [0.067, 0.402] against no metal 0.079 [0.029, 0.142].
+- Method: X-ray 0.117 [0.045, 0.210]; cryo-EM 0.035 [0.000, 0.091] in 6 groups.
+- Species: InsP6 0.114 [0.047, 0.199]; InsP3 0.049; InsP4 0.052; InsP5 0.000 in 4 groups,
+  which is not evidence.
+- Resolution shows no trend: 0.077, 0.140, 0.072 and 0.077 from ≤ 2.0 Å to > 3.0 Å.
+
+**Controls.**
+
+- *Seed noise.* The three seeds agree on success for 0.818 [0.699, 0.915] of copies, and
+  the top score's seed-to-seed standard deviation is 0.222 [0.185, 0.265] kcal/mol.
+- *Scoring functions and protonation, paired against the primary seed 1.* AD4 is better
+  by 0.058 [0.009, 0.135]; Vinardo by 0.014 [0.000, 0.034]; the fully deprotonated
+  ligand by 0.013 [−0.003, 0.035]; keeping metals by 0.051 [−0.060, 0.149] on the 42
+  copies with a metal. Every arm is near the floor: AD4 reaches 0.100 [0.025, 0.195].
+- *Site finding.* fpocket's top 3 pockets contain a true IP site for 0.330 [0.197, 0.472]
+  of copies, and 39 % of structures have any positive pocket among them.
+- *AlphaFold cross-docking.* 233 copies had a usable model. Success is 0.045
+  [0.000, 0.122], and 0.000 [0.000, 0.001] on surface copies. Paired against the crystal
+  receptor on the same copies the difference is −0.002 [−0.029, 0.016]: the model is not
+  worse than the crystal, because both are near zero.
+
+**What this settles.**
+
+- The protocol recovers crystal IP poses in about a tenth of cases, so it is not a
+  reliable tool for placing an IP ligand, and R1's "unreliable" label is what the data
+  support.
+- The failure is in ranking, not in search. That is the prediction the electrostatic
+  re-ranking study (`docs/RERANK_PLAN.md`) was written to test, and it was pre-registered
+  before this report was read.
+- The score still separates a true site from a decoy pocket (R4). Site *detection*,
+  which is what the screen does, is a different and easier task than pose prediction.
+- R2 cannot be decided: the cryptic class holds 4 strict groups, below the plan's
+  minimum of 5. The point estimates run the other way from the usual expectation, with
+  buried sites easier than surface ones, but the interval is wide and no claim is made.
+
+### Triaging the candidates by pocket conservation
+
+**Plan and run.** `docs/TRIAGE_PLAN.md`, triage run 36222552458; results in
+`results/triage/`, extracted from the Report job's log.
+
+The plan was written after the candidate list had been read, so this is a **filter
+applied to a list already in hand, not a test of the screen**, and it is reported as
+such.
+
+A first run (36219671246) is superseded and its outputs are not kept. It fetched the
+learned screen's `proteins.csv.gz`, which lacks the `combined`, `hull_depth` and
+`plddt_mean` columns the matching needs, so the control pool was silently emptied and H1
+had no comparison arm. The code now raises with the missing columns named and refuses to
+run without a control arm; two regression tests cover both paths.
+
+**Method.** Study B's criterion, imported from `scripts/arrestin.py` rather than
+reimplemented: at each top-pocket position that is K, R or H in the target, the fraction
+of UniRef50 homologues carrying K, R or H in that column after a MAFFT alignment. A
+pocket is **conserved-basic** with at least 3 basic pocket positions and at least 3 of
+them at a basic fraction ≥ 0.80. Controls are one protein per candidate from the same
+organism, matched on mean pLDDT within 5 and hull depth within 3 Å, drawn from below the
+median combined score. Positive controls are the annotated IP binders the screen also
+scored.
+
+**Results.**
+
+| role | n | evaluable | conserved-basic rate (group estimand) |
+|---|---|---|---|
+| candidates | 75 | 48 | 0.925 [0.825, 1.000] |
+| matched controls | 75 | 39 | 0.365 [0.216, 0.514] |
+| annotated binders | 34 | 26 | 0.714 [0.524, 0.905] |
+
+- **H1: enriched.** The paired difference is +0.646 [0.485, 0.808] over 38 matched pairs
+  in 33 clusters, Holm p < 0.001. Candidate pockets are conserved-basic about two and a
+  half times as often as pockets of the same model quality and burial drawn from the
+  bottom half of the ranking.
+- **H2: the filter is informative.** It keeps 0.714 [0.524, 0.905] of annotated IP
+  binders, above the plan's 0.5 threshold, so it is used for triage rather than declared
+  uninformative.
+- **H3.** 24 candidates have a conserved basic pocket, 30 are explained by another ligand
+  under study C's rule, 2 are not conserved, and 19 are not evaluable for want of
+  homologues.
+
+**What the enrichment does and does not mean.**
+
+- The screen's top pockets are under selection for basic residues in a way that matched
+  pockets of the same model quality are not, so the ranking is picking up something real
+  rather than AlphaFold surface noise. That is a property of the *ranking*, established
+  against controls.
+- It says nothing about *which* polyanion binds. Study C measured that directly and found
+  the descriptors too weak to change a proteome ranking, and study C's own S1b gate is
+  what the "explained" label rests on.
+- The candidates are *more* conserved-basic (0.925) than the annotated binders (0.714).
+  Two readings, neither settled here: the top of the ranking may be extreme on this axis,
+  or an annotated binder's IP site need not be its top-ranked pocket.
+
+**What the filter cannot reach.** Every *Dictyostelium* candidate is either explained (9)
+or not evaluable (15, plus 1 not conserved): the species has too few sequenced
+orthologues in UniRef50 for the criterion to apply. The shortlist is therefore human and
+yeast only, and this is a limitation of the filter, not evidence against the
+*Dictyostelium* candidates. Of the 45 unexplained candidates, 26 were evaluable.
+
+**ARRDC2 is on the shortlist and this is not a contradiction with study B.** Study B
+tested the site *mapped from the β-arrestin IP6 site*, which has no basic residue at all
+and failed. This tests ARRDC2's *top-ranked pocket*, a different set of residues; study B
+already reported that the two do not overlap (Jaccard 0.0). Passing here says its top
+pocket is a conserved basic pocket. It says nothing about the β-arrestin site hypothesis,
+which remains not supported.
+
+### The sampling ceiling
+
+**Plan and run.** `docs/SAMPLING_PLAN.md`, sampling run 36076556010; results in
+`results/sampling/`, extracted from the Report job's log. The plan was committed before
+any pose above exhaustiveness 32 existed.
+
+The report is attempt 2. One shard, Dock 128 13, was lost to a dead runner after 3 h
+52 min and was re-run once; the other 29 shards succeeded first time.
+
+**Why.** Studies A and F both ran at exhaustiveness 32, Vina's default for ligands far
+smaller than IP6 with its 12 rotatable bonds. Two thirds of study F's seed runs never
+produced a pose within 2 Å, capping any re-scoring at 0.399. Either that ceiling is a
+property of the search budget, in which case the pose-prediction failure is a
+configuration choice, or it is a property of the problem, in which case study F's partial
+gain is close to all that re-scoring can deliver.
+
+**Arms.** The exhaustiveness-32 arm is study F's pose lists, reused rather than re-docked:
+same receptor, ligand, box, seeds and starting poses, and a test pins the two docking
+routines to identical output on identical settings. New compute went to E128 (three seeds,
+every copy) and E512 (one seed, the plan's stratified 80-copy subset, selected by a rule
+that uses no docking outcome).
+
+**Accounting.** 218 copies in 29 strict groups are present in both the E32 and E128 arms
+and carry the comparison.
+
+- The E128 arm has 51 records without an outcome: the same 19 copies that fail receptor
+  preparation in studies A and F, plus 32 that did not fit the shard's time budget at
+  four times the search. The E512 arm has 11, one of them a budget overrun.
+- The comparison is paired, so a copy missing from one arm drops out of both rather than
+  biasing either. It does cost power: 218 copies against study F's 250.
+- Cost: the median copy took 448 s at E32, 1,987 s at E128 (4.4 times) and 2,253 s for a
+  single seed at E512.
+
+**Decisions (Holm across G1–G3).**
+
+| | question | difference (group) | Holm p | decision |
+|---|---|---|---|---|
+| G1 | sampling ceiling, E128 − E32 | +0.019 [−0.001, 0.047] | 0.152 | **search-saturated** |
+| G2 | top-pose success, E128 − E32 | +0.002 [−0.002, 0.009] | 0.715 | **no gain** |
+| G3 | re-ranked at E128 − Vina at E32 | +0.041 [0.004, 0.083] | 0.081 | **inconclusive** |
+
+**Levels (group estimand).**
+
+| arm | sampling ceiling | Vina top pose | re-ranked top pose |
+|---|---|---|---|
+| E32 | 0.385 [0.256, 0.516] | 0.092 [0.032, 0.172] | 0.140 [0.066, 0.224] |
+| E128 | 0.404 [0.277, 0.534] | 0.094 [0.035, 0.173] | 0.133 [0.064, 0.216] |
+
+- **G1 is the study's answer.** Quadrupling the search moves the ceiling by less than two
+  points, and the interval's upper bound of 0.047 sits below the plan's 0.05 margin, so
+  the pre-registered label is *search-saturated*. The ceiling is a property of the
+  problem, not of the budget.
+- **G2 confirms it end to end.** Top-pose success is unchanged at 0.094, and the interval
+  is tight around zero: ±0.009. Four times the compute buys nothing that reaches the top
+  of the ranking.
+- **G3 reproduces study F and stops at the same place.** The best protocol these studies
+  can assemble beats study A's registered one by +0.041 [0.004, 0.083]. The interval
+  excludes zero but Holm's correction leaves p at 0.081, so the label is *inconclusive*.
+  Study F's independent estimate of the same effect was +0.054 [−0.001, 0.114]: two
+  separate runs agree on the size and direction of the electrostatic gain and neither
+  clears its threshold.
+
+**G4 and the ladder (descriptive).**
+
+- Of the 420 seed runs whose E32 pose list held nothing within 2 Å, only 0.075
+  [0.032, 0.133] find one at E128, and 0.077 [0.000, 0.231] at E512. Runs that miss do
+  not miss for want of search.
+- The E512 ladder on the subset, one seed: ceiling 0.348 at E32, 0.404 at E128, 0.373 at
+  E512. Sixteen times the budget is flat against four times, within noise. The curve has
+  stopped climbing.
+
+**Strata (descriptive).** The ceiling is strongly burial-dependent, and in the opposite
+direction to the usual expectation: surface sites 0.279 at E32 and 0.316 at E128,
+semi-cryptic 0.563 and 0.572, cryptic 0.810 and 0.839 on 11 copies in 4 groups, which is
+below the plan's minimum and not evidence. An enclosed pocket constrains the ligand and
+the search finds a near-native pose; an open surface site does not.
+
+**What this settles.**
+
+- The pose-prediction failure in study A is not a search-budget artefact. Raising
+  exhaustiveness from 32 to 128, and to 512 on a subset, leaves both the ceiling and the
+  success rate where they were, at a 4.4-fold cost.
+- Two thirds of runs still fail to sample a near-native pose, and more search does not
+  rescue them. That points at the pose problem itself rather than at the sampler: the
+  receptor is rigid and its sidechain rotamers were fitted to the ligand that was present,
+  so the native pose may be geometrically unreachable in a rigid box. An ensemble or
+  flexible-sidechain receptor is the next thing to test, not a bigger search.
+- It also bounds the re-scoring work: with the ceiling fixed near 0.40, no re-ranking of
+  these pose lists can exceed it, and study F already reaches about a third of the way
+  from Vina's 0.09 to that ceiling.
+- Neither arm speaks to affinity, and none of these scores includes explicit
+  electrostatics except through study F's added term.
+
+### Electrostatic re-ranking of docked poses
+
+**Plan and run.** `docs/RERANK_PLAN.md` with `docs/RERANK_PLAN_AMENDMENT_1.md`, rerank run
+36055694750; results in `results/rerank/`, extracted from the Report job's log.
+
+Both plan files were committed before any pose for this study was generated, and before
+any redocking outcome had been read.
+
+**Why.** The redocking benchmark's failures are failures of ranking, not of search
+(230 of 242). Vina's function has no explicit electrostatics, and the ligand carries 5
+to 9 negative charges. The study asks whether one screened-Coulomb term, with a single
+weight fitted out of sample, picks the crystal-like pose out of Vina's own pose list
+more often than Vina's ranking does.
+
+**Data and term.**
+
+- The redocking primary set, re-docked with the same protocol (Vina 1.2.7,
+  exhaustiveness 32, seeds 1–3), keeping up to 40 poses within 10 kcal/mol so the
+  re-ranker has room to act. 250 copies in 31 strict groups, 750 seed runs; the same 19
+  copies failed receptor preparation as in study A, and no copy went unreached.
+- E_el = 332.0637 Σ q_i q_j exp(−κ r) / (ε(r) r) over pairs within 12 Å, with ε(r) = 4r,
+  κ = 0.127 Å⁻¹ (150 mM monovalent salt at 298 K) and r floored at 1.5 Å. Charges are the
+  PDBQT partial charges: PDB2PQR/AMBER at pH 7.4 for the receptor, Meeko's Gasteiger
+  charges for the ligand. Nothing in the term is fitted.
+- The re-ranking score is Vina + w·E_el over the grid {0, 0.002, 0.005, 0.01, 0.02, 0.05,
+  0.1, 0.2, 0.5, 1}, where w = 0 is Vina itself.
+
+**Cross-fitting.** w is chosen on four folds of strict homology groups and applied to
+the fifth, and the whole procedure is repeated inside each of the 2,000 bootstrap
+resamples, so the interval carries the uncertainty of choosing w. The folds chose
+w = 0.1 four times and 0.5 once.
+
+**Reproducibility.** Against study A's primary arm on the same 750 seed runs, the two
+independent docking runs agree on success for 98.7 % of runs and on top-pose RMSD within
+0.5 Å for 89.2 %.
+
+**Results.**
+
+| estimand | Vina | re-ranked (out of fold) | difference |
+|---|---|---|---|
+| group | 0.093 [0.034, 0.176] | 0.147 [0.090, 0.213] | 0.054 [−0.001, 0.114] |
+| per copy | 0.091 [0.050, 0.129] | 0.125 [0.091, 0.190] | 0.035 [0.000, 0.104] |
+
+- **F1: no detectable difference.** The group difference is +0.054, which would be a
+  58 % relative gain, but its 95 % lower bound is −0.001 and the interval includes zero.
+  The pre-registered rule needs a lower bound above zero, so the gain is not established.
+- **F3, permutation control: the signal is specific.** In 100 permutations of E_el
+  within each pose list the mean gain is 0.002 and the largest is 0.023, never reaching
+  the observed 0.054 (p = 0.0099). So the term is not acting as noise, which is what the
+  amendment was written to detect. F1 and F3 disagree in the informative way: the effect
+  is real in direction and specific to electrostatics, but too small for this sample to
+  bound away from zero.
+- **F2, decomposition.** Re-ranking cuts scoring failures from 26.3 % to 22.8 % of seed
+  runs. Sampling failures are unchanged at 64.7 %, as they must be, since re-ranking
+  cannot invent a pose. The sampling ceiling, the rate at which any pose in the list is
+  within 2 Å, is 0.399 [0.286, 0.521], so no re-scoring of these lists can do better than
+  about 0.40.
+- **F4, strata (descriptive).** Surface copies gain most, from 0.030 to 0.099, and
+  semi-cryptic from 0.154 to 0.216. Cryptic copies (4 groups) and the classic arrestins
+  (1 group) are below the 5-group minimum and are not evidence.
+- E_el correlates with RMSD within runs, with a median Spearman of 0.615, so the term
+  does rank near-native poses better; the median minimised crystal pose has
+  E_el = −59.3 kcal/mol.
+
+**What this settles.** One charge term, with a single out-of-sample weight, moves
+top-pose success from about 0.09 to about 0.15 in point estimate, and the permutation
+control says the movement is electrostatic rather than noise. The pre-registered interval
+does not exclude zero, so this is a lead, not a result. It is also bounded: even a perfect
+re-ranker of these pose lists would reach only about 0.40, because two thirds of runs
+never sample a near-native pose. A sampling fix, not a scoring fix, is what the remaining
+gap needs.
+
+### The α-arrestin lead
+
+**Plan and run.** `docs/ARRESTIN_PLAN.md`, arrestin run 36023420103; results in
+`results/arrestin/` (`arrestin.json`, `ARRESTIN.md` with one dossier per protein,
+`family.csv`, `mapping.json`, `report.html`).
+
+**B1: the family.** α-arrestins are arrestin-fold proteins (Pfam PF00339 or PF02752) that
+are not visual or β-arrestins. They were scored against every other unseen protein of
+the three pooled proteomes: 35,158 proteins, including 20 unseen α-arrestins in 14
+MMseqs2 clusters.
+
+- The learned score gives ROC-AUC 0.757 [0.683, 0.856] (2,000 cluster resamples). The
+  5th percentile is 0.694, so the family test is **supported**. The asymptotic
+  Mann–Whitney p is 3.4 × 10⁻⁵, which assumes paralogues are independent.
+- Per organism (descriptive): yeast 0.820 (6 clusters) and *Dictyostelium* 0.828
+  (5 clusters) are both supported. Human is *not evaluable*: its 6 unseen α-arrestins
+  fall in 3 clusters.
+- The human signal is ARRDC2 alone. It ranks 11th of 35,158 in the pooled ranking;
+  TXNIP and ARRDC1, 3, 4 and 5 all rank below 14,000th. ART5 ranks 135th.
+- Positive control: the four classic arrestins are all *seen*, homologous to benchmark
+  proteins, and rank at the 90.6–99.1th percentile of all scored proteins.
+
+**B2–B3: the site.**
+
+- *References.* The benchmark holds 7 classic-arrestin entries (1ZSH, 5TV1, 7F1W, 7F1X,
+  7JTB, 7JXA, 7MOR) with 24 distinct IP sites. They all fall in a single strict
+  homology group.
+- *ARRDC2.* It aligns best to 5TV1 chain A (TM-score 0.641, normalised by the
+  reference). Three of the four residues of site IHP_A_401 map (226→211, 227→212,
+  332→290).
+- *ART5.* It aligns best to 7F1W chain D (TM-score 0.678). Only one of the five residues
+  of IHP_D_501 maps (171→306).
+- *Overlap.* In both proteins the mapped site shares no residue with the top learned
+  pocket (Jaccard 0.0, threshold 0.20), so criterion 1 fails.
+- *Other α-arrestins.* No other α-arrestin's top pocket overlaps a mapped site. Their
+  TM-scores against the references are 0.60–0.69; the classic arrestins' own models
+  score 0.94–0.96.
+
+**B4: conservation.**
+
+- *ARRDC2.* Its UniRef50 cluster gives 119 homologues, but none of its mapped site
+  residues is K, R or H. It is therefore **not conserved** (at least 3 basic positions
+  are needed).
+- *ART5.* Its cluster has 8 homologues, so conservation is *not evaluable* (at least 10
+  are needed).
+
+**B5: docking.**
+
+- *Tasks.* There were 49 docking tasks with no failures.
+- *Protocol-validity gate.* IP6 redocked into the 24 crystal arrestin sites had a mean
+  top-pose success of **0.00** at 2 Å, against the 0.5 required. Every copy was
+  configuration-eligible and surface-bound. The top poses lay 5–15 Å from the crystal
+  ligand. The protocol is **not valid** on arrestin sites, so criteria 3 (convergence)
+  and 4 (scores) are *not evaluable* and count as failing.
+- *Descriptive scores (Vina, kcal/mol).* These are recorded because they were computed,
+  not as evidence.
+
+  | | ARRDC2 | ART5 |
+  |---|---|---|
+  | IP6 at the lead site | −4.28 | −6.58 |
+  | IP6 at the top pocket | −5.73 | −6.24 |
+  | IP6 at the five random negative pockets | −4.31 to −5.80 | −4.25 to −6.31 |
+  | ATP at the lead site | −6.01 | −8.08 |
+  | Largest-cluster fraction of the 15 top poses | 0.13 | 0.20 |
+
+  - For ARRDC2, the lead-site score is weaker than every negative pocket and than the
+    weakest positive control (−4.35; AlphaFold ARRB1/ARRB2/SAG controls −4.35 to −5.81).
+  - For ART5, the lead-site score beats its negatives, but its poses do not converge
+    (0.5 is required).
+  - At both lead sites, ATP scores better than IP6.
+
+**B6: verdict.**
+
+| protein | 1 overlap | 2 conservation | 3 convergence | 4 scores | verdict |
+|---|---|---|---|---|---|
+| ARRDC2 (Q8TBH0) | fails (Jaccard 0.0) | fails (no basic site residue) | not evaluable | not evaluable | **not supported** |
+| ART5 (P53244) | fails (Jaccard 0.0) | not evaluable (8 homologues) | not evaluable | not evaluable | **not supported** |
+
+**Study E (short MD) was not run.** The task made it conditional on A and B. B's leads
+failed on the structural criteria (overlap, conservation), which do not depend on
+docking. Simulating a docked pose from a protocol that reproduces none of 24 crystal
+arrestin–IP poses would have had no defensible starting structure.
+
+### IP versus other polyanion sites (specificity)
+
+**Plan and run.** `docs/SPECIFICITY_PLAN.md`, specificity run 36020458866; results in
+`results/specificity/` (extracted from the run log).
+
+**Question.** The learned `ip_site` model recognises buried polyanion sites in general.
+Can the 39 descriptors tell an inositol phosphate (IP) site from a site for another
+phosphate-dense ligand?
+
+**Data.**
+
+- **Label 1:** pockets on an IP copy in the IP benchmark table (run 35949588200).
+- **Label 0:** pockets on a class ligand in the transfer table (run 35972729955).
+- **Excluded:** pockets on neither ligand. The question is conditional on a polyanion
+  site.
+- **Groups:** the joint MMseqs2 and sequence-plus-Foldseek groups computed over both
+  datasets.
+- **Holdout:** the latest 20 % of joint strict groups.
+- **Size:** 3,638 pockets in 1,522 entries. Development holds 734 IP pockets (64
+  sequence / 21 strict groups) and 2,763 other-polyanion pockets (391 / 97).
+- **Protocol:** the benchmark's runner, unchanged.
+
+**Variants.**
+
+- S1: all rows.
+- S1b: without the joint strict group holding the most other-polyanion pockets, G:10JT
+  (the nucleotide-binding folds).
+- S1r: IP rows restricted to X-ray entries at 2.5 Å or better, the transfer set's rule.
+  This checks that the model is not separating the two datasets instead of the
+  chemistry.
+
+| variant | sequence CV ROC-AUC | strict CV ROC-AUC | holdout ROC-AUC | largest IP group (seq / strict) | 10-permutation mean | decision |
+|---|---|---|---|---|---|---|
+| S1 | 0.862 [0.802, 0.905] | 0.818 [0.699, 0.886] | 0.843 [0.767, 0.931] | 25 % / **49 %** | 0.502 ± 0.013 | **not evaluable** (40 % rule, strict) |
+| S1b | 0.830 [0.731, 0.902] | 0.757 [0.580, 0.878] | 0.742 [0.624, 0.844] (8 IP groups) | 14 % / 17 % | 0.493 ± 0.022 | **learnable** |
+| S1r | 0.812 [0.704, 0.899] | 0.859 [0.680, 0.925] | 0.773 [0.693, 0.948] (3 IP groups: underpowered) | 15 % / 35 % | 0.506 ± 0.017 | **learnable** |
+
+- **S1.** Joining the two datasets merges IP families with nucleotide-binding folds into
+  one joint strict group holding 49 % of the IP pockets. By the plan's 40 % rule, S1 is
+  therefore not evaluable, although every interval sits well above 0.5.
+- **S1b and S1r.** Both clear 0.5 under both groupings, and S1b also on a powered
+  holdout.
+- **The gate.** The plan's gate opened on S1b: S1 was not evaluable only because of
+  the 40 % rule, S1b is learnable, and S1r's point estimate exceeds 0.5.
+
+**Re-ranking (conditional, run).**
+
+- **Model.** The specificity model was locked on S1b (extra trees). Each pocket's
+  combined score is P(site) × P(IP | site). Each protein's score is its best confident
+  pocket.
+- **Unseen proteins.** Proteins with an MMseqs2 homologue among either dataset's UniProt
+  sequences were excluded: 4,300 proteins. That left 33,084 unseen proteins, 34 of
+  them annotated IP binders.
+
+| ranking | ROC-AUC [95 %] (cluster bootstrap) | Holm p | decision |
+|---|---|---|---|
+| L1 learned `ip_site` (same proteins) | 0.844 [0.771, 0.902] | – | – |
+| L3a combined | 0.828 [0.756, 0.886] | < 0.001 | **supported** |
+| L3b combined − L1 | −0.015 [−0.044, 0.015] | 0.321 | **not supported** |
+
+**What this settles.**
+
+- **Specificity is learnable at the pocket level.** Among polyanion sites, the
+  descriptors separate IP sites from nucleotide and sugar-phosphate sites in families
+  held out by homology, and also on comparable X-ray data.
+- **It does not improve the proteome ranking.** L3b's interval is centred just below 0,
+  so this is not "no effect of any size". A candidate list re-weighted by P(IP | site)
+  should not be read as more trustworthy than the learned ranking.
+- **Candidates.** 75 candidates (the top 25 per proteome); 30 of them are "explained" by
+  the plan's keyword rule. The rule is crude. It misses "mitochondrial substrate
+  carrier" names (mcfA, mcfU) and matches some broad keywords. Its counts are an
+  approximate triage, not a classification.
+- **ARRDC2 again.** It moves to rank 1 among unseen human proteins under the combined
+  score, with P(IP | site) = 0.90.
+
+### The screen's hull-depth gate
+
+**Plan and run.** `docs/HULL_GATE_PLAN.md`, hull-gate run 36020459316; results in
+`results/hull_gate/`.
+
+**Arms.** The calibrated screen was re-aggregated from its 800 shards (2,845,762
+pockets) with the hull-depth gate at 10 Å (current), at 5 Å, and removed. Every other
+calibrated criterion was unchanged. Proteins were ranked by their best composite score
+among pockets passing the arm's non-score gates.
+
+**Evaluation.** 35,158 unseen proteins, 35 annotated IP binders, and 2,000 resamples of
+20,073 MMseqs2 clusters.
+
+| arm | ROC-AUC [95 %] | recall@546 | hits (annotated) |
+|---|---|---|---|
+| 10 Å gate | 0.701 [0.613, 0.789] | 0.114 | 546 (4) |
+| 5 Å gate | 0.738 [0.645, 0.817] | 0.114 | 554 (4) |
+| no gate | 0.747 [0.663, 0.821] | 0.114 | 554 (4) |
+
+**Decision.**
+
+- Removing the gate changes ROC-AUC by +0.046 [−0.015, 0.101], and relaxing it to 5 Å
+  by +0.037 [−0.018, 0.091].
+- Neither lower bound reaches the non-inferiority margin of −0.01.
+- By the plan's rule the 10 Å gate is **kept**. `CALIBRATED_CRITERIA` is unchanged and
+  cites the decision.
+- The point estimates favour removing the gate, and the recall of the top 546 proteins
+  is identical in all arms. The data do not show that the gate helps. They also do not
+  show, at the pre-registered margin, that it can be dropped without cost.
 
 ### Results on the deposited set (superseded)
 
@@ -716,6 +1240,171 @@ on the same code, to measure that leak.
   one - the distinction the screen depends on. Both tasks are measured inside
   proteins already known to bind an inositol phosphate, so neither number is a
   proteome-screen precision.
+
+### Sequence disorder and alignment-free conservation on the candidates
+
+**Plan and runs.** `docs/ORTHOGONAL_PLAN.md`; analysis run 36259814742, report run
+36279873788; results in `results/orthogonal/`, extracted from the Report job's log.
+
+**Why.** Study H ranked the candidates with AlphaFold pLDDT and a MAFFT alignment. Two
+tools use neither: **metapredict v3** scores disorder from sequence alone, and **SHARK**
+finds conserved motifs without an alignment. The arms are study H's arms, through study
+H's own matching code, so the two studies are commensurable.
+
+**The question I1 actually asks.** The controls are *already* matched on pLDDT, so I1 is
+not "are candidate pockets ordered" — AlphaFold confidence would answer that. It is
+whether sequence disorder carries information **beyond** what pLDDT already encodes. A
+null was pre-registered as a real and reportable answer.
+
+**Results.**
+
+- **I1: candidates more ordered.** The paired difference in mean pocket disorder is
+  **−0.093 [−0.149, −0.040]** over 75 matched pairs in 65 clusters, Holm p 0.001. At
+  matched model confidence, candidate pockets are measurably more ordered than controls,
+  so metapredict is not restating pLDDT.
+- **I2, the same result as a rate.** Predicted-disordered pockets:
+
+| role | n | disordered-pocket rate |
+|---|---|---|
+| candidates | 75 | 0.015 [0.000, 0.046] |
+| matched controls | 75 | 0.111 [0.042, 0.181] |
+| annotated binders | 34 | 0.000 [0.000, 0.000] |
+
+  The QC passes its own calibration guard — no annotated binder is flagged — so it is used,
+  and it demotes exactly one candidate: **P53244 (yeast ART5)**, one of study B's two
+  original α-arrestin leads. Study B already found ART5 not supported on the site-overlap
+  criterion; this is an independent reason to set it aside.
+
+  **The 24-protein shortlist is unchanged by this.** ART5 is candidate #10 in yeast and
+  unexplained, but it had already failed study H's conservation criterion and so was never
+  on the shortlist. The disorder QC removed a protein the previous filter had removed too.
+  Its practical effect is therefore nil: it agreed with study H rather than adding to it,
+  and the only fair claim is that two independent filters concur on one protein.
+- **I3, motif support: weak, and reported as weak.** −0.132 [−0.348, 0.053] over only 16
+  pairs in 15 clusters, because **74 of the 150 proteins produced no shark-capture result**.
+  The interval spans zero and the coverage is under a fifth of the arms. Nothing is
+  concluded from it.
+- **I4, remote homology: did not run to completion.** shark-dive was killed by its
+  340-minute job timeout, so it reports **0 queries**. This is the search not finishing, not
+  an absence of remote homologues, and the 19 candidates study H could not evaluate remain
+  unevaluated.
+
+**What I1 does and does not license.** It says the ranking is not simply tracking
+low-confidence regions of AlphaFold models, which is one of the more plausible ways a
+pocket screen can fool itself, and it says so against matched controls. It says nothing
+about *which* ligand binds: study C measured that directly and found the descriptors too
+weak to change a ranking. An ordered pocket is a necessary condition for a real binding
+site, not evidence of one.
+
+**A workflow fault this run exposed.** The analysis run concluded `cancelled`, because
+GitHub marks a job killed by `timeout-minutes` as cancelled and the report job was gated
+on `if: !cancelled()` — so the report was skipped even though the disorder job and all 25
+SHARK-capture shards had succeeded. The report was recovered by dispatching the
+report-only path against the same artifacts, and the gate is now `always()`. The same
+gate is the convention in twelve workflows here and is left alone in the finished studies;
+the hazard applies wherever a best-effort job carries a timeout.
+
+### The inositol-phosphate kinases and the missing cosubstrate
+
+**Plan and run.** `docs/KINASE_PLAN.md`, kinase run 36264528692; results in
+`results/kinase/`, extracted from the Report job's log.
+
+**Why.** The census holds 18 copies of the inositol-phosphate kinase (IPK) superfamily —
+*Entamoeba* IP6KA, PPIP5K2, IPMK, ITPKA, ITPKC — and study A recovers none of them. Every
+failure is a *scoring* failure, 10 of the 18 sampled a near-native pose and then ranked a
+wrong one above it, and all 18 sit at sites the pipeline calls `surface`. These are
+**catalytic** sites: the crystal holds the inositol phosphate against a nucleotide and its
+metals, and the protocol deletes both. That slice was read before the plan was written, so
+it is a re-analysis and is reported as K0, not as a test.
+
+**The 0 of 18 is 0 of 2.** Those 18 copies fall into two strict homology groups, because
+the superfamily shares a fold. The family rate is therefore **not evaluable** under the
+five-group rule, and a zero is unremarkable regardless: at the overall 0.096 success rate,
+P(no success) is 0.16 across copies and 0.82 across groups. Only the mechanism — scoring,
+not sampling — motivates the study.
+
+**Method.** A blind cofactor census: every primary-set copy whose structure carries ATP,
+ADP, AMP, ANP, ACP, AGS, GTP, GDP, GNP or ADX with a heavy atom within 6.0 Å of the ligand.
+The holo receptor is the apo receptor with those atoms plus the catalytic metals appended as
+rigid HETATM records (C→C, N→NA, O→OA, P→P). `cryptic_ip/docking/receptor.py` is not edited;
+a test pins the no-cofactor case to a byte-identical copy of the apo receptor. The apo arm is
+study F's pose lists at the same exhaustiveness, seeds and starting poses, not a re-dock.
+
+**Results.** The census found **33 qualifying copies** (ADP 15, ATP 9, ANP 8, ACP 1), 32 with
+both arms — but spanning only **4 strict homology groups**.
+
+| arm | ceiling | Vina top pose | re-ranked |
+|---|---|---|---|
+| apo | 0.542 [0.354, 0.854] | 0.273 [0.000, 0.751] | 0.363 [0.068, 0.796] |
+| holo | 0.531 [0.354, 0.844] | 0.260 [0.000, 0.750] | 0.358 [0.102, 0.781] |
+
+- **K1: not evaluable** (4 groups, fewer than 5). Top-pose success holo − apo is
+  −0.012 [−0.068, 0.031], Holm p 0.655.
+- **K2: not evaluable** on the same ground. Ceiling holo − apo −0.010 [−0.031, 0.000].
+- **K3 (descriptive, 5 groups, evaluable).** The pyrophosphates pooled are
+  0.000 [0.000, 0.000] over 6 copies, against InsP6's 0.114 [0.043, 0.196] over 154.
+- **K4 could not run as designed.** No cofactor CCD template was available, so no copy
+  carried charges. The arm self-reports as not evidence about electrostatics, and its
+  +0.098 [0.030, 0.161] is study G's re-ranking repeated on an uncharged cofactor.
+- **Metals only**, quoted from study A on the same copies rather than re-docked: mean 0.167
+  over 12 copies.
+
+**What this does and does not say.** It does not say the cosubstrate hypothesis is wrong. It
+says the **deposited structures cannot test it**: only four independent folds in the whole
+census carry a bound nucleotide beside an inositol phosphate, and no re-analysis of them will
+reach the five-group bar. Testing this needs structures the PDB does not currently hold, not
+more compute. The point estimates lean very slightly negative, which is at least no hint of a
+large rescue being missed for want of power.
+
+### Does buried IP-site frequency track IP concentration?
+
+**Plan and run.** `docs/COEVOLUTION_PLAN.md`, coevolution run 36264528735; results in
+`results/coevolution/`, extracted from the Report job's log.
+
+**Why it had never been asked.** Every earlier study took candidates as a **rank cutoff per
+organism** (the top 25–27 of each), which fixes the count by construction and cannot produce
+a rate. A rate needs one absolute threshold applied to all three proteomes.
+
+**Method.** The threshold is the `combined` score at a 1 % false-positive rate among
+**pooled** non-annotated, unseen proteins — pooling leaves the per-organism rates free to
+differ, where anchoring within organism would force them equal — with the founding document's
+pLDDT ≥ 70 floor. The **primary test is the matched comparison**: proteins are binned on mean
+pLDDT (width 5), log₂ length (0.5) and basic-residue fraction (0.02); only bins holding both
+arms contribute; the estimand is the bin-weighted mean of within-bin differences, resampling
+MMseqs2 clusters whole. A rule-only arm repeats it with a score carrying no training
+distribution.
+
+**Results.** Threshold `combined` ≥ 0.519604; no protein was excluded by the pLDDT floor.
+
+| organism | proteins | hits | hit rate |
+|---|---|---|---|
+| *Dictyostelium* | 11,679 | 106 | 0.908 % [0.702, 1.122] |
+| human | 19,899 | 243 | 1.221 % [1.018, 1.424] |
+| yeast | 5,806 | 85 | 1.464 % [1.113, 1.842] |
+
+- **C1 (raw, not the test): −0.435 [−0.714, −0.150] pp.** *Dictyostelium* is **lower**, not
+  higher — the opposite of the co-evolution prediction, and the interval clears zero.
+- **C2 (primary, matched): inconclusive**, −0.017 [−0.341, 0.269] pp over 722 shared bins and
+  20,080 clusters, Holm p 0.834. Matching on model confidence, length and composition removes
+  essentially all of the raw difference, which is what the design anticipated.
+- **C4 (rule-only): inconclusive**, +0.183 [−0.081, 0.433] pp. **C2 and C4 disagree in
+  direction**, so by the pre-registered rule the primary is **not robust** and no
+  co-evolution claim is made in either direction.
+- **C5 (deepest quartile, the pyrophosphate prediction): inconclusive**,
+  +0.209 [−0.439, 0.906] pp.
+- **C3.** Nine of ten pLDDT deciles are inconclusive. The top decile (97.0–98.9) reads
+  "lower in *Dictyostelium*" at −0.928 [−1.384, −0.526] pp — a single decile out of ten with
+  no correction applied, and it points away from the hypothesis, so it is reported rather
+  than interpreted.
+- **Sensitivity.** Across anchors 0.1 %–5 % the matched difference stays inside
+  ±0.7 pp; the 0.1 % anchor reads "no material difference" and the rest inconclusive.
+
+**Conclusion.** The IP-concentration hypothesis is **not supported by this screen**. The
+raw comparison runs against it, the matched comparison is null, and the two score variants
+disagree, so the honest statement is that this screen detects no relationship — not that
+none exists. With three organisms there are two contrasts and no replication, and phylogeny
+is not controlled and cannot be at n = 3, so even the negative is weak evidence about
+co-evolution itself rather than about this screen's output.
 
 ---
 
@@ -903,6 +1592,22 @@ validates the machinery, not the biology.
 - Effect sizes: Hedges' g (small-sample corrected) for the parametric case,
   Cliff's delta for the non-parametric case.
 - Enrichment: two-sided permutation tests with FDR correction.
+- Group bootstrap, measured calibration (`tests/test_statistical_calibration.py`,
+  run with `-m slow`). These are simulations of a null ROC-AUC with families correlated
+  within a group, 300 replicates each. The one-sided false-positive rate of "95 %
+  interval above 0.5" is:
+  - 2.3 % with 30 groups and 3.3 % with 80 groups, against a nominal 2.5 %;
+  - 6–8 % with 5–9 groups.
+
+  The docking plans' 5-group minimum therefore marks intervals from fewer than 5
+  groups as not evidence, but it does not make an interval from 5–9 groups exact. A
+  decision that rests on 5–9 groups is read with that caveat.
+- Cross-fitted re-ranking (study F), in the same simulations:
+  - No "improves" decision in 40 null data sets.
+  - With a partial electrostatic signal (half of the native poses marked), "improves"
+    in 10, 19 and 20 of 20 data sets at small, medium and large effects.
+  - The out-of-fold gain never exceeds the in-sample optimum, so choosing the weight
+    does not inflate it.
 
 ---
 

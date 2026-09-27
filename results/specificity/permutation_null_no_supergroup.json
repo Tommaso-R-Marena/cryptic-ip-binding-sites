@@ -1,0 +1,101 @@
+{
+  "rule": {
+    "leak_mean": 0.52,
+    "high": 0.6,
+    "max_high_fraction": 0.1
+  },
+  "tasks": {
+    "ip_site": {
+      "pooled": {
+        "n": 10,
+        "mean": 0.4929059353697841,
+        "sd": 0.02173197644889952,
+        "p2.5": 0.46357063403781984,
+        "p97.5": 0.5148043766578249,
+        "above_0.60": 0
+      },
+      "within_fold_mean": {
+        "n": 10,
+        "mean": 0.48909768418870636,
+        "sd": 0.021424599573831617,
+        "p2.5": 0.46465628030109335,
+        "p97.5": 0.526130204827708,
+        "above_0.60": 0
+      },
+      "verdict": "chance",
+      "per_permutation": [
+        {
+          "file": "ip_site__full__sequence__r0__permuted.csv.gz",
+          "repeat": 0,
+          "pooled": 0.5145888594164456,
+          "within_fold_mean": 0.5313980188819386,
+          "folds": 5
+        },
+        {
+          "file": "ip_site__full__sequence__r1__permuted.csv.gz",
+          "repeat": 1,
+          "pooled": 0.5036793017883118,
+          "within_fold_mean": 0.4876593045252823,
+          "folds": 5
+        },
+        {
+          "file": "ip_site__full__sequence__r2__permuted.csv.gz",
+          "repeat": 2,
+          "pooled": 0.5119244554728426,
+          "within_fold_mean": 0.5060974329226751,
+          "folds": 5
+        },
+        {
+          "file": "ip_site__full__sequence__r3__permuted.csv.gz",
+          "repeat": 3,
+          "pooled": 0.4692250648869114,
+          "within_fold_mean": 0.4635363972708969,
+          "folds": 5
+        },
+        {
+          "file": "ip_site__full__sequence__r4__permuted.csv.gz",
+          "repeat": 4,
+          "pooled": 0.4684335871766351,
+          "within_fold_mean": 0.4747494963434022,
+          "folds": 5
+        },
+        {
+          "file": "ip_site__full__sequence__r5__permuted.csv.gz",
+          "repeat": 5,
+          "pooled": 0.5137355846477092,
+          "within_fold_mean": 0.507985511974247,
+          "folds": 5
+        },
+        {
+          "file": "ip_site__full__sequence__r6__permuted.csv.gz",
+          "repeat": 6,
+          "pooled": 0.46215880893300254,
+          "within_fold_mean": 0.4685136551828812,
+          "folds": 5
+        },
+        {
+          "file": "ip_site__full__sequence__r7__permuted.csv.gz",
+          "repeat": 7,
+          "pooled": 0.5148669461795157,
+          "within_fold_mean": 0.4979922533989118,
+          "folds": 5
+        },
+        {
+          "file": "ip_site__full__sequence__r8__permuted.csv.gz",
+          "repeat": 8,
+          "pooled": 0.47618674120342636,
+          "within_fold_mean": 0.47372500334348366,
+          "folds": 5
+        },
+        {
+          "file": "ip_site__full__sequence__r9__permuted.csv.gz",
+          "repeat": 9,
+          "pooled": 0.4942600039930407,
+          "within_fold_mean": 0.4793197680433446,
+          "folds": 5
+        }
+      ]
+    }
+  },
+  "not_evaluable": []
+}

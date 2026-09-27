@@ -264,7 +264,205 @@ experiment above.
 rank 27) rank highly. They share the arrestin fold of the β-arrestins, which are
 established IP6 binders, but are too divergent in sequence to be excluded as
 homologues. We report them as hypotheses: the empirical precision at their depth is
-about 7–20 %, and that figure is a lower bound.
+about 7–20 %, and that figure is a lower bound. The test of this lead is below.
+
+### Docking places inositol phosphates poorly, and the scoring function is why
+
+The screen ranks pockets; it does not place ligands. A pre-registered redocking
+benchmark (`docs/REDOCKING_PLAN.md`) asked how well the standard tool does the second
+job on this ligand class: every crystal IP copy of the benchmark put back into its own
+site with AutoDock Vina, three seeds per copy.
+
+- **Top-pose success is 0.110 [0.046, 0.193]** across 250 copies in 31 strict homology
+  groups (group estimand; per copy 0.096 [0.056, 0.141]). By the pre-registered rule
+  (R1) the protocol is *unreliable*.
+- **The search is not the problem.** Of the 242 copies whose top pose misses 2 Å, 230
+  are scoring failures: the crystal pose, minimised in the same receptor, scores worse
+  than the pose Vina ranked first. Only 12 are sampling failures. Success over the best
+  of 20 poses is three times the top-pose rate, at 0.324 [0.221, 0.441].
+- **Alternative scoring functions do not rescue it.** AD4 beats Vina by 0.058
+  [0.009, 0.135] and Vinardo by 0.014 [0.000, 0.034]. Both remain near the floor. So
+  does the fully deprotonated ligand, and so does keeping metals in the receptor.
+- **AlphaFold models are no worse than crystals here, because both fail.** Cross-docking
+  success is 0.045 [0.000, 0.122] (R3: *not trustworthy*), and the paired difference
+  against the crystal receptor is −0.002 [−0.029, 0.016].
+- **Site discrimination survives.** The Vina score separates the true site from a decoy
+  fpocket pocket with ROC-AUC 0.744 [0.658, 0.873] (R4: *discriminates*). Finding the
+  site and placing the ligand are different tasks, and only the first is what this
+  pipeline claims.
+- **Burial cannot be tested.** The cryptic class holds 4 strict groups, below the
+  pre-registered minimum of 5, so R2 is *not evaluable*. Its point estimate is higher
+  than the surface one (0.343 against 0.044), but the interval is wide.
+- **What is missing.** 19 of 269 primary copies (7.1 %) failed receptor preparation,
+  17 of them surface sites: PDB2PQR exceptions, and five large cryo-EM assemblies whose
+  outputs the receptor reader could not reconcile. These estimates are conditional on a
+  receptor that could be prepared.
+
+A scoring failure on a ligand carrying 5 to 9 negative charges points at the missing
+electrostatics in Vina's function. That prediction is tested, pre-registered before this
+report was read, in `docs/RERANK_PLAN.md`.
+
+### The screen's top pockets are conserved, which narrows but does not confirm the candidates
+
+The screen ranks a pocket from one AlphaFold model and never asks whether it is
+conserved. A pre-registered filter (`docs/TRIAGE_PLAN.md`) applied study B's conservation
+criterion, unchanged, to all 75 candidates against pLDDT- and depth-matched pockets from
+the bottom half of the same ranking.
+
+- **Candidate pockets are conserved-basic far more often than matched controls:** 0.925
+  [0.825, 1.000] against 0.365 [0.216, 0.514], a paired difference of +0.646
+  [0.485, 0.808] over 38 pairs in 33 clusters (H1 *enriched*, Holm p < 0.001).
+- **The filter is calibrated, not vacuous.** It keeps 0.714 [0.524, 0.905] of annotated
+  IP binders, so it is informative for triage, and its control rate of 0.37 shows it is
+  not simply passing every basic pocket.
+- **24 candidates survive** with a conserved basic pocket, 30 are attributed to another
+  ligand by study C's rule, and 19 cannot be evaluated for want of orthologues.
+- **The filter cannot reach *Dictyostelium*.** All 25 of its candidates are explained or
+  unevaluable, because the species has too few UniRef50 orthologues. That is a limit of
+  the method, not evidence against those proteins, and it leaves the shortlist human and
+  yeast only.
+
+This is the first evidence in the project that the proteome ranking tracks something
+under evolutionary selection rather than model noise, and it is evidence about the
+*ranking*, since it is established against matched controls. It is not evidence that any
+candidate binds inositol phosphate: study C showed these descriptors separate IP from
+other polyanions too weakly to change a ranking, so a conserved basic pocket remains a
+conserved basic pocket.
+
+### The docking failure is not a search-budget artefact
+
+Studies A and F both used AutoDock Vina's default exhaustiveness of 32, on a ligand with
+12 rotatable bonds, and two thirds of runs never sampled a pose within 2 Å. A
+pre-registered test (`docs/SAMPLING_PLAN.md`) re-docked the same sites at four and sixteen
+times that budget to ask whether the ceiling belongs to the search or to the problem.
+
+- **The ceiling does not move.** Any-pose-within-2 Å goes from 0.385 [0.256, 0.516] at
+  exhaustiveness 32 to 0.404 [0.277, 0.534] at 128, a difference of +0.019
+  [−0.001, 0.047]. The pre-registered upper bound for calling the search saturated was
+  0.05, so the decision is *search-saturated* (G1).
+- **Nor does success.** Top-pose success is 0.092 against 0.094, a difference of +0.002
+  [−0.002, 0.009] (G2: *no gain*). The cost was 4.4 times the compute per copy.
+- **Sixteen times the budget is no better.** On the subset, one seed, the ceiling reads
+  0.348, 0.404 and 0.373 at 32, 128 and 512. The curve has flattened.
+- **Runs that miss keep missing.** Of 420 seed runs with no near-native pose at
+  exhaustiveness 32, 7.5 % [3.2, 13.3] find one at 128 and 7.7 % at 512.
+- **Electrostatic re-ranking replicates.** The best available protocol, more search plus
+  the frozen charge term, beats study A's registered one by +0.041 [0.004, 0.083]; Holm's
+  correction leaves p at 0.081, so G3 is *inconclusive*. Study F's independent estimate
+  was +0.054 [−0.001, 0.114]. Two runs agree on the effect and neither clears its bar.
+- **Burial helps sampling, not hurts it.** The ceiling is 0.279 for surface sites, 0.563
+  for semi-cryptic and 0.810 for cryptic ones (11 copies in 4 groups, below the minimum
+  and not evidence). An enclosed pocket constrains the ligand; an open surface site leaves
+  the search nothing to hold on to.
+
+Taken with study A, this locates the failure. It is not the sampler and, given study F,
+only partly the scoring function. What remains is the rigid receptor: crystal sidechain
+rotamers were fitted around the ligand that was present, so for most of these sites the
+native pose may simply not exist in the rigid box being searched. That is a prediction
+about receptor flexibility, and it is testable in the same framework.
+
+**Caveat.** 218 of 250 copies carry the comparison: 19 fail receptor preparation as in
+study A, and 32 did not fit the shard time budget at four times the search. The comparison
+is paired, so missing copies cost power rather than introducing bias.
+
+### Adding electrostatics helps the ranking, but not by enough to call it
+
+Because the redocking failures are failures of ranking rather than of search, and the
+ligand carries 5 to 9 charges, the obvious suspect is the missing electrostatics in
+Vina's scoring function. A separate pre-registered study (`docs/RERANK_PLAN.md`, with
+amendment 1) re-docked the same 250 copies keeping 40 poses per seed, scored every pose
+with a screened Coulomb term and re-ranked by Vina + w·E_el, with w chosen out of sample
+over folds of homology groups.
+
+- **The point estimate moves, the interval does not clear zero.** Top-pose success goes
+  from 0.093 [0.034, 0.176] to 0.147 [0.090, 0.213], a difference of +0.054
+  [−0.001, 0.114]. By the pre-registered rule this is *no detectable difference*.
+- **The movement is specific to electrostatics.** Shuffling the electrostatic energies
+  among each run's poses 100 times gives a mean gain of 0.002 and a maximum of 0.023,
+  never reaching the observed value (p = 0.0099). The amendment added this gate precisely
+  because re-ranking a systematically wrong order by noise can lift success on its own;
+  here the gate is passed and the interval is what falls short.
+- **The ceiling is sampling, not scoring.** Re-ranking cuts scoring failures from 26.3 %
+  to 22.8 % of runs and leaves sampling failures at 64.7 %. Any re-scoring of these pose
+  lists is capped at 0.399 [0.286, 0.521], the rate at which a near-native pose is present
+  at all.
+- **Surface sites gain most,** from 0.030 to 0.099, and semi-cryptic from 0.154 to 0.216
+  (descriptive). The cryptic stratum has 4 homology groups and is not evidence.
+- **The two docking runs agree.** Against the redocking benchmark's own arm on the same
+  750 seed runs, success agrees for 98.7 % of runs, so the comparison is not an artefact
+  of re-docking.
+
+The honest reading is that a single charge term recovers part of what Vina is missing on
+polyanions, with the direction and the specificity established but the size not bounded
+away from zero at this sample. Closing the rest of the gap needs better sampling, not a
+better score.
+
+### The α-arrestins rank high as a family, but the two leads do not hold up
+
+A pre-registered test (`docs/ARRESTIN_PLAN.md`) asked whether the α-arrestin lead is
+worth an experiment.
+
+- **The family ranks high.** Across the three proteomes, the 20 unseen α-arrestins (14
+  sequence clusters) rank above other unseen proteins: ROC-AUC 0.757 [0.683, 0.856],
+  so the family test is *supported*.
+  - The effect is carried by yeast (0.820) and *Dictyostelium* (0.828).
+  - In human, ARRDC2 is the only α-arrestin near the top. Its paralogues rank in the
+    bottom 60 %, and human alone has too few clusters to test.
+- **ARRDC2 and ART5: not supported.** Neither protein's top pocket is the structural
+  counterpart of the β-arrestin IP6 site.
+  - *No overlap.* The site mapped by structural alignment (TM-score 0.64 and 0.68)
+    shares no residue with the top pocket.
+  - *No basic residues at ARRDC2's mapped positions,* so there is nothing to conserve
+    across its 119 homologues.
+  - *ART5's conservation cannot be assessed:* it has 8 homologues.
+- **Docking cannot arbitrate here.** The docking protocol failed its validity gate on
+  the arrestins themselves: none of 24 crystal arrestin–IP poses was recovered. The
+  docking criteria are therefore not evaluable. The descriptive scores point the same
+  way as the structural criteria: ARRDC2's mapped site scores worse than random
+  pockets of the same model, and ATP scores better than IP6 at both sites.
+- **What this means.** Whatever makes the α-arrestins score high, it is not a conserved
+  counterpart of the β-arrestin IP6 site. We do not recommend them for binding assays
+  on this evidence. The short MD study (E), conditional on this lead, was not run.
+
+### Inositol phosphate sites can be told from other polyanion sites, but that does not improve the ranking
+
+The learned model's top proteome candidates bind other polyanions, so we asked,
+under a pre-registered plan (`docs/SPECIFICITY_PLAN.md`), whether the pocket
+descriptors separate inositol phosphate (IP) sites from sites for nucleotides,
+sugar phosphates and pyrophosphates.
+
+- **Pocket level: learnable, with one caveat.** On all 3,638 polyanion-site pockets the
+  decision is *not evaluable*: under the joint strict grouping, one group holds 49 %
+  of the IP pockets, above the plan's 40 % limit, although every interval sits above
+  0.5.
+  - Without the nucleotide-fold super-group the task is *learnable*: ROC-AUC 0.830
+    [0.731, 0.902] by sequence group, 0.757 [0.580, 0.878] by strict group, and 0.742
+    [0.624, 0.844] on a temporal holdout of eight IP families.
+  - On IP entries restricted to X-ray structures at 2.5 Å or better it is also
+    *learnable*, so the signal is not a difference between the two datasets.
+  - Ten permutations of each variant sit at chance.
+- **Proteome level: no gain.** Multiplying the site probability by P(IP | site) ranks
+  annotated IP binders among 33,084 unseen proteins at ROC-AUC 0.828 [0.756, 0.886]
+  (L3a *supported*). The learned site model alone on the same proteins reaches 0.844,
+  so the combined score is not better (L3b *not supported*: −0.015 [−0.044, 0.015]).
+- **What this means.** The descriptors carry some information about which polyanion a
+  site holds, but not enough to change which proteins reach the top of a proteome
+  ranking. ARRDC2 is the top unseen human protein under the combined score.
+
+### The screen's hull-depth gate stays, by rule, though it does not help
+
+The calibrated screen requires a pocket 10 Å inside the convex hull. A
+pre-registered comparison (`docs/HULL_GATE_PLAN.md`) re-aggregated the screen with
+that gate, with a 5 Å gate and with none, on 35,158 unseen proteins.
+
+- **ROC-AUC.** Removing the gate raised the ROC-AUC of the ranking for annotated IP
+  binders from 0.701 to 0.747 (+0.046 [−0.015, 0.101]).
+- **Recall.** Recall among the top 546 proteins was unchanged.
+- **Decision.** A gate stays unless removing it is shown non-inferior at a margin of
+  0.01, and the interval's lower bound misses that margin. By the rule fixed in
+  advance, the decision is to **keep** the gate. Taken together with the transfer
+  result (hull depth adds +0.002 to a learned model), the evidence is that the gate
+  does not help. It has not been shown that it can be removed without cost.
 
 ### A depth measure that fits the controls does not generalise
 

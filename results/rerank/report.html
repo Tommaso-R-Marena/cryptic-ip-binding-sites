@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Electrostatic re-ranking</title>
+<style>
+:root {
+  --bg: #fbfbfa; --card: #fff; --ink: #1c1b19; --dim: #6b6862; --line: #e4e1dc;
+  --hit: #1a7f5a; --null: #8a8681; --bad: #b3261e; --band: #f0efeb; --accent: #2f5d8a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17181a; --card: #1e2022; --ink: #e9e7e4; --dim: #9a978f; --line: #303336;
+    --hit: #4cc38a; --null: #7d7a75; --bad: #f2645a; --band: #26292c; --accent: #7fb2e5;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17181a; --card: #1e2022; --ink: #e9e7e4; --dim: #9a978f; --line: #303336;
+  --hit: #4cc38a; --null: #7d7a75; --bad: #f2645a; --band: #26292c; --accent: #7fb2e5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 1120px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+h2 { font-size: 1.1rem; margin: 34px 0 12px; color: var(--dim); text-transform: uppercase;
+  letter-spacing: 0.08em; font-weight: 600; }
+h3 { font-size: 1.02rem; margin: 0 0 6px; font-weight: 650; }
+.sub { color: var(--dim); margin: 0 0 8px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 18px 20px; margin: 14px 0; overflow-x: auto; }
+.meta { color: var(--dim); font-size: 0.9rem; margin-bottom: 6px; }
+.axis { color: var(--dim); font-size: 0.9rem; margin: 2px 0 10px; }
+.note { color: var(--dim); font-size: 0.88rem; margin: 10px 0 0; }
+.note.bad { color: var(--bad); }
+.banner { background: var(--bad); color: #fff; padding: 10px 14px; border-radius: 10px; font-weight: 600; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.82rem;
+  font-weight: 650; border: 1px solid currentColor; }
+.badge.ok { color: var(--hit); } .badge.no { color: var(--bad); } .badge.meh { color: var(--dim); }
+.forest { width: 100%; min-width: 760px; height: auto; display: block; }
+.forest .rowlabel { fill: var(--ink); font-size: 12.5px; text-anchor: end; }
+.forest .value { fill: var(--ink); font-size: 12.5px; font-family: ui-monospace, Menlo, monospace; }
+.forest .dim { fill: var(--dim); }
+.forest .missing { fill: var(--dim); font-size: 12.5px; font-style: italic; }
+.forest .tick { fill: var(--dim); font-size: 11px; }
+.forest .mid { text-anchor: middle; }
+.forest .grid { stroke: var(--line); stroke-width: 1; }
+.forest .nullline { stroke: var(--dim); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.forest .band { fill: var(--band); }
+.forest .ci { stroke-width: 2.5; stroke-linecap: round; }
+.forest .ci.hit, .forest .pt.hit { stroke: var(--hit); fill: var(--hit); }
+.forest .ci.bad, .forest .pt.bad { stroke: var(--bad); fill: var(--bad); }
+.forest .ci.null, .forest .pt.null { stroke: var(--null); fill: var(--null); }
+.tiles { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0 16px; }
+.tile { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; min-width: 104px; }
+.tile .n { font-size: 1.35rem; font-weight: 650; }
+.tile .k { color: var(--dim); font-size: 0.82rem; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+th { color: var(--dim); font-weight: 600; }
+footer { color: var(--dim); font-size: 0.85rem; margin-top: 30px; }
+@media (max-width: 640px) { main { padding: 20px 16px 48px; } }
+</style></head>
+<body><main>
+<h1>Electrostatic re-ranking</h1>
+<p class="sub">Pre-registered in <code>docs/RERANK_PLAN.md</code>. Intervals are 95 % percentile intervals from
+resampling whole homology groups (or sequence clusters), never structures, copies or pockets.</p>
+<h2>Decision</h2><article class="card"><table><thead><tr><th>question</th><th>decision</th><th>detail</th></tr></thead><tbody><tr><td>F1 electrostatic re-ranking</td><td><span class="badge meh">no detectable difference</span></td><td>group difference 0.054 [-0.001, 0.114]</td></tr></tbody></table></article><article class="card"><p class="axis">re-ranked minus Vina top-pose success at 2 Å</p><svg class="forest" viewBox="0 0 1160 106" role="img" aria-label="interval plot"><line x1="325.8" y1="6" x2="325.8" y2="66" class="grid"/><text x="325.8" y="80" class="tick mid">0</text><line x1="502.6" y1="6" x2="502.6" y2="66" class="grid"/><text x="502.6" y="80" class="tick mid">0.05</text><line x1="679.4" y1="6" x2="679.4" y2="66" class="grid"/><text x="679.4" y="80" class="tick mid">0.1</text><line x1="325.8" y1="6" x2="325.8" y2="66" class="nullline"/><text x="278" y="25.0" class="rowlabel">difference (group)</text><line x1="322.4" y1="21.0" x2="727.6" y2="21.0" class="ci null"/><circle cx="516.3" cy="21.0" r="4.5" class="pt null"/><text x="770" y="25.0" class="value">0.054 <tspan class="dim">[-0.001, 0.114]</tspan></text><text x="278" y="55.0" class="rowlabel">difference (copy)</text><line x1="325.8" y1="51.0" x2="692.3" y2="51.0" class="ci hit"/><circle cx="448.4" cy="51.0" r="4.5" class="pt hit"/><text x="770" y="55.0" class="value">0.035 <tspan class="dim">[0.000, 0.104]</tspan></text></svg></article><article class="card"><p class="axis">top-pose success, group estimand</p><svg class="forest" viewBox="0 0 1160 136" role="img" aria-label="interval plot"><line x1="294.0" y1="6" x2="294.0" y2="96" class="grid"/><text x="294.0" y="110" class="tick mid">0</text><line x1="460.4" y1="6" x2="460.4" y2="96" class="grid"/><text x="460.4" y="110" class="tick mid">0.2</text><line x1="626.8" y1="6" x2="626.8" y2="96" class="grid"/><text x="626.8" y="110" class="tick mid">0.4</text><line x1="710.0" y1="6" x2="710.0" y2="96" class="nullline"/><text x="278" y="25.0" class="rowlabel">Vina</text><line x1="322.4" y1="21.0" x2="440.6" y2="21.0" class="ci hit"/><circle cx="371.7" cy="21.0" r="4.5" class="pt hit"/><text x="770" y="25.0" class="value">0.093 <tspan class="dim">[0.034, 0.176]</tspan></text><text x="278" y="55.0" class="rowlabel">re-ranked</text><line x1="368.5" y1="51.0" x2="471.2" y2="51.0" class="ci hit"/><circle cx="416.6" cy="51.0" r="4.5" class="pt hit"/><text x="770" y="55.0" class="value">0.147 <tspan class="dim">[0.090, 0.213]</tspan></text><text x="278" y="85.0" class="rowlabel">sampling ceiling</text><line x1="531.7" y1="81.0" x2="727.6" y2="81.0" class="ci null"/><circle cx="626.3" cy="81.0" r="4.5" class="pt null"/><text x="770" y="85.0" class="value">0.399 <tspan class="dim">[0.286, 0.521]</tspan></text></svg></article>
+<footer>Green intervals exclude the reference value; grey intervals include it. </footer>
+</main></body></html>

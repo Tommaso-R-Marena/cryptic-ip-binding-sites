@@ -1,0 +1,5369 @@
+[
+  {
+    "uniprot_id": "Q8N5I2",
+    "gene": "ARRDC1",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.51103,
+        "tm_norm_structure2": 0.60726,
+        "rmsd": 4.34,
+        "aligned_length": 275,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.52049,
+        "tm_norm_structure2": 0.65027,
+        "rmsd": 3.78,
+        "aligned_length": 266,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.52318,
+        "tm_norm_structure2": 0.61773,
+        "rmsd": 3.76,
+        "aligned_length": 268,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.52726,
+        "tm_norm_structure2": 0.61467,
+        "rmsd": 3.95,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.52691,
+        "tm_norm_structure2": 0.62944,
+        "rmsd": 3.99,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.53221,
+        "tm_norm_structure2": 0.62091,
+        "rmsd": 3.69,
+        "aligned_length": 272,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.52936,
+        "tm_norm_structure2": 0.6157,
+        "rmsd": 3.95,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.52467,
+        "tm_norm_structure2": 0.61961,
+        "rmsd": 3.7,
+        "aligned_length": 268,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.52565,
+        "tm_norm_structure2": 0.61101,
+        "rmsd": 4.07,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.52758,
+        "tm_norm_structure2": 0.61932,
+        "rmsd": 4.08,
+        "aligned_length": 275,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.52376,
+        "tm_norm_structure2": 0.61383,
+        "rmsd": 3.69,
+        "aligned_length": 268,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.52645,
+        "tm_norm_structure2": 0.6077,
+        "rmsd": 3.95,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.52924,
+        "tm_norm_structure2": 0.61279,
+        "rmsd": 3.82,
+        "aligned_length": 272,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.52652,
+        "tm_norm_structure2": 0.61808,
+        "rmsd": 4.06,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.52059,
+        "tm_norm_structure2": 0.61168,
+        "rmsd": 3.68,
+        "aligned_length": 266,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.52585,
+        "tm_norm_structure2": 0.61136,
+        "rmsd": 3.98,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.52935,
+        "tm_norm_structure2": 0.62039,
+        "rmsd": 3.69,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.52251,
+        "tm_norm_structure2": 0.62816,
+        "rmsd": 4.09,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.5249,
+        "tm_norm_structure2": 0.61655,
+        "rmsd": 3.82,
+        "aligned_length": 270,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.52284,
+        "tm_norm_structure2": 0.6134,
+        "rmsd": 4.03,
+        "aligned_length": 273,
+        "error": null
+      }
+    ],
+    "reference": "5TV1_A.pdb",
+    "tm_reference_norm": 0.65027,
+    "tm_target_norm": 0.52049,
+    "top_pocket_residues": [
+      42,
+      44,
+      46,
+      68,
+      70,
+      110,
+      112,
+      113,
+      114,
+      116,
+      125,
+      126,
+      127
+    ],
+    "sites": [
+      {
+        "copy": "IHP_A_401",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          192,
+          226,
+          227,
+          332
+        ],
+        "mapping": {
+          "226": 194,
+          "227": 195
+        },
+        "mapped_residues": [
+          194,
+          195
+        ],
+        "fraction_mapped": 0.5,
+        "jaccard_top_pocket": 0.0
+      },
+      {
+        "copy": "IHP_A_402",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          233,
+          237,
+          251,
+          325,
+          327
+        ],
+        "mapping": {
+          "233": 201,
+          "237": 205,
+          "251": 219,
+          "325": 265,
+          "327": 267
+        },
+        "mapped_residues": [
+          201,
+          205,
+          219,
+          265,
+          267
+        ],
+        "fraction_mapped": 1.0,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_A_401",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "Q8NCT1",
+    "gene": "ARRDC4",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.51294,
+        "tm_norm_structure2": 0.59198,
+        "rmsd": 4.26,
+        "aligned_length": 265,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.52847,
+        "tm_norm_structure2": 0.63805,
+        "rmsd": 4.1,
+        "aligned_length": 268,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.5355,
+        "tm_norm_structure2": 0.61262,
+        "rmsd": 3.73,
+        "aligned_length": 266,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.54265,
+        "tm_norm_structure2": 0.61266,
+        "rmsd": 3.88,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.54639,
+        "tm_norm_structure2": 0.63216,
+        "rmsd": 3.99,
+        "aligned_length": 276,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.53693,
+        "tm_norm_structure2": 0.6065,
+        "rmsd": 3.88,
+        "aligned_length": 269,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.54741,
+        "tm_norm_structure2": 0.61661,
+        "rmsd": 3.96,
+        "aligned_length": 276,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.53612,
+        "tm_norm_structure2": 0.61321,
+        "rmsd": 3.77,
+        "aligned_length": 267,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.54211,
+        "tm_norm_structure2": 0.6105,
+        "rmsd": 3.96,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.54077,
+        "tm_norm_structure2": 0.61484,
+        "rmsd": 4.02,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.53372,
+        "tm_norm_structure2": 0.6061,
+        "rmsd": 3.77,
+        "aligned_length": 266,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.54188,
+        "tm_norm_structure2": 0.60611,
+        "rmsd": 3.99,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.5366,
+        "tm_norm_structure2": 0.60216,
+        "rmsd": 3.78,
+        "aligned_length": 267,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.54221,
+        "tm_norm_structure2": 0.61667,
+        "rmsd": 3.98,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.5339,
+        "tm_norm_structure2": 0.60744,
+        "rmsd": 3.87,
+        "aligned_length": 268,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.54072,
+        "tm_norm_structure2": 0.60898,
+        "rmsd": 4.02,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.53574,
+        "tm_norm_structure2": 0.60841,
+        "rmsd": 3.81,
+        "aligned_length": 267,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.53601,
+        "tm_norm_structure2": 0.62416,
+        "rmsd": 4.11,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.53481,
+        "tm_norm_structure2": 0.60872,
+        "rmsd": 3.81,
+        "aligned_length": 267,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.53545,
+        "tm_norm_structure2": 0.60837,
+        "rmsd": 4.14,
+        "aligned_length": 274,
+        "error": null
+      }
+    ],
+    "reference": "5TV1_A.pdb",
+    "tm_reference_norm": 0.63805,
+    "tm_target_norm": 0.52847,
+    "top_pocket_residues": [
+      183,
+      184,
+      185,
+      186,
+      224,
+      299,
+      301,
+      302,
+      303
+    ],
+    "sites": [
+      {
+        "copy": "IHP_A_401",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          192,
+          226,
+          227,
+          332
+        ],
+        "mapping": {
+          "226": 222,
+          "227": 223,
+          "332": 301
+        },
+        "mapped_residues": [
+          222,
+          223,
+          301
+        ],
+        "fraction_mapped": 0.75,
+        "jaccard_top_pocket": 0.09090909090909091
+      },
+      {
+        "copy": "IHP_A_402",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          233,
+          237,
+          251,
+          325,
+          327
+        ],
+        "mapping": {
+          "233": 229,
+          "237": 233,
+          "251": 248,
+          "325": 294,
+          "327": 296
+        },
+        "mapped_residues": [
+          229,
+          233,
+          248,
+          294,
+          296
+        ],
+        "fraction_mapped": 1.0,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_A_401",
+    "lead_jaccard": 0.09090909090909091,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "Q96B67",
+    "gene": "ARRDC3",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.51093,
+        "tm_norm_structure2": 0.58393,
+        "rmsd": 4.47,
+        "aligned_length": 267,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.52977,
+        "tm_norm_structure2": 0.63455,
+        "rmsd": 3.95,
+        "aligned_length": 264,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.5317,
+        "tm_norm_structure2": 0.60151,
+        "rmsd": 4.05,
+        "aligned_length": 269,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.5337,
+        "tm_norm_structure2": 0.59653,
+        "rmsd": 4.21,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.53631,
+        "tm_norm_structure2": 0.61412,
+        "rmsd": 4.22,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.53682,
+        "tm_norm_structure2": 0.60051,
+        "rmsd": 4.1,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.53787,
+        "tm_norm_structure2": 0.59982,
+        "rmsd": 4.31,
+        "aligned_length": 276,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.53233,
+        "tm_norm_structure2": 0.60247,
+        "rmsd": 4.03,
+        "aligned_length": 269,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.53283,
+        "tm_norm_structure2": 0.59403,
+        "rmsd": 4.31,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.53616,
+        "tm_norm_structure2": 0.60349,
+        "rmsd": 4.24,
+        "aligned_length": 275,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.53076,
+        "tm_norm_structure2": 0.59638,
+        "rmsd": 3.99,
+        "aligned_length": 268,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.53404,
+        "tm_norm_structure2": 0.59143,
+        "rmsd": 4.25,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.53538,
+        "tm_norm_structure2": 0.59449,
+        "rmsd": 4.09,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.5347,
+        "tm_norm_structure2": 0.60196,
+        "rmsd": 4.37,
+        "aligned_length": 275,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.53072,
+        "tm_norm_structure2": 0.59772,
+        "rmsd": 4.07,
+        "aligned_length": 269,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.53335,
+        "tm_norm_structure2": 0.59475,
+        "rmsd": 4.32,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.53325,
+        "tm_norm_structure2": 0.59915,
+        "rmsd": 4.09,
+        "aligned_length": 270,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.527,
+        "tm_norm_structure2": 0.60755,
+        "rmsd": 4.26,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.5312,
+        "tm_norm_structure2": 0.59798,
+        "rmsd": 4.14,
+        "aligned_length": 270,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.52788,
+        "tm_norm_structure2": 0.59392,
+        "rmsd": 4.38,
+        "aligned_length": 273,
+        "error": null
+      }
+    ],
+    "reference": "5TV1_A.pdb",
+    "tm_reference_norm": 0.63455,
+    "tm_target_norm": 0.52977,
+    "top_pocket_residues": [
+      4,
+      5,
+      41,
+      42,
+      43,
+      45,
+      46,
+      48,
+      87,
+      90,
+      91,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98,
+      99,
+      100,
+      101,
+      102,
+      103,
+      143,
+      144,
+      145,
+      146,
+      147,
+      149
+    ],
+    "sites": [
+      {
+        "copy": "IHP_A_401",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          192,
+          226,
+          227,
+          332
+        ],
+        "mapping": {
+          "226": 218,
+          "227": 219,
+          "332": 297
+        },
+        "mapped_residues": [
+          218,
+          219,
+          297
+        ],
+        "fraction_mapped": 0.75,
+        "jaccard_top_pocket": 0.0
+      },
+      {
+        "copy": "IHP_A_402",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          233,
+          237,
+          251,
+          325,
+          327
+        ],
+        "mapping": {
+          "233": 225,
+          "237": 229,
+          "251": 244,
+          "325": 290,
+          "327": 292
+        },
+        "mapped_residues": [
+          225,
+          229,
+          244,
+          290,
+          292
+        ],
+        "fraction_mapped": 1.0,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_A_401",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "Q9H3M7",
+    "gene": "TXNIP",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.55746,
+        "tm_norm_structure2": 0.60791,
+        "rmsd": 4.0,
+        "aligned_length": 266,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.57902,
+        "tm_norm_structure2": 0.66156,
+        "rmsd": 3.56,
+        "aligned_length": 265,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.58506,
+        "tm_norm_structure2": 0.63124,
+        "rmsd": 3.47,
+        "aligned_length": 269,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.5842,
+        "tm_norm_structure2": 0.62223,
+        "rmsd": 3.74,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.58695,
+        "tm_norm_structure2": 0.64094,
+        "rmsd": 3.78,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.58748,
+        "tm_norm_structure2": 0.62624,
+        "rmsd": 3.51,
+        "aligned_length": 270,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.58795,
+        "tm_norm_structure2": 0.62489,
+        "rmsd": 3.73,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.58212,
+        "tm_norm_structure2": 0.62771,
+        "rmsd": 3.56,
+        "aligned_length": 270,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.58329,
+        "tm_norm_structure2": 0.61976,
+        "rmsd": 3.82,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.58294,
+        "tm_norm_structure2": 0.62557,
+        "rmsd": 3.7,
+        "aligned_length": 272,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.58201,
+        "tm_norm_structure2": 0.62348,
+        "rmsd": 3.46,
+        "aligned_length": 267,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.58391,
+        "tm_norm_structure2": 0.61618,
+        "rmsd": 3.78,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.58428,
+        "tm_norm_structure2": 0.61801,
+        "rmsd": 3.63,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.58434,
+        "tm_norm_structure2": 0.62707,
+        "rmsd": 3.76,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.58194,
+        "tm_norm_structure2": 0.62443,
+        "rmsd": 3.67,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.58266,
+        "tm_norm_structure2": 0.61919,
+        "rmsd": 3.81,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.58449,
+        "tm_norm_structure2": 0.62594,
+        "rmsd": 3.58,
+        "aligned_length": 270,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.57995,
+        "tm_norm_structure2": 0.63783,
+        "rmsd": 3.87,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.58285,
+        "tm_norm_structure2": 0.62549,
+        "rmsd": 3.67,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.57954,
+        "tm_norm_structure2": 0.62174,
+        "rmsd": 3.87,
+        "aligned_length": 273,
+        "error": null
+      }
+    ],
+    "reference": "5TV1_A.pdb",
+    "tm_reference_norm": 0.66156,
+    "tm_target_norm": 0.57902,
+    "top_pocket_residues": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      38,
+      39,
+      40,
+      88,
+      131,
+      132,
+      134,
+      137
+    ],
+    "sites": [
+      {
+        "copy": "IHP_A_401",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          192,
+          226,
+          227,
+          332
+        ],
+        "mapping": {
+          "226": 205,
+          "227": 206,
+          "332": 284
+        },
+        "mapped_residues": [
+          205,
+          206,
+          284
+        ],
+        "fraction_mapped": 0.75,
+        "jaccard_top_pocket": 0.0
+      },
+      {
+        "copy": "IHP_A_402",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          233,
+          237,
+          251,
+          325,
+          327
+        ],
+        "mapping": {
+          "233": 212,
+          "237": 216,
+          "251": 231,
+          "325": 277,
+          "327": 279
+        },
+        "mapped_residues": [
+          212,
+          216,
+          231,
+          277,
+          279
+        ],
+        "fraction_mapped": 1.0,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_A_401",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "Q8TBH0",
+    "gene": "ARRDC2",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.52618,
+        "tm_norm_structure2": 0.59339,
+        "rmsd": 4.35,
+        "aligned_length": 267,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.54231,
+        "tm_norm_structure2": 0.64057,
+        "rmsd": 3.92,
+        "aligned_length": 264,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.54929,
+        "tm_norm_structure2": 0.61328,
+        "rmsd": 4.01,
+        "aligned_length": 270,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.54989,
+        "tm_norm_structure2": 0.60606,
+        "rmsd": 4.16,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.55278,
+        "tm_norm_structure2": 0.62438,
+        "rmsd": 4.3,
+        "aligned_length": 276,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.55287,
+        "tm_norm_structure2": 0.61008,
+        "rmsd": 3.91,
+        "aligned_length": 270,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.55397,
+        "tm_norm_structure2": 0.60937,
+        "rmsd": 4.15,
+        "aligned_length": 275,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.54947,
+        "tm_norm_structure2": 0.61326,
+        "rmsd": 4.06,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.54916,
+        "tm_norm_structure2": 0.6039,
+        "rmsd": 4.19,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.55113,
+        "tm_norm_structure2": 0.61221,
+        "rmsd": 4.18,
+        "aligned_length": 274,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.54766,
+        "tm_norm_structure2": 0.60701,
+        "rmsd": 3.95,
+        "aligned_length": 269,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.55043,
+        "tm_norm_structure2": 0.60123,
+        "rmsd": 4.13,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.55085,
+        "tm_norm_structure2": 0.60323,
+        "rmsd": 4.01,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.55002,
+        "tm_norm_structure2": 0.61063,
+        "rmsd": 4.25,
+        "aligned_length": 275,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.54632,
+        "tm_norm_structure2": 0.60669,
+        "rmsd": 4.12,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.54877,
+        "tm_norm_structure2": 0.60356,
+        "rmsd": 4.17,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.54925,
+        "tm_norm_structure2": 0.60879,
+        "rmsd": 4.0,
+        "aligned_length": 270,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.54487,
+        "tm_norm_structure2": 0.61981,
+        "rmsd": 4.27,
+        "aligned_length": 273,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.54876,
+        "tm_norm_structure2": 0.60958,
+        "rmsd": 4.09,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.54485,
+        "tm_norm_structure2": 0.60494,
+        "rmsd": 4.18,
+        "aligned_length": 272,
+        "error": null
+      }
+    ],
+    "reference": "5TV1_A.pdb",
+    "tm_reference_norm": 0.64057,
+    "tm_target_norm": 0.54231,
+    "top_pocket_residues": [
+      50,
+      52,
+      54,
+      56,
+      126,
+      128,
+      130,
+      132,
+      144,
+      146
+    ],
+    "sites": [
+      {
+        "copy": "IHP_A_401",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          192,
+          226,
+          227,
+          332
+        ],
+        "mapping": {
+          "226": 211,
+          "227": 212,
+          "332": 290
+        },
+        "mapped_residues": [
+          211,
+          212,
+          290
+        ],
+        "fraction_mapped": 0.75,
+        "jaccard_top_pocket": 0.0
+      },
+      {
+        "copy": "IHP_A_402",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          233,
+          237,
+          251,
+          325,
+          327
+        ],
+        "mapping": {
+          "233": 218,
+          "237": 222,
+          "251": 237,
+          "325": 283,
+          "327": 285
+        },
+        "mapped_residues": [
+          218,
+          222,
+          237,
+          283,
+          285
+        ],
+        "fraction_mapped": 1.0,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_A_401",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "A0ACI8PLY4",
+    "gene": "ARRDC1",
+    "error": "no AlphaFold model"
+  },
+  {
+    "uniprot_id": "A6NEK1",
+    "gene": "ARRDC5",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.59906,
+        "tm_norm_structure2": 0.58169,
+        "rmsd": 4.19,
+        "aligned_length": 260,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.5733,
+        "tm_norm_structure2": 0.58034,
+        "rmsd": 4.79,
+        "aligned_length": 262,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.62386,
+        "tm_norm_structure2": 0.5985,
+        "rmsd": 4.12,
+        "aligned_length": 270,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.61929,
+        "tm_norm_structure2": 0.58722,
+        "rmsd": 4.34,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.61776,
+        "tm_norm_structure2": 0.59996,
+        "rmsd": 4.37,
+        "aligned_length": 272,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.61725,
+        "tm_norm_structure2": 0.58535,
+        "rmsd": 4.31,
+        "aligned_length": 270,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.61811,
+        "tm_norm_structure2": 0.58484,
+        "rmsd": 4.31,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.62395,
+        "tm_norm_structure2": 0.59861,
+        "rmsd": 4.21,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.61626,
+        "tm_norm_structure2": 0.5831,
+        "rmsd": 4.37,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.61044,
+        "tm_norm_structure2": 0.58317,
+        "rmsd": 4.41,
+        "aligned_length": 270,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.61979,
+        "tm_norm_structure2": 0.59035,
+        "rmsd": 4.22,
+        "aligned_length": 269,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.61442,
+        "tm_norm_structure2": 0.5772,
+        "rmsd": 4.33,
+        "aligned_length": 269,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.62353,
+        "tm_norm_structure2": 0.58693,
+        "rmsd": 4.27,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.61346,
+        "tm_norm_structure2": 0.58599,
+        "rmsd": 4.41,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.61835,
+        "tm_norm_structure2": 0.59054,
+        "rmsd": 4.31,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.6133,
+        "tm_norm_structure2": 0.58023,
+        "rmsd": 4.35,
+        "aligned_length": 269,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.6197,
+        "tm_norm_structure2": 0.59038,
+        "rmsd": 4.26,
+        "aligned_length": 270,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.60251,
+        "tm_norm_structure2": 0.58954,
+        "rmsd": 4.59,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.61878,
+        "tm_norm_structure2": 0.59097,
+        "rmsd": 4.3,
+        "aligned_length": 271,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.60324,
+        "tm_norm_structure2": 0.57645,
+        "rmsd": 4.55,
+        "aligned_length": 270,
+        "error": null
+      }
+    ],
+    "reference": "7F1W_D.pdb",
+    "tm_reference_norm": 0.59996,
+    "tm_target_norm": 0.61776,
+    "top_pocket_residues": [
+      57,
+      59,
+      61,
+      90,
+      133,
+      135,
+      149
+    ],
+    "sites": [
+      {
+        "copy": "IHP_D_501",
+        "pdb_id": "7F1W",
+        "reference_residues": [
+          15,
+          171,
+          298,
+          300,
+          301
+        ],
+        "mapping": {
+          "171": 149
+        },
+        "mapped_residues": [
+          149
+        ],
+        "fraction_mapped": 0.2,
+        "jaccard_top_pocket": 0.14285714285714285
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_D_501",
+    "lead_jaccard": 0.14285714285714285,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "A0ACI8Q3D0",
+    "gene": "TXNIP",
+    "error": "no AlphaFold model"
+  },
+  {
+    "uniprot_id": "A0ACI8Q9N3",
+    "gene": "ARRDC2",
+    "error": "no AlphaFold model"
+  },
+  {
+    "uniprot_id": "A0ACI8R9A3",
+    "gene": "TXNIP",
+    "error": "no AlphaFold model"
+  },
+  {
+    "uniprot_id": "A0ACI8RGW9",
+    "gene": "TXNIP",
+    "error": "no AlphaFold model"
+  },
+  {
+    "uniprot_id": "A0ACI8RTP6",
+    "gene": "TXNIP",
+    "error": "no AlphaFold model"
+  },
+  {
+    "uniprot_id": "A0ACI8SB10",
+    "gene": "TXNIP",
+    "error": "no AlphaFold model"
+  },
+  {
+    "uniprot_id": "A0ACI8UXB0",
+    "gene": "TXNIP",
+    "error": "no AlphaFold model"
+  },
+  {
+    "uniprot_id": "B3KSD4",
+    "gene": NaN,
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.5346,
+        "tm_norm_structure2": 0.50382,
+        "rmsd": 3.6,
+        "aligned_length": 213,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.55484,
+        "tm_norm_structure2": 0.54587,
+        "rmsd": 3.25,
+        "aligned_length": 213,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.56415,
+        "tm_norm_structure2": 0.52447,
+        "rmsd": 3.36,
+        "aligned_length": 220,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.55863,
+        "tm_norm_structure2": 0.51287,
+        "rmsd": 3.49,
+        "aligned_length": 218,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.55996,
+        "tm_norm_structure2": 0.52728,
+        "rmsd": 3.43,
+        "aligned_length": 219,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.56386,
+        "tm_norm_structure2": 0.51774,
+        "rmsd": 3.3,
+        "aligned_length": 219,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.56181,
+        "tm_norm_structure2": 0.51456,
+        "rmsd": 3.38,
+        "aligned_length": 219,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.5637,
+        "tm_norm_structure2": 0.52407,
+        "rmsd": 3.29,
+        "aligned_length": 219,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.55626,
+        "tm_norm_structure2": 0.50949,
+        "rmsd": 3.33,
+        "aligned_length": 217,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.55748,
+        "tm_norm_structure2": 0.51603,
+        "rmsd": 3.57,
+        "aligned_length": 220,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.56073,
+        "tm_norm_structure2": 0.5174,
+        "rmsd": 3.39,
+        "aligned_length": 219,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.55972,
+        "tm_norm_structure2": 0.50903,
+        "rmsd": 3.49,
+        "aligned_length": 220,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.565,
+        "tm_norm_structure2": 0.51485,
+        "rmsd": 3.31,
+        "aligned_length": 219,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.55856,
+        "tm_norm_structure2": 0.5167,
+        "rmsd": 3.53,
+        "aligned_length": 219,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.56324,
+        "tm_norm_structure2": 0.52116,
+        "rmsd": 3.46,
+        "aligned_length": 221,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.55889,
+        "tm_norm_structure2": 0.51197,
+        "rmsd": 3.5,
+        "aligned_length": 219,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.56284,
+        "tm_norm_structure2": 0.51937,
+        "rmsd": 3.32,
+        "aligned_length": 219,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.55255,
+        "tm_norm_structure2": 0.52444,
+        "rmsd": 3.5,
+        "aligned_length": 218,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.56513,
+        "tm_norm_structure2": 0.52272,
+        "rmsd": 3.43,
+        "aligned_length": 221,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.55245,
+        "tm_norm_structure2": 0.51136,
+        "rmsd": 3.54,
+        "aligned_length": 218,
+        "error": null
+      }
+    ],
+    "reference": "5TV1_A.pdb",
+    "tm_reference_norm": 0.54587,
+    "tm_target_norm": 0.55484,
+    "top_pocket_residues": [],
+    "sites": [
+      {
+        "copy": "IHP_A_401",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          192,
+          226,
+          227,
+          332
+        ],
+        "mapping": {
+          "226": 135,
+          "227": 136,
+          "332": 214
+        },
+        "mapped_residues": [
+          135,
+          136,
+          214
+        ],
+        "fraction_mapped": 0.75,
+        "jaccard_top_pocket": 0.0
+      },
+      {
+        "copy": "IHP_A_402",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          233,
+          237,
+          251,
+          325,
+          327
+        ],
+        "mapping": {
+          "233": 142,
+          "237": 146,
+          "251": 161,
+          "325": 207,
+          "327": 209
+        },
+        "mapped_residues": [
+          142,
+          146,
+          161,
+          207,
+          209
+        ],
+        "fraction_mapped": 1.0,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_A_402",
+    "overlap": false
+  },
+  {
+    "uniprot_id": "B4DK87",
+    "gene": NaN,
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.48619,
+        "tm_norm_structure2": 0.33315,
+        "rmsd": 2.85,
+        "aligned_length": 131,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.49176,
+        "tm_norm_structure2": 0.35021,
+        "rmsd": 2.19,
+        "aligned_length": 127,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.50545,
+        "tm_norm_structure2": 0.34094,
+        "rmsd": 2.77,
+        "aligned_length": 135,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.49115,
+        "tm_norm_structure2": 0.32798,
+        "rmsd": 2.7,
+        "aligned_length": 132,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.49305,
+        "tm_norm_structure2": 0.33819,
+        "rmsd": 2.74,
+        "aligned_length": 133,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.49885,
+        "tm_norm_structure2": 0.33199,
+        "rmsd": 2.49,
+        "aligned_length": 132,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.49382,
+        "tm_norm_structure2": 0.32906,
+        "rmsd": 2.72,
+        "aligned_length": 133,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.50339,
+        "tm_norm_structure2": 0.3395,
+        "rmsd": 2.66,
+        "aligned_length": 134,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.49371,
+        "tm_norm_structure2": 0.32863,
+        "rmsd": 2.61,
+        "aligned_length": 132,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.48762,
+        "tm_norm_structure2": 0.32907,
+        "rmsd": 2.95,
+        "aligned_length": 133,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.49731,
+        "tm_norm_structure2": 0.33314,
+        "rmsd": 2.72,
+        "aligned_length": 133,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.491,
+        "tm_norm_structure2": 0.32523,
+        "rmsd": 3.0,
+        "aligned_length": 134,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.50366,
+        "tm_norm_structure2": 0.33299,
+        "rmsd": 2.79,
+        "aligned_length": 135,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.49107,
+        "tm_norm_structure2": 0.33119,
+        "rmsd": 2.98,
+        "aligned_length": 134,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.50136,
+        "tm_norm_structure2": 0.33674,
+        "rmsd": 2.69,
+        "aligned_length": 134,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.49018,
+        "tm_norm_structure2": 0.32677,
+        "rmsd": 2.95,
+        "aligned_length": 133,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.50169,
+        "tm_norm_structure2": 0.33556,
+        "rmsd": 2.57,
+        "aligned_length": 133,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.48545,
+        "tm_norm_structure2": 0.33509,
+        "rmsd": 2.44,
+        "aligned_length": 129,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.5052,
+        "tm_norm_structure2": 0.33942,
+        "rmsd": 2.88,
+        "aligned_length": 136,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.48921,
+        "tm_norm_structure2": 0.32917,
+        "rmsd": 2.59,
+        "aligned_length": 131,
+        "error": null
+      }
+    ],
+    "reference": "5TV1_A.pdb",
+    "tm_reference_norm": 0.35021,
+    "tm_target_norm": 0.49176,
+    "top_pocket_residues": [],
+    "sites": [],
+    "has_mapped_site": false,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "B4DVM7",
+    "gene": NaN,
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.52746,
+        "tm_norm_structure2": 0.50258,
+        "rmsd": 3.76,
+        "aligned_length": 216,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.55444,
+        "tm_norm_structure2": 0.55146,
+        "rmsd": 3.44,
+        "aligned_length": 217,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.55917,
+        "tm_norm_structure2": 0.52574,
+        "rmsd": 3.5,
+        "aligned_length": 223,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.55271,
+        "tm_norm_structure2": 0.51342,
+        "rmsd": 3.5,
+        "aligned_length": 221,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.55489,
+        "tm_norm_structure2": 0.52845,
+        "rmsd": 3.68,
+        "aligned_length": 224,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.56062,
+        "tm_norm_structure2": 0.52025,
+        "rmsd": 3.32,
+        "aligned_length": 220,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.55635,
+        "tm_norm_structure2": 0.51538,
+        "rmsd": 3.49,
+        "aligned_length": 222,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.55676,
+        "tm_norm_structure2": 0.52339,
+        "rmsd": 3.29,
+        "aligned_length": 220,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.55234,
+        "tm_norm_structure2": 0.51169,
+        "rmsd": 3.58,
+        "aligned_length": 222,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.55266,
+        "tm_norm_structure2": 0.51717,
+        "rmsd": 3.51,
+        "aligned_length": 221,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.55513,
+        "tm_norm_structure2": 0.51805,
+        "rmsd": 3.51,
+        "aligned_length": 221,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.55389,
+        "tm_norm_structure2": 0.50945,
+        "rmsd": 3.5,
+        "aligned_length": 221,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.55854,
+        "tm_norm_structure2": 0.51469,
+        "rmsd": 3.39,
+        "aligned_length": 221,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.55334,
+        "tm_norm_structure2": 0.51787,
+        "rmsd": 3.56,
+        "aligned_length": 222,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.55677,
+        "tm_norm_structure2": 0.52086,
+        "rmsd": 3.44,
+        "aligned_length": 221,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.5524,
+        "tm_norm_structure2": 0.5119,
+        "rmsd": 3.65,
+        "aligned_length": 222,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.55769,
+        "tm_norm_structure2": 0.52028,
+        "rmsd": 3.34,
+        "aligned_length": 220,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.55113,
+        "tm_norm_structure2": 0.52879,
+        "rmsd": 3.72,
+        "aligned_length": 223,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.55841,
+        "tm_norm_structure2": 0.52234,
+        "rmsd": 3.51,
+        "aligned_length": 222,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.54992,
+        "tm_norm_structure2": 0.51457,
+        "rmsd": 3.71,
+        "aligned_length": 222,
+        "error": null
+      }
+    ],
+    "reference": "5TV1_A.pdb",
+    "tm_reference_norm": 0.55146,
+    "tm_target_norm": 0.55444,
+    "top_pocket_residues": [],
+    "sites": [
+      {
+        "copy": "IHP_A_401",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          192,
+          226,
+          227,
+          332
+        ],
+        "mapping": {
+          "226": 149,
+          "227": 150,
+          "332": 228
+        },
+        "mapped_residues": [
+          149,
+          150,
+          228
+        ],
+        "fraction_mapped": 0.75,
+        "jaccard_top_pocket": 0.0
+      },
+      {
+        "copy": "IHP_A_402",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          233,
+          237,
+          251,
+          325,
+          327
+        ],
+        "mapping": {
+          "233": 156,
+          "237": 160,
+          "251": 175,
+          "325": 221,
+          "327": 223
+        },
+        "mapped_residues": [
+          156,
+          160,
+          175,
+          221,
+          223
+        ],
+        "fraction_mapped": 1.0,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_A_402",
+    "overlap": false
+  },
+  {
+    "uniprot_id": "B7Z7L5",
+    "gene": NaN,
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.80739,
+        "tm_norm_structure2": 0.553,
+        "rmsd": 2.57,
+        "aligned_length": 216,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.84568,
+        "tm_norm_structure2": 0.60038,
+        "rmsd": 1.85,
+        "aligned_length": 215,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.84461,
+        "tm_norm_structure2": 0.56822,
+        "rmsd": 2.97,
+        "aligned_length": 226,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.84922,
+        "tm_norm_structure2": 0.56403,
+        "rmsd": 2.38,
+        "aligned_length": 223,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.85431,
+        "tm_norm_structure2": 0.58114,
+        "rmsd": 2.27,
+        "aligned_length": 222,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.8486,
+        "tm_norm_structure2": 0.56178,
+        "rmsd": 2.82,
+        "aligned_length": 224,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.85824,
+        "tm_norm_structure2": 0.56812,
+        "rmsd": 2.39,
+        "aligned_length": 225,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.8442,
+        "tm_norm_structure2": 0.56774,
+        "rmsd": 2.88,
+        "aligned_length": 225,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.85854,
+        "tm_norm_structure2": 0.56824,
+        "rmsd": 2.56,
+        "aligned_length": 226,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.85162,
+        "tm_norm_structure2": 0.56761,
+        "rmsd": 2.27,
+        "aligned_length": 220,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.84052,
+        "tm_norm_structure2": 0.56072,
+        "rmsd": 2.89,
+        "aligned_length": 224,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.85426,
+        "tm_norm_structure2": 0.5607,
+        "rmsd": 2.32,
+        "aligned_length": 223,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.83962,
+        "tm_norm_structure2": 0.55262,
+        "rmsd": 2.83,
+        "aligned_length": 223,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.85713,
+        "tm_norm_structure2": 0.57187,
+        "rmsd": 2.24,
+        "aligned_length": 222,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.84937,
+        "tm_norm_structure2": 0.56749,
+        "rmsd": 2.8,
+        "aligned_length": 225,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.85092,
+        "tm_norm_structure2": 0.56285,
+        "rmsd": 2.47,
+        "aligned_length": 223,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.8423,
+        "tm_norm_structure2": 0.56137,
+        "rmsd": 2.78,
+        "aligned_length": 223,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.86621,
+        "tm_norm_structure2": 0.59223,
+        "rmsd": 2.26,
+        "aligned_length": 223,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.85153,
+        "tm_norm_structure2": 0.56863,
+        "rmsd": 2.78,
+        "aligned_length": 225,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.85423,
+        "tm_norm_structure2": 0.56929,
+        "rmsd": 2.31,
+        "aligned_length": 221,
+        "error": null
+      }
+    ],
+    "reference": "5TV1_A.pdb",
+    "tm_reference_norm": 0.60038,
+    "tm_target_norm": 0.84568,
+    "top_pocket_residues": [],
+    "sites": [
+      {
+        "copy": "IHP_A_401",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          192,
+          226,
+          227,
+          332
+        ],
+        "mapping": {
+          "192": 67,
+          "226": 101,
+          "227": 102,
+          "332": 213
+        },
+        "mapped_residues": [
+          67,
+          101,
+          102,
+          213
+        ],
+        "fraction_mapped": 1.0,
+        "jaccard_top_pocket": 0.0
+      },
+      {
+        "copy": "IHP_A_402",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          233,
+          237,
+          251,
+          325,
+          327
+        ],
+        "mapping": {
+          "233": 108,
+          "237": 112,
+          "251": 126,
+          "325": 200,
+          "327": 202
+        },
+        "mapped_residues": [
+          108,
+          112,
+          126,
+          200,
+          202
+        ],
+        "fraction_mapped": 1.0,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_A_402",
+    "overlap": false
+  },
+  {
+    "uniprot_id": "B7ZAG5",
+    "gene": NaN,
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.48666,
+        "tm_norm_structure2": 0.33323,
+        "rmsd": 2.65,
+        "aligned_length": 130,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.49287,
+        "tm_norm_structure2": 0.35098,
+        "rmsd": 2.1,
+        "aligned_length": 127,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.50651,
+        "tm_norm_structure2": 0.34179,
+        "rmsd": 2.61,
+        "aligned_length": 135,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.4928,
+        "tm_norm_structure2": 0.32903,
+        "rmsd": 2.61,
+        "aligned_length": 132,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.49429,
+        "tm_norm_structure2": 0.33917,
+        "rmsd": 2.61,
+        "aligned_length": 133,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.50051,
+        "tm_norm_structure2": 0.33328,
+        "rmsd": 2.59,
+        "aligned_length": 133,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.49508,
+        "tm_norm_structure2": 0.32995,
+        "rmsd": 2.59,
+        "aligned_length": 133,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.50499,
+        "tm_norm_structure2": 0.34055,
+        "rmsd": 2.55,
+        "aligned_length": 134,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.49511,
+        "tm_norm_structure2": 0.32985,
+        "rmsd": 2.66,
+        "aligned_length": 133,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.48908,
+        "tm_norm_structure2": 0.32994,
+        "rmsd": 2.82,
+        "aligned_length": 133,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.49839,
+        "tm_norm_structure2": 0.33378,
+        "rmsd": 2.67,
+        "aligned_length": 133,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.49143,
+        "tm_norm_structure2": 0.32535,
+        "rmsd": 2.77,
+        "aligned_length": 133,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.50507,
+        "tm_norm_structure2": 0.33385,
+        "rmsd": 2.71,
+        "aligned_length": 135,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.492,
+        "tm_norm_structure2": 0.33198,
+        "rmsd": 2.83,
+        "aligned_length": 134,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.5035,
+        "tm_norm_structure2": 0.33833,
+        "rmsd": 2.75,
+        "aligned_length": 135,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.49236,
+        "tm_norm_structure2": 0.32851,
+        "rmsd": 2.91,
+        "aligned_length": 134,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.50391,
+        "tm_norm_structure2": 0.33715,
+        "rmsd": 2.63,
+        "aligned_length": 134,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.48536,
+        "tm_norm_structure2": 0.33514,
+        "rmsd": 2.4,
+        "aligned_length": 129,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.50565,
+        "tm_norm_structure2": 0.33957,
+        "rmsd": 2.63,
+        "aligned_length": 135,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.49119,
+        "tm_norm_structure2": 0.33054,
+        "rmsd": 2.69,
+        "aligned_length": 132,
+        "error": null
+      }
+    ],
+    "reference": "5TV1_A.pdb",
+    "tm_reference_norm": 0.35098,
+    "tm_target_norm": 0.49287,
+    "top_pocket_residues": [],
+    "sites": [],
+    "has_mapped_site": false,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "Q7Z3R3",
+    "gene": "DKFZp686J1593",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.7661,
+        "tm_norm_structure2": 0.45078,
+        "rmsd": 1.97,
+        "aligned_length": 169,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.7723,
+        "tm_norm_structure2": 0.47317,
+        "rmsd": 1.55,
+        "aligned_length": 166,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.79506,
+        "tm_norm_structure2": 0.46175,
+        "rmsd": 2.45,
+        "aligned_length": 178,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.7993,
+        "tm_norm_structure2": 0.45746,
+        "rmsd": 1.99,
+        "aligned_length": 176,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.80901,
+        "tm_norm_structure2": 0.47547,
+        "rmsd": 1.99,
+        "aligned_length": 178,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.79017,
+        "tm_norm_structure2": 0.4521,
+        "rmsd": 2.39,
+        "aligned_length": 176,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.80739,
+        "tm_norm_structure2": 0.46099,
+        "rmsd": 2.02,
+        "aligned_length": 178,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.79349,
+        "tm_norm_structure2": 0.46101,
+        "rmsd": 2.48,
+        "aligned_length": 178,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.80485,
+        "tm_norm_structure2": 0.45926,
+        "rmsd": 1.97,
+        "aligned_length": 177,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.78911,
+        "tm_norm_structure2": 0.45387,
+        "rmsd": 1.88,
+        "aligned_length": 172,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.78714,
+        "tm_norm_structure2": 0.45271,
+        "rmsd": 2.31,
+        "aligned_length": 175,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.79839,
+        "tm_norm_structure2": 0.4518,
+        "rmsd": 1.84,
+        "aligned_length": 175,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.78827,
+        "tm_norm_structure2": 0.44768,
+        "rmsd": 2.44,
+        "aligned_length": 176,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.79746,
+        "tm_norm_structure2": 0.45924,
+        "rmsd": 1.77,
+        "aligned_length": 174,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.79468,
+        "tm_norm_structure2": 0.45845,
+        "rmsd": 2.35,
+        "aligned_length": 177,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.79501,
+        "tm_norm_structure2": 0.45302,
+        "rmsd": 1.91,
+        "aligned_length": 174,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.79004,
+        "tm_norm_structure2": 0.45445,
+        "rmsd": 2.39,
+        "aligned_length": 176,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.8016,
+        "tm_norm_structure2": 0.474,
+        "rmsd": 1.88,
+        "aligned_length": 175,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.7966,
+        "tm_norm_structure2": 0.45941,
+        "rmsd": 2.29,
+        "aligned_length": 177,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.79248,
+        "tm_norm_structure2": 0.45606,
+        "rmsd": 1.88,
+        "aligned_length": 173,
+        "error": null
+      }
+    ],
+    "reference": "7F1W_D.pdb",
+    "tm_reference_norm": 0.47547,
+    "tm_target_norm": 0.80901,
+    "top_pocket_residues": [],
+    "sites": [],
+    "has_mapped_site": false,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "P36117",
+    "gene": "ALY1",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.27598,
+        "tm_norm_structure2": 0.65261,
+        "rmsd": 3.8,
+        "aligned_length": 281,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.2718,
+        "tm_norm_structure2": 0.64942,
+        "rmsd": 4.38,
+        "aligned_length": 287,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.286,
+        "tm_norm_structure2": 0.65386,
+        "rmsd": 4.39,
+        "aligned_length": 301,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.28668,
+        "tm_norm_structure2": 0.653,
+        "rmsd": 4.1,
+        "aligned_length": 297,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.28782,
+        "tm_norm_structure2": 0.66552,
+        "rmsd": 4.43,
+        "aligned_length": 303,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.2829,
+        "tm_norm_structure2": 0.6348,
+        "rmsd": 4.59,
+        "aligned_length": 301,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.29019,
+        "tm_norm_structure2": 0.6528,
+        "rmsd": 4.54,
+        "aligned_length": 307,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.28615,
+        "tm_norm_structure2": 0.65435,
+        "rmsd": 4.39,
+        "aligned_length": 301,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.28836,
+        "tm_norm_structure2": 0.65326,
+        "rmsd": 4.28,
+        "aligned_length": 301,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.28497,
+        "tm_norm_structure2": 0.64692,
+        "rmsd": 4.5,
+        "aligned_length": 301,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.28583,
+        "tm_norm_structure2": 0.64679,
+        "rmsd": 4.55,
+        "aligned_length": 303,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.28826,
+        "tm_norm_structure2": 0.64456,
+        "rmsd": 4.47,
+        "aligned_length": 304,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.2856,
+        "tm_norm_structure2": 0.63937,
+        "rmsd": 4.51,
+        "aligned_length": 302,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.2874,
+        "tm_norm_structure2": 0.65387,
+        "rmsd": 4.48,
+        "aligned_length": 303,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.28484,
+        "tm_norm_structure2": 0.64638,
+        "rmsd": 4.47,
+        "aligned_length": 301,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.28817,
+        "tm_norm_structure2": 0.64843,
+        "rmsd": 4.55,
+        "aligned_length": 305,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.28511,
+        "tm_norm_structure2": 0.64649,
+        "rmsd": 4.48,
+        "aligned_length": 301,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.28391,
+        "tm_norm_structure2": 0.66189,
+        "rmsd": 4.37,
+        "aligned_length": 298,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.28532,
+        "tm_norm_structure2": 0.64816,
+        "rmsd": 4.43,
+        "aligned_length": 301,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.28507,
+        "tm_norm_structure2": 0.64878,
+        "rmsd": 4.41,
+        "aligned_length": 300,
+        "error": null
+      }
+    ],
+    "reference": "7F1W_D.pdb",
+    "tm_reference_norm": 0.66552,
+    "tm_target_norm": 0.28782,
+    "top_pocket_residues": [
+      378,
+      379,
+      380,
+      381,
+      383,
+      425,
+      440,
+      441,
+      442,
+      445,
+      452,
+      495,
+      496,
+      497,
+      502
+    ],
+    "sites": [
+      {
+        "copy": "IHP_D_501",
+        "pdb_id": "7F1W",
+        "reference_residues": [
+          15,
+          171,
+          298,
+          300,
+          301
+        ],
+        "mapping": {
+          "15": 30,
+          "171": 321
+        },
+        "mapped_residues": [
+          30,
+          321
+        ],
+        "fraction_mapped": 0.4,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_D_501",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "P38167",
+    "gene": "ECM21",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.23523,
+        "tm_norm_structure2": 0.67236,
+        "rmsd": 3.77,
+        "aligned_length": 288,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.23271,
+        "tm_norm_structure2": 0.6725,
+        "rmsd": 4.39,
+        "aligned_length": 294,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.23871,
+        "tm_norm_structure2": 0.66194,
+        "rmsd": 4.19,
+        "aligned_length": 298,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.24098,
+        "tm_norm_structure2": 0.65912,
+        "rmsd": 4.17,
+        "aligned_length": 301,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.24108,
+        "tm_norm_structure2": 0.67063,
+        "rmsd": 4.37,
+        "aligned_length": 304,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.23624,
+        "tm_norm_structure2": 0.64133,
+        "rmsd": 4.39,
+        "aligned_length": 298,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.24214,
+        "tm_norm_structure2": 0.65748,
+        "rmsd": 4.37,
+        "aligned_length": 305,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.2379,
+        "tm_norm_structure2": 0.65922,
+        "rmsd": 4.16,
+        "aligned_length": 297,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.24196,
+        "tm_norm_structure2": 0.65939,
+        "rmsd": 4.23,
+        "aligned_length": 303,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.23816,
+        "tm_norm_structure2": 0.65281,
+        "rmsd": 4.5,
+        "aligned_length": 301,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.23924,
+        "tm_norm_structure2": 0.65411,
+        "rmsd": 4.46,
+        "aligned_length": 302,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.24324,
+        "tm_norm_structure2": 0.65576,
+        "rmsd": 4.43,
+        "aligned_length": 307,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.23932,
+        "tm_norm_structure2": 0.64805,
+        "rmsd": 4.37,
+        "aligned_length": 301,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.24217,
+        "tm_norm_structure2": 0.66165,
+        "rmsd": 4.54,
+        "aligned_length": 307,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.23834,
+        "tm_norm_structure2": 0.65565,
+        "rmsd": 4.31,
+        "aligned_length": 299,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.24154,
+        "tm_norm_structure2": 0.6581,
+        "rmsd": 4.28,
+        "aligned_length": 303,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.23841,
+        "tm_norm_structure2": 0.65414,
+        "rmsd": 4.29,
+        "aligned_length": 299,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.23932,
+        "tm_norm_structure2": 0.67178,
+        "rmsd": 4.43,
+        "aligned_length": 302,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.23901,
+        "tm_norm_structure2": 0.65663,
+        "rmsd": 4.3,
+        "aligned_length": 300,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.239,
+        "tm_norm_structure2": 0.6593,
+        "rmsd": 4.13,
+        "aligned_length": 298,
+        "error": null
+      }
+    ],
+    "reference": "5TV1_A.pdb",
+    "tm_reference_norm": 0.6725,
+    "tm_target_norm": 0.23271,
+    "top_pocket_residues": [
+      342,
+      344,
+      348,
+      367,
+      369,
+      374,
+      419,
+      420,
+      421,
+      424,
+      425,
+      428,
+      429,
+      432,
+      474
+    ],
+    "sites": [
+      {
+        "copy": "IHP_A_401",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          192,
+          226,
+          227,
+          332
+        ],
+        "mapping": {},
+        "mapped_residues": [],
+        "fraction_mapped": 0.0,
+        "jaccard_top_pocket": 0.0
+      },
+      {
+        "copy": "IHP_A_402",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          233,
+          237,
+          251,
+          325,
+          327
+        ],
+        "mapping": {
+          "233": 625,
+          "237": 629,
+          "325": 844,
+          "327": 846
+        },
+        "mapped_residues": [
+          625,
+          629,
+          844,
+          846
+        ],
+        "fraction_mapped": 0.8,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_A_401",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "P43602",
+    "gene": "ROG3",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.34397,
+        "tm_norm_structure2": 0.67509,
+        "rmsd": 3.61,
+        "aligned_length": 279,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.33379,
+        "tm_norm_structure2": 0.67041,
+        "rmsd": 4.14,
+        "aligned_length": 280,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.34706,
+        "tm_norm_structure2": 0.66792,
+        "rmsd": 3.7,
+        "aligned_length": 284,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.35858,
+        "tm_norm_structure2": 0.68173,
+        "rmsd": 3.68,
+        "aligned_length": 293,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.35418,
+        "tm_norm_structure2": 0.68894,
+        "rmsd": 3.68,
+        "aligned_length": 290,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.34673,
+        "tm_norm_structure2": 0.65231,
+        "rmsd": 4.09,
+        "aligned_length": 290,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.35742,
+        "tm_norm_structure2": 0.67637,
+        "rmsd": 3.71,
+        "aligned_length": 293,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.34894,
+        "tm_norm_structure2": 0.66911,
+        "rmsd": 3.87,
+        "aligned_length": 288,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.35795,
+        "tm_norm_structure2": 0.67874,
+        "rmsd": 3.73,
+        "aligned_length": 293,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.35414,
+        "tm_norm_structure2": 0.67508,
+        "rmsd": 3.84,
+        "aligned_length": 292,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.34925,
+        "tm_norm_structure2": 0.66364,
+        "rmsd": 3.9,
+        "aligned_length": 289,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.35754,
+        "tm_norm_structure2": 0.66956,
+        "rmsd": 3.84,
+        "aligned_length": 295,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.34829,
+        "tm_norm_structure2": 0.65292,
+        "rmsd": 3.95,
+        "aligned_length": 289,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.35513,
+        "tm_norm_structure2": 0.67879,
+        "rmsd": 3.7,
+        "aligned_length": 291,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.3473,
+        "tm_norm_structure2": 0.66194,
+        "rmsd": 3.89,
+        "aligned_length": 287,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.35654,
+        "tm_norm_structure2": 0.67451,
+        "rmsd": 3.77,
+        "aligned_length": 293,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.34798,
+        "tm_norm_structure2": 0.66149,
+        "rmsd": 3.92,
+        "aligned_length": 288,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.35268,
+        "tm_norm_structure2": 0.68921,
+        "rmsd": 3.72,
+        "aligned_length": 290,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.34752,
+        "tm_norm_structure2": 0.6626,
+        "rmsd": 3.87,
+        "aligned_length": 287,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.35473,
+        "tm_norm_structure2": 0.67697,
+        "rmsd": 3.79,
+        "aligned_length": 292,
+        "error": null
+      }
+    ],
+    "reference": "7MOR_B.pdb",
+    "tm_reference_norm": 0.68921,
+    "tm_target_norm": 0.35268,
+    "top_pocket_residues": [
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      156,
+      196,
+      197,
+      200
+    ],
+    "sites": [
+      {
+        "copy": "5A3_B_501",
+        "pdb_id": "7MOR",
+        "reference_residues": [
+          15,
+          171,
+          173,
+          298,
+          300,
+          381
+        ],
+        "mapping": {
+          "171": 206,
+          "173": 208
+        },
+        "mapped_residues": [
+          206,
+          208
+        ],
+        "fraction_mapped": 0.3333333333333333,
+        "jaccard_top_pocket": 0.0
+      },
+      {
+        "copy": "5A3_C_502",
+        "pdb_id": "7MOR",
+        "reference_residues": [
+          161,
+          163,
+          165,
+          166
+        ],
+        "mapping": {},
+        "mapped_residues": [],
+        "fraction_mapped": 0.0,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "5A3_B_501",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "P47029",
+    "gene": "ALY2",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.2507,
+        "tm_norm_structure2": 0.66687,
+        "rmsd": 4.04,
+        "aligned_length": 292,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.24009,
+        "tm_norm_structure2": 0.64673,
+        "rmsd": 4.43,
+        "aligned_length": 287,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.25683,
+        "tm_norm_structure2": 0.66537,
+        "rmsd": 4.3,
+        "aligned_length": 304,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.25975,
+        "tm_norm_structure2": 0.66634,
+        "rmsd": 4.31,
+        "aligned_length": 307,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.25775,
+        "tm_norm_structure2": 0.6742,
+        "rmsd": 4.39,
+        "aligned_length": 306,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.25649,
+        "tm_norm_structure2": 0.65084,
+        "rmsd": 4.5,
+        "aligned_length": 307,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.25984,
+        "tm_norm_structure2": 0.66311,
+        "rmsd": 4.36,
+        "aligned_length": 308,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.2571,
+        "tm_norm_structure2": 0.66478,
+        "rmsd": 4.34,
+        "aligned_length": 305,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.25951,
+        "tm_norm_structure2": 0.66461,
+        "rmsd": 4.24,
+        "aligned_length": 306,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.25663,
+        "tm_norm_structure2": 0.66097,
+        "rmsd": 4.33,
+        "aligned_length": 304,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.25789,
+        "tm_norm_structure2": 0.66095,
+        "rmsd": 4.4,
+        "aligned_length": 307,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.25952,
+        "tm_norm_structure2": 0.65654,
+        "rmsd": 4.37,
+        "aligned_length": 308,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.25855,
+        "tm_norm_structure2": 0.65442,
+        "rmsd": 4.42,
+        "aligned_length": 308,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.25826,
+        "tm_norm_structure2": 0.66589,
+        "rmsd": 4.36,
+        "aligned_length": 306,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.25699,
+        "tm_norm_structure2": 0.66045,
+        "rmsd": 4.32,
+        "aligned_length": 305,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.25856,
+        "tm_norm_structure2": 0.66099,
+        "rmsd": 4.33,
+        "aligned_length": 306,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.25707,
+        "tm_norm_structure2": 0.65961,
+        "rmsd": 4.33,
+        "aligned_length": 305,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.25275,
+        "tm_norm_structure2": 0.66818,
+        "rmsd": 4.22,
+        "aligned_length": 298,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.25831,
+        "tm_norm_structure2": 0.66204,
+        "rmsd": 4.43,
+        "aligned_length": 308,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.25625,
+        "tm_norm_structure2": 0.65972,
+        "rmsd": 4.39,
+        "aligned_length": 304,
+        "error": null
+      }
+    ],
+    "reference": "7F1W_D.pdb",
+    "tm_reference_norm": 0.6742,
+    "tm_target_norm": 0.25775,
+    "top_pocket_residues": [
+      397,
+      399,
+      428,
+      430,
+      443,
+      444,
+      449
+    ],
+    "sites": [
+      {
+        "copy": "IHP_D_501",
+        "pdb_id": "7F1W",
+        "reference_residues": [
+          15,
+          171,
+          298,
+          300,
+          301
+        ],
+        "mapping": {
+          "15": 27,
+          "171": 334
+        },
+        "mapped_residues": [
+          27,
+          334
+        ],
+        "fraction_mapped": 0.4,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_D_501",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "Q02805",
+    "gene": "ROD1",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.30263,
+        "tm_norm_structure2": 0.67168,
+        "rmsd": 3.53,
+        "aligned_length": 278,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.29263,
+        "tm_norm_structure2": 0.66512,
+        "rmsd": 4.0,
+        "aligned_length": 276,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.30517,
+        "tm_norm_structure2": 0.66216,
+        "rmsd": 3.63,
+        "aligned_length": 283,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.31188,
+        "tm_norm_structure2": 0.6687,
+        "rmsd": 3.61,
+        "aligned_length": 289,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.30893,
+        "tm_norm_structure2": 0.67695,
+        "rmsd": 3.77,
+        "aligned_length": 288,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.3038,
+        "tm_norm_structure2": 0.64407,
+        "rmsd": 3.98,
+        "aligned_length": 287,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.31082,
+        "tm_norm_structure2": 0.66322,
+        "rmsd": 3.67,
+        "aligned_length": 289,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.30602,
+        "tm_norm_structure2": 0.66308,
+        "rmsd": 3.74,
+        "aligned_length": 285,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.31194,
+        "tm_norm_structure2": 0.66692,
+        "rmsd": 3.72,
+        "aligned_length": 290,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.30828,
+        "tm_norm_structure2": 0.66254,
+        "rmsd": 3.78,
+        "aligned_length": 288,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.30658,
+        "tm_norm_structure2": 0.65677,
+        "rmsd": 3.82,
+        "aligned_length": 287,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.31119,
+        "tm_norm_structure2": 0.65891,
+        "rmsd": 3.74,
+        "aligned_length": 290,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.30485,
+        "tm_norm_structure2": 0.64737,
+        "rmsd": 3.73,
+        "aligned_length": 284,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.30936,
+        "tm_norm_structure2": 0.66663,
+        "rmsd": 3.71,
+        "aligned_length": 288,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.30491,
+        "tm_norm_structure2": 0.65498,
+        "rmsd": 3.77,
+        "aligned_length": 285,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.31088,
+        "tm_norm_structure2": 0.6634,
+        "rmsd": 3.79,
+        "aligned_length": 290,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.30445,
+        "tm_norm_structure2": 0.65525,
+        "rmsd": 3.68,
+        "aligned_length": 283,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.30652,
+        "tm_norm_structure2": 0.67659,
+        "rmsd": 3.65,
+        "aligned_length": 285,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.30444,
+        "tm_norm_structure2": 0.65663,
+        "rmsd": 3.67,
+        "aligned_length": 283,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.3088,
+        "tm_norm_structure2": 0.66492,
+        "rmsd": 3.75,
+        "aligned_length": 288,
+        "error": null
+      }
+    ],
+    "reference": "7F1W_D.pdb",
+    "tm_reference_norm": 0.67695,
+    "tm_target_norm": 0.30893,
+    "top_pocket_residues": [
+      63,
+      65,
+      67,
+      68,
+      69,
+      86,
+      87,
+      88,
+      188,
+      189,
+      190,
+      206,
+      207,
+      208,
+      403,
+      404,
+      406,
+      407,
+      410,
+      411,
+      413
+    ],
+    "sites": [
+      {
+        "copy": "IHP_D_501",
+        "pdb_id": "7F1W",
+        "reference_residues": [
+          15,
+          171,
+          298,
+          300,
+          301
+        ],
+        "mapping": {
+          "171": 206
+        },
+        "mapped_residues": [
+          206
+        ],
+        "fraction_mapped": 0.2,
+        "jaccard_top_pocket": 0.047619047619047616
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_D_501",
+    "lead_jaccard": 0.047619047619047616,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "P53179",
+    "gene": "RIM8",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.44333,
+        "tm_norm_structure2": 0.64974,
+        "rmsd": 3.7,
+        "aligned_length": 277,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.44028,
+        "tm_norm_structure2": 0.66882,
+        "rmsd": 3.81,
+        "aligned_length": 280,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.45145,
+        "tm_norm_structure2": 0.65348,
+        "rmsd": 3.71,
+        "aligned_length": 282,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.45772,
+        "tm_norm_structure2": 0.6538,
+        "rmsd": 3.75,
+        "aligned_length": 287,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.45245,
+        "tm_norm_structure2": 0.66336,
+        "rmsd": 3.68,
+        "aligned_length": 282,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.45656,
+        "tm_norm_structure2": 0.65071,
+        "rmsd": 3.88,
+        "aligned_length": 289,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.45928,
+        "tm_norm_structure2": 0.65468,
+        "rmsd": 3.78,
+        "aligned_length": 288,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.45292,
+        "tm_norm_structure2": 0.65503,
+        "rmsd": 3.77,
+        "aligned_length": 284,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.45694,
+        "tm_norm_structure2": 0.65157,
+        "rmsd": 3.65,
+        "aligned_length": 285,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.45709,
+        "tm_norm_structure2": 0.65759,
+        "rmsd": 3.58,
+        "aligned_length": 285,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.45497,
+        "tm_norm_structure2": 0.65223,
+        "rmsd": 3.72,
+        "aligned_length": 286,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.45713,
+        "tm_norm_structure2": 0.64555,
+        "rmsd": 3.79,
+        "aligned_length": 288,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.45819,
+        "tm_norm_structure2": 0.64854,
+        "rmsd": 3.99,
+        "aligned_length": 291,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.46002,
+        "tm_norm_structure2": 0.66171,
+        "rmsd": 3.8,
+        "aligned_length": 289,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.45366,
+        "tm_norm_structure2": 0.65361,
+        "rmsd": 3.66,
+        "aligned_length": 283,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.45843,
+        "tm_norm_structure2": 0.65171,
+        "rmsd": 3.97,
+        "aligned_length": 291,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.45487,
+        "tm_norm_structure2": 0.65199,
+        "rmsd": 3.83,
+        "aligned_length": 287,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.45851,
+        "tm_norm_structure2": 0.67692,
+        "rmsd": 3.74,
+        "aligned_length": 287,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.45425,
+        "tm_norm_structure2": 0.65319,
+        "rmsd": 3.71,
+        "aligned_length": 285,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.45762,
+        "tm_norm_structure2": 0.65808,
+        "rmsd": 3.82,
+        "aligned_length": 288,
+        "error": null
+      }
+    ],
+    "reference": "7MOR_B.pdb",
+    "tm_reference_norm": 0.67692,
+    "tm_target_norm": 0.45851,
+    "top_pocket_residues": [
+      213,
+      214,
+      215,
+      216,
+      234,
+      261,
+      263,
+      288,
+      289,
+      290,
+      291,
+      292,
+      375,
+      376,
+      377,
+      378,
+      447,
+      448,
+      449,
+      450
+    ],
+    "sites": [
+      {
+        "copy": "5A3_B_501",
+        "pdb_id": "7MOR",
+        "reference_residues": [
+          15,
+          171,
+          173,
+          298,
+          300,
+          381
+        ],
+        "mapping": {
+          "171": 189,
+          "173": 191
+        },
+        "mapped_residues": [
+          189,
+          191
+        ],
+        "fraction_mapped": 0.3333333333333333,
+        "jaccard_top_pocket": 0.0
+      },
+      {
+        "copy": "5A3_C_502",
+        "pdb_id": "7MOR",
+        "reference_residues": [
+          161,
+          163,
+          165,
+          166
+        ],
+        "mapping": {
+          "161": 181,
+          "163": 183,
+          "165": 185
+        },
+        "mapped_residues": [
+          181,
+          183,
+          185
+        ],
+        "fraction_mapped": 0.75,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "5A3_B_501",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "P53244",
+    "gene": "ART5",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.42337,
+        "tm_norm_structure2": 0.66901,
+        "rmsd": 3.7,
+        "aligned_length": 282,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.40834,
+        "tm_norm_structure2": 0.6648,
+        "rmsd": 4.09,
+        "aligned_length": 281,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.42349,
+        "tm_norm_structure2": 0.65741,
+        "rmsd": 3.86,
+        "aligned_length": 286,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.44085,
+        "tm_norm_structure2": 0.67423,
+        "rmsd": 3.98,
+        "aligned_length": 300,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.43391,
+        "tm_norm_structure2": 0.678,
+        "rmsd": 4.11,
+        "aligned_length": 298,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.42125,
+        "tm_norm_structure2": 0.64217,
+        "rmsd": 4.24,
+        "aligned_length": 291,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.43937,
+        "tm_norm_structure2": 0.66897,
+        "rmsd": 4.08,
+        "aligned_length": 301,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.42604,
+        "tm_norm_structure2": 0.65988,
+        "rmsd": 4.11,
+        "aligned_length": 291,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.44098,
+        "tm_norm_structure2": 0.6723,
+        "rmsd": 4.04,
+        "aligned_length": 301,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.42925,
+        "tm_norm_structure2": 0.65845,
+        "rmsd": 4.14,
+        "aligned_length": 296,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.42515,
+        "tm_norm_structure2": 0.65325,
+        "rmsd": 4.13,
+        "aligned_length": 291,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.43729,
+        "tm_norm_structure2": 0.66141,
+        "rmsd": 3.93,
+        "aligned_length": 298,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.4233,
+        "tm_norm_structure2": 0.64213,
+        "rmsd": 4.11,
+        "aligned_length": 290,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.43234,
+        "tm_norm_structure2": 0.66456,
+        "rmsd": 4.05,
+        "aligned_length": 296,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.42231,
+        "tm_norm_structure2": 0.65036,
+        "rmsd": 4.12,
+        "aligned_length": 289,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.43613,
+        "tm_norm_structure2": 0.66507,
+        "rmsd": 3.97,
+        "aligned_length": 297,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.42276,
+        "tm_norm_structure2": 0.64976,
+        "rmsd": 4.11,
+        "aligned_length": 289,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.42674,
+        "tm_norm_structure2": 0.6715,
+        "rmsd": 3.97,
+        "aligned_length": 292,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.42303,
+        "tm_norm_structure2": 0.65138,
+        "rmsd": 4.17,
+        "aligned_length": 290,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.43208,
+        "tm_norm_structure2": 0.66442,
+        "rmsd": 3.98,
+        "aligned_length": 295,
+        "error": null
+      }
+    ],
+    "reference": "7F1W_D.pdb",
+    "tm_reference_norm": 0.678,
+    "tm_target_norm": 0.43391,
+    "top_pocket_residues": [
+      64,
+      66,
+      175,
+      219,
+      221,
+      225,
+      266,
+      267,
+      268,
+      297,
+      298,
+      299,
+      300
+    ],
+    "sites": [
+      {
+        "copy": "IHP_D_501",
+        "pdb_id": "7F1W",
+        "reference_residues": [
+          15,
+          171,
+          298,
+          300,
+          301
+        ],
+        "mapping": {
+          "171": 306
+        },
+        "mapped_residues": [
+          306
+        ],
+        "fraction_mapped": 0.2,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_D_501",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "P33757",
+    "gene": "SPO23",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.4632,
+        "tm_norm_structure2": 0.65792,
+        "rmsd": 3.88,
+        "aligned_length": 281,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.46272,
+        "tm_norm_structure2": 0.68501,
+        "rmsd": 3.79,
+        "aligned_length": 281,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.47786,
+        "tm_norm_structure2": 0.66839,
+        "rmsd": 4.0,
+        "aligned_length": 293,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.48258,
+        "tm_norm_structure2": 0.66911,
+        "rmsd": 3.72,
+        "aligned_length": 291,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.48466,
+        "tm_norm_structure2": 0.68788,
+        "rmsd": 3.83,
+        "aligned_length": 294,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.47762,
+        "tm_norm_structure2": 0.65984,
+        "rmsd": 4.11,
+        "aligned_length": 294,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.48537,
+        "tm_norm_structure2": 0.67048,
+        "rmsd": 3.88,
+        "aligned_length": 295,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.47895,
+        "tm_norm_structure2": 0.67066,
+        "rmsd": 4.02,
+        "aligned_length": 293,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.48334,
+        "tm_norm_structure2": 0.66824,
+        "rmsd": 3.78,
+        "aligned_length": 292,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.47541,
+        "tm_norm_structure2": 0.66246,
+        "rmsd": 3.97,
+        "aligned_length": 290,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.47707,
+        "tm_norm_structure2": 0.66212,
+        "rmsd": 4.03,
+        "aligned_length": 293,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.48473,
+        "tm_norm_structure2": 0.66464,
+        "rmsd": 3.93,
+        "aligned_length": 295,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.48243,
+        "tm_norm_structure2": 0.66046,
+        "rmsd": 4.19,
+        "aligned_length": 299,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.48038,
+        "tm_norm_structure2": 0.67039,
+        "rmsd": 3.83,
+        "aligned_length": 291,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.47738,
+        "tm_norm_structure2": 0.66358,
+        "rmsd": 4.15,
+        "aligned_length": 295,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.48226,
+        "tm_norm_structure2": 0.6665,
+        "rmsd": 3.93,
+        "aligned_length": 293,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.4793,
+        "tm_norm_structure2": 0.66578,
+        "rmsd": 4.02,
+        "aligned_length": 294,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.47795,
+        "tm_norm_structure2": 0.68292,
+        "rmsd": 3.8,
+        "aligned_length": 290,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.47865,
+        "tm_norm_structure2": 0.66545,
+        "rmsd": 4.08,
+        "aligned_length": 295,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.47809,
+        "tm_norm_structure2": 0.66765,
+        "rmsd": 3.81,
+        "aligned_length": 289,
+        "error": null
+      }
+    ],
+    "reference": "7F1W_D.pdb",
+    "tm_reference_norm": 0.68788,
+    "tm_target_norm": 0.48466,
+    "top_pocket_residues": [
+      33,
+      34,
+      35,
+      36,
+      38,
+      53,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120,
+      121,
+      122,
+      123,
+      124,
+      125,
+      126,
+      129,
+      131,
+      132,
+      133,
+      134,
+      135,
+      136,
+      137,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      147,
+      177,
+      179,
+      201,
+      202,
+      203,
+      204,
+      207,
+      208,
+      209,
+      212,
+      213,
+      214,
+      215,
+      247,
+      248,
+      249,
+      250,
+      251,
+      252,
+      253,
+      301,
+      302,
+      303,
+      304,
+      306,
+      307,
+      308,
+      432,
+      433,
+      434,
+      435,
+      436,
+      437,
+      438,
+      439,
+      440,
+      442,
+      443,
+      445,
+      448,
+      483,
+      484,
+      485,
+      486,
+      488,
+      489
+    ],
+    "sites": [
+      {
+        "copy": "IHP_D_501",
+        "pdb_id": "7F1W",
+        "reference_residues": [
+          15,
+          171,
+          298,
+          300,
+          301
+        ],
+        "mapping": {
+          "15": 91,
+          "171": 296
+        },
+        "mapped_residues": [
+          91,
+          296
+        ],
+        "fraction_mapped": 0.4,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_D_501",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "P10523",
+    "gene": "SAG",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.82079,
+        "tm_norm_structure2": 0.93456,
+        "rmsd": 1.88,
+        "aligned_length": 349,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.77306,
+        "tm_norm_structure2": 0.91999,
+        "rmsd": 2.2,
+        "aligned_length": 336,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.83054,
+        "tm_norm_structure2": 0.93363,
+        "rmsd": 2.1,
+        "aligned_length": 353,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.84383,
+        "tm_norm_structure2": 0.93575,
+        "rmsd": 2.16,
+        "aligned_length": 360,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.82834,
+        "tm_norm_structure2": 0.94412,
+        "rmsd": 1.86,
+        "aligned_length": 350,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.84205,
+        "tm_norm_structure2": 0.93405,
+        "rmsd": 2.13,
+        "aligned_length": 358,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.8447,
+        "tm_norm_structure2": 0.93416,
+        "rmsd": 2.22,
+        "aligned_length": 361,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.83104,
+        "tm_norm_structure2": 0.93427,
+        "rmsd": 2.1,
+        "aligned_length": 353,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.84693,
+        "tm_norm_structure2": 0.9368,
+        "rmsd": 2.16,
+        "aligned_length": 361,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.84261,
+        "tm_norm_structure2": 0.94243,
+        "rmsd": 2.06,
+        "aligned_length": 357,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.8357,
+        "tm_norm_structure2": 0.93178,
+        "rmsd": 2.15,
+        "aligned_length": 356,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.85331,
+        "tm_norm_structure2": 0.93639,
+        "rmsd": 2.17,
+        "aligned_length": 364,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.84443,
+        "tm_norm_structure2": 0.92898,
+        "rmsd": 2.24,
+        "aligned_length": 361,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.84168,
+        "tm_norm_structure2": 0.94128,
+        "rmsd": 2.06,
+        "aligned_length": 357,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.83514,
+        "tm_norm_structure2": 0.93383,
+        "rmsd": 2.13,
+        "aligned_length": 355,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.85052,
+        "tm_norm_structure2": 0.94098,
+        "rmsd": 2.04,
+        "aligned_length": 361,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.83732,
+        "tm_norm_structure2": 0.93381,
+        "rmsd": 2.14,
+        "aligned_length": 356,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.81741,
+        "tm_norm_structure2": 0.9394,
+        "rmsd": 2.1,
+        "aligned_length": 347,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.83663,
+        "tm_norm_structure2": 0.93564,
+        "rmsd": 2.1,
+        "aligned_length": 355,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.83964,
+        "tm_norm_structure2": 0.93897,
+        "rmsd": 2.15,
+        "aligned_length": 357,
+        "error": null
+      }
+    ],
+    "reference": "7F1W_D.pdb",
+    "tm_reference_norm": 0.94412,
+    "tm_target_norm": 0.82834,
+    "top_pocket_residues": [
+      18,
+      19,
+      70,
+      74,
+      150,
+      152,
+      175,
+      176,
+      177,
+      302,
+      305,
+      381,
+      382,
+      383,
+      384
+    ],
+    "sites": [
+      {
+        "copy": "IHP_D_501",
+        "pdb_id": "7F1W",
+        "reference_residues": [
+          15,
+          171,
+          298,
+          300,
+          301
+        ],
+        "mapping": {
+          "15": 19,
+          "171": 175,
+          "298": 302,
+          "300": 304,
+          "301": 305
+        },
+        "mapped_residues": [
+          19,
+          175,
+          302,
+          304,
+          305
+        ],
+        "fraction_mapped": 1.0,
+        "jaccard_top_pocket": 0.25
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_D_501",
+    "lead_jaccard": 0.25,
+    "overlap": true
+  },
+  {
+    "uniprot_id": "P36575",
+    "gene": "ARR3",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.86834,
+        "tm_norm_structure2": 0.94908,
+        "rmsd": 1.8,
+        "aligned_length": 352,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.75898,
+        "tm_norm_structure2": 0.86275,
+        "rmsd": 2.91,
+        "aligned_length": 333,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.86084,
+        "tm_norm_structure2": 0.92764,
+        "rmsd": 2.23,
+        "aligned_length": 355,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.87872,
+        "tm_norm_structure2": 0.93458,
+        "rmsd": 1.96,
+        "aligned_length": 359,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.85813,
+        "tm_norm_structure2": 0.93727,
+        "rmsd": 2.05,
+        "aligned_length": 352,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.86601,
+        "tm_norm_structure2": 0.92055,
+        "rmsd": 2.35,
+        "aligned_length": 360,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.87506,
+        "tm_norm_structure2": 0.92801,
+        "rmsd": 2.13,
+        "aligned_length": 360,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.86196,
+        "tm_norm_structure2": 0.92889,
+        "rmsd": 2.2,
+        "aligned_length": 355,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.88035,
+        "tm_norm_structure2": 0.93381,
+        "rmsd": 1.99,
+        "aligned_length": 360,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.86359,
+        "tm_norm_structure2": 0.9255,
+        "rmsd": 2.17,
+        "aligned_length": 356,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.86459,
+        "tm_norm_structure2": 0.92421,
+        "rmsd": 2.25,
+        "aligned_length": 357,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.88189,
+        "tm_norm_structure2": 0.92788,
+        "rmsd": 2.1,
+        "aligned_length": 363,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.87286,
+        "tm_norm_structure2": 0.92069,
+        "rmsd": 2.44,
+        "aligned_length": 363,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.86742,
+        "tm_norm_structure2": 0.92975,
+        "rmsd": 2.05,
+        "aligned_length": 356,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.86276,
+        "tm_norm_structure2": 0.92462,
+        "rmsd": 2.29,
+        "aligned_length": 357,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.87633,
+        "tm_norm_structure2": 0.92933,
+        "rmsd": 2.04,
+        "aligned_length": 360,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.86614,
+        "tm_norm_structure2": 0.92585,
+        "rmsd": 2.28,
+        "aligned_length": 358,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.84091,
+        "tm_norm_structure2": 0.92575,
+        "rmsd": 2.08,
+        "aligned_length": 346,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.86357,
+        "tm_norm_structure2": 0.92553,
+        "rmsd": 2.27,
+        "aligned_length": 357,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.86586,
+        "tm_norm_structure2": 0.92795,
+        "rmsd": 2.07,
+        "aligned_length": 356,
+        "error": null
+      }
+    ],
+    "reference": "1ZSH_A.pdb",
+    "tm_reference_norm": 0.94908,
+    "tm_target_norm": 0.86834,
+    "top_pocket_residues": [
+      7,
+      58,
+      62,
+      123,
+      124,
+      125,
+      139,
+      140,
+      142,
+      162,
+      163,
+      164,
+      165,
+      166,
+      287,
+      288,
+      289,
+      292,
+      294,
+      295,
+      367,
+      368,
+      369,
+      370,
+      373,
+      377
+    ],
+    "sites": [
+      {
+        "copy": "IHP_A_601",
+        "pdb_id": "1ZSH",
+        "reference_residues": [
+          232,
+          236,
+          250,
+          255,
+          324,
+          326
+        ],
+        "mapping": {
+          "232": 229,
+          "236": 233,
+          "250": 247,
+          "255": 252,
+          "324": 321,
+          "326": 323
+        },
+        "mapped_residues": [
+          229,
+          233,
+          247,
+          252,
+          321,
+          323
+        ],
+        "fraction_mapped": 1.0,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_A_601",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "P49407",
+    "gene": "ARRB1",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.81502,
+        "tm_norm_structure2": 0.9582,
+        "rmsd": 1.9,
+        "aligned_length": 354,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.75206,
+        "tm_norm_structure2": 0.92407,
+        "rmsd": 2.3,
+        "aligned_length": 335,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.80705,
+        "tm_norm_structure2": 0.93456,
+        "rmsd": 1.96,
+        "aligned_length": 355,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.82242,
+        "tm_norm_structure2": 0.94037,
+        "rmsd": 1.82,
+        "aligned_length": 359,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.80733,
+        "tm_norm_structure2": 0.94844,
+        "rmsd": 1.8,
+        "aligned_length": 352,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.81845,
+        "tm_norm_structure2": 0.93531,
+        "rmsd": 1.98,
+        "aligned_length": 360,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.82376,
+        "tm_norm_structure2": 0.93936,
+        "rmsd": 1.85,
+        "aligned_length": 360,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.80715,
+        "tm_norm_structure2": 0.93473,
+        "rmsd": 1.98,
+        "aligned_length": 355,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.82501,
+        "tm_norm_structure2": 0.9409,
+        "rmsd": 1.83,
+        "aligned_length": 360,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.81833,
+        "tm_norm_structure2": 0.94363,
+        "rmsd": 1.78,
+        "aligned_length": 356,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.81168,
+        "tm_norm_structure2": 0.93222,
+        "rmsd": 2.03,
+        "aligned_length": 358,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.83195,
+        "tm_norm_structure2": 0.9414,
+        "rmsd": 1.82,
+        "aligned_length": 363,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.82118,
+        "tm_norm_structure2": 0.93071,
+        "rmsd": 2.1,
+        "aligned_length": 363,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.81814,
+        "tm_norm_structure2": 0.94334,
+        "rmsd": 1.76,
+        "aligned_length": 356,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.81008,
+        "tm_norm_structure2": 0.93294,
+        "rmsd": 2.02,
+        "aligned_length": 357,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.82737,
+        "tm_norm_structure2": 0.94385,
+        "rmsd": 1.76,
+        "aligned_length": 360,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.81399,
+        "tm_norm_structure2": 0.93525,
+        "rmsd": 2.0,
+        "aligned_length": 358,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.79455,
+        "tm_norm_structure2": 0.94134,
+        "rmsd": 1.79,
+        "aligned_length": 346,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.81177,
+        "tm_norm_structure2": 0.9351,
+        "rmsd": 1.98,
+        "aligned_length": 357,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.81825,
+        "tm_norm_structure2": 0.94354,
+        "rmsd": 1.79,
+        "aligned_length": 356,
+        "error": null
+      }
+    ],
+    "reference": "1ZSH_A.pdb",
+    "tm_reference_norm": 0.9582,
+    "tm_target_norm": 0.81502,
+    "top_pocket_residues": [
+      145,
+      147,
+      160,
+      163,
+      164,
+      165
+    ],
+    "sites": [
+      {
+        "copy": "IHP_A_601",
+        "pdb_id": "1ZSH",
+        "reference_residues": [
+          232,
+          236,
+          250,
+          255,
+          324,
+          326
+        ],
+        "mapping": {
+          "232": 232,
+          "236": 236,
+          "250": 250,
+          "255": 255,
+          "324": 324,
+          "326": 326
+        },
+        "mapped_residues": [
+          232,
+          236,
+          250,
+          255,
+          324,
+          326
+        ],
+        "fraction_mapped": 1.0,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_A_601",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  },
+  {
+    "uniprot_id": "P32121",
+    "gene": "ARRB2",
+    "alignments": [
+      {
+        "reference": "1ZSH_A.pdb",
+        "tm_norm_structure1": 0.81491,
+        "tm_norm_structure2": 0.93699,
+        "rmsd": 1.88,
+        "aligned_length": 349,
+        "error": null
+      },
+      {
+        "reference": "5TV1_A.pdb",
+        "tm_norm_structure1": 0.77983,
+        "tm_norm_structure2": 0.9394,
+        "rmsd": 2.07,
+        "aligned_length": 337,
+        "error": null
+      },
+      {
+        "reference": "7F1W_A.pdb",
+        "tm_norm_structure1": 0.80587,
+        "tm_norm_structure2": 0.91335,
+        "rmsd": 2.13,
+        "aligned_length": 349,
+        "error": null
+      },
+      {
+        "reference": "7F1W_B.pdb",
+        "tm_norm_structure1": 0.81509,
+        "tm_norm_structure2": 0.91181,
+        "rmsd": 2.24,
+        "aligned_length": 353,
+        "error": null
+      },
+      {
+        "reference": "7F1W_D.pdb",
+        "tm_norm_structure1": 0.79855,
+        "tm_norm_structure2": 0.91751,
+        "rmsd": 2.26,
+        "aligned_length": 346,
+        "error": null
+      },
+      {
+        "reference": "7F1X_A.pdb",
+        "tm_norm_structure1": 0.81301,
+        "tm_norm_structure2": 0.90922,
+        "rmsd": 2.21,
+        "aligned_length": 353,
+        "error": null
+      },
+      {
+        "reference": "7F1X_B.pdb",
+        "tm_norm_structure1": 0.8153,
+        "tm_norm_structure2": 0.90949,
+        "rmsd": 2.3,
+        "aligned_length": 354,
+        "error": null
+      },
+      {
+        "reference": "7F1X_C.pdb",
+        "tm_norm_structure1": 0.80512,
+        "tm_norm_structure2": 0.91247,
+        "rmsd": 2.17,
+        "aligned_length": 349,
+        "error": null
+      },
+      {
+        "reference": "7F1X_D.pdb",
+        "tm_norm_structure1": 0.81698,
+        "tm_norm_structure2": 0.91148,
+        "rmsd": 2.25,
+        "aligned_length": 354,
+        "error": null
+      },
+      {
+        "reference": "7JTB_B.pdb",
+        "tm_norm_structure1": 0.81811,
+        "tm_norm_structure2": 0.92255,
+        "rmsd": 2.22,
+        "aligned_length": 354,
+        "error": null
+      },
+      {
+        "reference": "7JTB_C.pdb",
+        "tm_norm_structure1": 0.80987,
+        "tm_norm_structure2": 0.91035,
+        "rmsd": 2.21,
+        "aligned_length": 352,
+        "error": null
+      },
+      {
+        "reference": "7JTB_D.pdb",
+        "tm_norm_structure1": 0.82357,
+        "tm_norm_structure2": 0.91186,
+        "rmsd": 2.06,
+        "aligned_length": 355,
+        "error": null
+      },
+      {
+        "reference": "7JXA_A.pdb",
+        "tm_norm_structure1": 0.81815,
+        "tm_norm_structure2": 0.90769,
+        "rmsd": 2.43,
+        "aligned_length": 357,
+        "error": null
+      },
+      {
+        "reference": "7JXA_B.pdb",
+        "tm_norm_structure1": 0.8134,
+        "tm_norm_structure2": 0.91727,
+        "rmsd": 2.24,
+        "aligned_length": 352,
+        "error": null
+      },
+      {
+        "reference": "7JXA_C.pdb",
+        "tm_norm_structure1": 0.80938,
+        "tm_norm_structure2": 0.91231,
+        "rmsd": 2.15,
+        "aligned_length": 351,
+        "error": null
+      },
+      {
+        "reference": "7JXA_D.pdb",
+        "tm_norm_structure1": 0.8224,
+        "tm_norm_structure2": 0.91787,
+        "rmsd": 2.04,
+        "aligned_length": 354,
+        "error": null
+      },
+      {
+        "reference": "7MOR_A.pdb",
+        "tm_norm_structure1": 0.81121,
+        "tm_norm_structure2": 0.91219,
+        "rmsd": 2.26,
+        "aligned_length": 352,
+        "error": null
+      },
+      {
+        "reference": "7MOR_B.pdb",
+        "tm_norm_structure1": 0.78728,
+        "tm_norm_structure2": 0.912,
+        "rmsd": 2.09,
+        "aligned_length": 340,
+        "error": null
+      },
+      {
+        "reference": "7MOR_C.pdb",
+        "tm_norm_structure1": 0.81075,
+        "tm_norm_structure2": 0.91407,
+        "rmsd": 2.14,
+        "aligned_length": 351,
+        "error": null
+      },
+      {
+        "reference": "7MOR_D.pdb",
+        "tm_norm_structure1": 0.81319,
+        "tm_norm_structure2": 0.91705,
+        "rmsd": 2.09,
+        "aligned_length": 351,
+        "error": null
+      }
+    ],
+    "reference": "5TV1_A.pdb",
+    "tm_reference_norm": 0.9394,
+    "tm_target_norm": 0.77983,
+    "top_pocket_residues": [
+      16,
+      18,
+      48,
+      52,
+      151,
+      152,
+      153,
+      157,
+      158,
+      159,
+      160,
+      162,
+      163
+    ],
+    "sites": [
+      {
+        "copy": "IHP_A_401",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          192,
+          226,
+          227,
+          332
+        ],
+        "mapping": {
+          "226": 226,
+          "227": 227,
+          "332": 332
+        },
+        "mapped_residues": [
+          226,
+          227,
+          332
+        ],
+        "fraction_mapped": 0.75,
+        "jaccard_top_pocket": 0.0
+      },
+      {
+        "copy": "IHP_A_402",
+        "pdb_id": "5TV1",
+        "reference_residues": [
+          233,
+          237,
+          251,
+          325,
+          327
+        ],
+        "mapping": {
+          "233": 233,
+          "237": 237,
+          "251": 251,
+          "325": 325,
+          "327": 327
+        },
+        "mapped_residues": [
+          233,
+          237,
+          251,
+          325,
+          327
+        ],
+        "fraction_mapped": 1.0,
+        "jaccard_top_pocket": 0.0
+      }
+    ],
+    "has_mapped_site": true,
+    "lead_site": "IHP_A_401",
+    "lead_jaccard": 0.0,
+    "overlap": false
+  }
+]

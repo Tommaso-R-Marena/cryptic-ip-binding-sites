@@ -1,0 +1,64 @@
+name: Hull gate
+
+# docs/HULL_GATE_PLAN.md: re-aggregate the proteome screen (run 35935291031)
+# with the calibrated hull-depth gate at 10 A, at 5 A and without it; compare the
+# protein rankings on unseen proteins (learned-screen run 35992676292) against
+# UniProt IP annotations; decide keep, relax or remove by the plan's rule.
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/HULL_GATE_PLAN.md'
+      - 'scripts/hull_gate.py'
+      - '.github/workflows/hull-gate.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: hull-gate-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  SCREEN_RUN: '35935291031'
+  LEARNED_SCREEN_RUN: '35992676292'
+
+jobs:
+  decide:
+    name: Decide the gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Screen shards and the learned screen's protein table
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$SCREEN_RUN" --repo "$GITHUB_REPOSITORY" --pattern 'shard-*' --dir screen/shards
+          gh run download "$LEARNED_SCREEN_RUN" --repo "$GITHUB_REPOSITORY" --name learned-screen --dir ls
+          find screen -name '*_pockets_part*.csv.gz' | wc -l
+      - name: Evaluate and decide
+        run: |
+          python scripts/hull_gate.py --shards-dir screen/shards \
+            --proteins "$(find ls -name 'proteins.csv.gz' | head -1)" --out-dir results/hull_gate
+          cat results/hull_gate/HULL_GATE.md >> "$GITHUB_STEP_SUMMARY"
+          python scripts/extract_log_block.py emit HULL_GATE_JSON results/hull_gate/hull_gate.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: hull-gate-report
+          path: results/hull_gate
+          retention-days: 90

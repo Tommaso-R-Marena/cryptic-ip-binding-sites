@@ -101,6 +101,12 @@ PLAN_CRITERIA = HitCriteria()
 #: sit between ADAR2 and the highest negative; they rest on one positive and
 #: four negatives, and are reported beside the plan's criteria, not instead.
 #: A test fails if a scorer change stops them separating the controls.
+#:
+#: The hull-depth gate was re-examined by docs/HULL_GATE_PLAN.md (run 36020459316,
+#: results/hull_gate/). Removing it raised the protein ranking's ROC-AUC for annotated
+#: IP binders among unseen proteins, but not by enough to meet the plan's
+#: non-inferiority rule (the lower bound of the paired difference fell below -0.01),
+#: so by the rule fixed in advance the 10 A gate is **kept**.
 CALIBRATED_CRITERIA = HitCriteria(min_score=0.54, max_sasa=float("inf"), min_hull_depth=10.0)
 
 

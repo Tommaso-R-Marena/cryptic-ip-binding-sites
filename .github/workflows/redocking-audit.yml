@@ -1,0 +1,77 @@
+name: Redocking audit
+
+# A data-quality audit of the redocking census (results/redocking/ledger.jsonl):
+# for every copy excluded because its configuration differs from the CCD
+# template, which stereocentres differ and how well the deposited coordinates
+# define them. Reads the census of a finished redocking census job; docks nothing.
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'scripts/redocking_audit.py'
+      - '.github/workflows/redocking-audit.yml'
+  workflow_dispatch:
+    inputs:
+      census_run:
+        description: 'redocking run holding the redocking-census and redocking-inputs artifacts'
+        default: '36020459246'
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  CENSUS_RUN: ${{ inputs.census_run || '36020459246' }}
+  PY_DOCKING: 'rdkit==2026.3.6 vina==1.2.7 meeko==0.8.0 gemmi==0.7.5 pdb2pqr==3.6.1 propka==3.5.1'
+
+jobs:
+  audit:
+    name: Configuration exclusions
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+      - name: Census and entries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-census --dir census
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-inputs --dir bench
+      - name: Restore structures
+        uses: actions/cache/restore@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch the entries with an excluded copy
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          c = pd.read_csv("census/census.csv")
+          ids = sorted(c.loc[c["status"] == "excluded: configuration differs from the CCD", "pdb_id"].unique())
+          open("audit_ids.txt", "w").write("\n".join(ids) + "\n")
+          print(len(ids), "entries")
+          PY
+          python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file audit_ids.txt
+      - name: Audit
+        run: |
+          python scripts/redocking_audit.py --census census/census.csv --structures-dir data/redock/structures \
+            --ccd-dir census/ccd --output audit/configuration_audit.csv
+          python scripts/extract_log_block.py emit REDOCKING_AUDIT_B64 audit/configuration_audit.csv
+          python scripts/extract_log_block.py emit REDOCKING_CENSUS_B64 census/census.csv
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: redocking-audit
+          path: audit
+          retention-days: 90

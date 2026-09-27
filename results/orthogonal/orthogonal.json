@@ -1,0 +1,119 @@
+{
+  "plan": "docs/ORTHOGONAL_PLAN.md",
+  "I1": {
+    "question": "mean pocket disorder, candidates - matched controls",
+    "pairs": 75,
+    "clusters": 65,
+    "estimate": {
+      "point": -0.0930200563170589,
+      "low": -0.14896415663130866,
+      "high": -0.040457501815130505,
+      "p_value": 0.001
+    },
+    "per_copy": {
+      "point": -0.08935542273024719,
+      "low": -0.14239035991365254,
+      "high": -0.03951485744193681,
+      "p_value": 0.001
+    },
+    "decision": "candidates more ordered"
+  },
+  "holm": {
+    "I1": 0.001
+  },
+  "I2": {
+    "rates": {
+      "candidate": {
+        "n": 75,
+        "scored": 75,
+        "estimate": {
+          "copies": 75,
+          "groups": 65,
+          "evidence": true,
+          "per_copy": {
+            "point": 0.013333333333333334,
+            "low": 0.0,
+            "high": 0.043478260869565216,
+            "p_value": 0.712
+          },
+          "per_group": {
+            "point": 0.015384615384615385,
+            "low": 0.0,
+            "high": 0.046153846153846156,
+            "p_value": 0.712
+          }
+        }
+      },
+      "control": {
+        "n": 75,
+        "scored": 75,
+        "estimate": {
+          "copies": 75,
+          "groups": 72,
+          "evidence": true,
+          "per_copy": {
+            "point": 0.10666666666666667,
+            "low": 0.04054054054054054,
+            "high": 0.17811731647348067,
+            "p_value": 0.0
+          },
+          "per_group": {
+            "point": 0.1111111111111111,
+            "low": 0.041666666666666664,
+            "high": 0.18055555555555555,
+            "p_value": 0.0
+          }
+        }
+      },
+      "positive": {
+        "n": 34,
+        "scored": 34,
+        "estimate": {
+          "copies": 34,
+          "groups": 28,
+          "evidence": true,
+          "per_copy": {
+            "point": 0.0,
+            "low": 0.0,
+            "high": 0.0,
+            "p_value": 1.0
+          },
+          "per_group": {
+            "point": 0.0,
+            "low": 0.0,
+            "high": 0.0,
+            "p_value": 1.0
+          }
+        }
+      }
+    },
+    "informative": true,
+    "demoted": [
+      "P53244"
+    ],
+    "note": "annotated binders are rarely flagged, so a flagged candidate is demoted"
+  },
+  "I3": {
+    "question": "shark-capture motif support, candidates - matched controls",
+    "pairs": 16,
+    "clusters": 15,
+    "estimate": {
+      "point": -0.1322222222222222,
+      "low": -0.3478055555555556,
+      "high": 0.05336111111111096,
+      "p_value": 0.214
+    },
+    "failures": 74,
+    "note": "descriptive: orthogonal to study H's MAFFT criterion, not combined with it"
+  },
+  "I4": {
+    "queries": 0,
+    "with_remote_homologues": 0,
+    "counts": {},
+    "note": "a within-proteome remote hit is not an orthologue set: study H's conservation criterion is not re-run on these"
+  },
+  "notes": [
+    "The controls are already pLDDT-matched, so I1 asks whether sequence disorder carries information beyond AlphaFold's confidence. A null is a real answer.",
+    "No sequence tool speaks to ligand identity; study C measured that and found the descriptors too weak to change a ranking."
+  ]
+}

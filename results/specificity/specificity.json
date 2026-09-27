@@ -1,0 +1,1373 @@
+{
+  "plan": "docs/SPECIFICITY_PLAN.md",
+  "decisions": {
+    "all": {
+      "permutation_null": "chance",
+      "sequence_cv": {
+        "roc_auc": {
+          "point": 0.8621185688790797,
+          "low": 0.8020321964681593,
+          "high": 0.9054810579864147,
+          "p_value": 0.0
+        },
+        "pr_auc": {
+          "point": 0.7328940662130186,
+          "low": 0.6142490388461319,
+          "high": 0.8129623672755232,
+          "p_value": 0.0
+        },
+        "pockets": 3497,
+        "positives": 734,
+        "groups": 446,
+        "positive_groups": 64
+      },
+      "strict_cv": {
+        "roc_auc": {
+          "point": 0.8181980452081368,
+          "low": 0.6987625363812119,
+          "high": 0.8859746838003955,
+          "p_value": 0.0
+        },
+        "pr_auc": {
+          "point": 0.6361299274432055,
+          "low": 0.4696613674786823,
+          "high": 0.7879111101451042,
+          "p_value": 0.001
+        },
+        "pockets": 3497,
+        "positives": 734,
+        "groups": 111,
+        "positive_groups": 21
+      },
+      "holdout": {
+        "roc_auc": {
+          "point": 0.8429175475687104,
+          "low": 0.7672677637456958,
+          "high": 0.9308949401132063,
+          "p_value": 0.0
+        },
+        "pr_auc": {
+          "point": 0.8815210621755581,
+          "low": 0.6883330233395337,
+          "high": 0.9588893337634968,
+          "p_value": 0.027
+        },
+        "pockets": 141,
+        "positives": 86,
+        "groups": 28,
+        "positive_groups": 8
+      },
+      "largest_group_share": {
+        "ip": {
+          "sequence": 0.2547683923705722,
+          "strict": 0.49318801089918257
+        },
+        "other": {
+          "sequence": 0.2634817227651104,
+          "strict": 0.5906623235613464
+        }
+      },
+      "not_evaluable_runs": [],
+      "holdout_powered": true,
+      "decision": "not evaluable: one group holds > 40 % of IP pockets under ['strict']",
+      "reason": "forty_percent_rule",
+      "p_value_sequence": 0.0
+    },
+    "no_supergroup": {
+      "permutation_null": "chance",
+      "sequence_cv": {
+        "roc_auc": {
+          "point": 0.8302157509610235,
+          "low": 0.7312987164008767,
+          "high": 0.9016871591352338,
+          "p_value": 0.0
+        },
+        "pr_auc": {
+          "point": 0.6950285971095691,
+          "low": 0.4914019669856553,
+          "high": 0.8215615948319241,
+          "p_value": 0.001
+        },
+        "pockets": 1503,
+        "positives": 372,
+        "groups": 240,
+        "positive_groups": 32
+      },
+      "strict_cv": {
+        "roc_auc": {
+          "point": 0.7572991833281043,
+          "low": 0.5801961317844244,
+          "high": 0.8783509284260275,
+          "p_value": 0.008
+        },
+        "pr_auc": {
+          "point": 0.6565130721841189,
+          "low": 0.40036460459298084,
+          "high": 0.8014716376139828,
+          "p_value": 0.004
+        },
+        "pockets": 1503,
+        "positives": 372,
+        "groups": 110,
+        "positive_groups": 20
+      },
+      "holdout": {
+        "roc_auc": {
+          "point": 0.7418604651162791,
+          "low": 0.6243468514516034,
+          "high": 0.84373477124183,
+          "p_value": 0.0
+        },
+        "pr_auc": {
+          "point": 0.8102442410716076,
+          "low": 0.5266012377840598,
+          "high": 0.9268208314419111,
+          "p_value": 0.113
+        },
+        "pockets": 141,
+        "positives": 86,
+        "groups": 28,
+        "positive_groups": 8
+      },
+      "largest_group_share": {
+        "ip": {
+          "sequence": 0.1424731182795699,
+          "strict": 0.17204301075268819
+        },
+        "other": {
+          "sequence": 0.046861184792219276,
+          "strict": 0.08576480990274093
+        }
+      },
+      "not_evaluable_runs": [],
+      "holdout_powered": true,
+      "decision": "learnable",
+      "p_value_sequence": 0.0
+    },
+    "xray25": {
+      "permutation_null": "chance",
+      "sequence_cv": {
+        "roc_auc": {
+          "point": 0.8119308320263804,
+          "low": 0.7039046362773694,
+          "high": 0.898896291891711,
+          "p_value": 0.0
+        },
+        "pr_auc": {
+          "point": 0.5494582013059778,
+          "low": 0.40106077406596596,
+          "high": 0.6714129299229411,
+          "p_value": 0.0
+        },
+        "pockets": 3138,
+        "positives": 375,
+        "groups": 433,
+        "positive_groups": 48
+      },
+      "strict_cv": {
+        "roc_auc": {
+          "point": 0.8592669803353843,
+          "low": 0.6803620885676551,
+          "high": 0.9251601392963501,
+          "p_value": 0.0
+        },
+        "pr_auc": {
+          "point": 0.6437446370738201,
+          "low": 0.40912199528049853,
+          "high": 0.8081801641958951,
+          "p_value": 0.001
+        },
+        "pockets": 3138,
+        "positives": 375,
+        "groups": 111,
+        "positive_groups": 21
+      },
+      "holdout": {
+        "roc_auc": {
+          "point": 0.7727272727272727,
+          "low": 0.6934742399784772,
+          "high": 0.9480687416032244,
+          "p_value": 0.0
+        },
+        "pr_auc": {
+          "point": 0.363963117019383,
+          "low": 0.12140033879164314,
+          "high": 0.6948909496695159,
+          "p_value": 0.10948905109489052
+        },
+        "pockets": 65,
+        "positives": 10,
+        "groups": 23,
+        "positive_groups": 3
+      },
+      "largest_group_share": {
+        "ip": {
+          "sequence": 0.14666666666666667,
+          "strict": 0.34933333333333333
+        },
+        "other": {
+          "sequence": 0.2634817227651104,
+          "strict": 0.5906623235613464
+        }
+      },
+      "not_evaluable_runs": [],
+      "holdout_powered": false,
+      "decision": "learnable",
+      "p_value_sequence": 0.0
+    }
+  },
+  "gate": {
+    "open": true,
+    "variant": "no_supergroup",
+    "s1r_point": 0.8119308320263804,
+    "reason": "opened"
+  },
+  "prepare": {
+    "plan": "docs/SPECIFICITY_PLAN.md",
+    "ip_table_sha256": "a21d92fd0f57306848c260d1f163017f0bf1e82a5dfcf1f3be69e0c20b698a1d",
+    "transfer_table_sha256": "33cc8abf6dbcd08312eaea75e7af3c69895f911b8df59714f4db69b3984c0d23",
+    "supergroup": "G:10JT",
+    "variants": {
+      "all": {
+        "pockets": 3638,
+        "entries": 1522,
+        "holdout_entries": 58,
+        "development": {
+          "ip": {
+            "pockets": 734,
+            "groups": {
+              "sequence": 64,
+              "strict": 21
+            }
+          },
+          "other": {
+            "pockets": 2763,
+            "groups": {
+              "sequence": 391,
+              "strict": 97
+            }
+          }
+        },
+        "holdout": {
+          "ip": {
+            "pockets": 86,
+            "groups": {
+              "sequence": 8,
+              "strict": 8
+            }
+          },
+          "other": {
+            "pockets": 55,
+            "groups": {
+              "sequence": 20,
+              "strict": 20
+            }
+          }
+        },
+        "largest_group_share": {
+          "ip": {
+            "sequence": 0.2547683923705722,
+            "strict": 0.49318801089918257
+          },
+          "other": {
+            "sequence": 0.2634817227651104,
+            "strict": 0.5906623235613464
+          }
+        },
+        "tasks": {
+          "ip_site": {
+            "largest_group_positive_share": {
+              "sequence": 0.2547683923705722,
+              "strict": 0.49318801089918257
+            }
+          }
+        }
+      },
+      "no_supergroup": {
+        "pockets": 1644,
+        "entries": 665,
+        "holdout_entries": 58,
+        "development": {
+          "ip": {
+            "pockets": 372,
+            "groups": {
+              "sequence": 32,
+              "strict": 20
+            }
+          },
+          "other": {
+            "pockets": 1131,
+            "groups": {
+              "sequence": 210,
+              "strict": 96
+            }
+          }
+        },
+        "holdout": {
+          "ip": {
+            "pockets": 86,
+            "groups": {
+              "sequence": 8,
+              "strict": 8
+            }
+          },
+          "other": {
+            "pockets": 55,
+            "groups": {
+              "sequence": 20,
+              "strict": 20
+            }
+          }
+        },
+        "largest_group_share": {
+          "ip": {
+            "sequence": 0.1424731182795699,
+            "strict": 0.17204301075268819
+          },
+          "other": {
+            "sequence": 0.046861184792219276,
+            "strict": 0.08576480990274093
+          }
+        },
+        "tasks": {
+          "ip_site": {
+            "largest_group_positive_share": {
+              "sequence": 0.1424731182795699,
+              "strict": 0.17204301075268819
+            }
+          }
+        }
+      },
+      "xray25": {
+        "pockets": 3203,
+        "entries": 1346,
+        "holdout_entries": 29,
+        "development": {
+          "ip": {
+            "pockets": 375,
+            "groups": {
+              "sequence": 48,
+              "strict": 21
+            }
+          },
+          "other": {
+            "pockets": 2763,
+            "groups": {
+              "sequence": 391,
+              "strict": 97
+            }
+          }
+        },
+        "holdout": {
+          "ip": {
+            "pockets": 10,
+            "groups": {
+              "sequence": 3,
+              "strict": 3
+            }
+          },
+          "other": {
+            "pockets": 55,
+            "groups": {
+              "sequence": 20,
+              "strict": 20
+            }
+          }
+        },
+        "largest_group_share": {
+          "ip": {
+            "sequence": 0.14666666666666667,
+            "strict": 0.34933333333333333
+          },
+          "other": {
+            "sequence": 0.2634817227651104,
+            "strict": 0.5906623235613464
+          }
+        },
+        "tasks": {
+          "ip_site": {
+            "largest_group_positive_share": {
+              "sequence": 0.14666666666666667,
+              "strict": 0.34933333333333333
+            }
+          }
+        }
+      }
+    }
+  },
+  "rerank": {
+    "ran": true,
+    "variant": "no_supergroup",
+    "specificity_model": {
+      "family": "extra_trees",
+      "max_depth": 12,
+      "max_features": "sqrt",
+      "min_samples_leaf": 8
+    },
+    "proteins_scored": 37384,
+    "proteins_seen": 4300,
+    "unseen": 33084,
+    "annotated_unseen": 34,
+    "L1_same_proteins": {
+      "point": 0.8435783572127792,
+      "low": 0.7707489171658279,
+      "high": 0.901615956951748,
+      "p_value": 0.0
+    },
+    "L3a_combined": {
+      "point": 0.8283492035240723,
+      "low": 0.7558001663730536,
+      "high": 0.8858787915488381,
+      "p_value": 0.0
+    },
+    "L3b_combined_minus_L1": {
+      "point": -0.01522915368870692,
+      "low": -0.04440244378740147,
+      "high": 0.014701881316962987,
+      "p_value": 0.321
+    },
+    "holm": {
+      "S1": 0.0,
+      "L3a": 0.0,
+      "L3b": 0.321
+    },
+    "decisions": {
+      "L3a": "supported",
+      "L3b": "not supported",
+      "S1_holm_p": 0.0
+    },
+    "per_organism": {
+      "dictyostelium": {
+        "binders": 4,
+        "roc_auc": {
+          "point": 0.8689196832579186,
+          "low": 0.7188673793701242,
+          "high": 0.9622245540398741,
+          "p_value": 0.0
+        }
+      },
+      "human": {
+        "binders": 26,
+        "roc_auc": {
+          "point": 0.795880779180578,
+          "low": 0.6994942582570144,
+          "high": 0.8707012406662181,
+          "p_value": 0.0
+        }
+      },
+      "yeast": {
+        "binders": 4,
+        "roc_auc": {
+          "point": 0.9160887656033287,
+          "low": 0.7268717436963255,
+          "high": 0.9920704892241444,
+          "p_value": 0.0
+        }
+      }
+    },
+    "candidates_explained": 30,
+    "candidates_unexplained": 45,
+    "candidates": [
+      {
+        "organism_key": "dictyostelium",
+        "rank": 1,
+        "uniprot_id": "Q54G81",
+        "gene": NaN,
+        "protein_name": "separase (EC 3.4.22.49)",
+        "combined": 0.7295271653482154,
+        "learned_score": 0.8503579931375153,
+        "p_ip_given_site": 0.8579059304852565,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 2,
+        "uniprot_id": "Q54WR2",
+        "gene": "gcn1",
+        "protein_name": "eIF-2-alpha kinase activator GCN1 (GCN1-like protein 1) (Translational activator gcn1)",
+        "combined": 0.6932415974648289,
+        "learned_score": 0.7973796886817576,
+        "p_ip_given_site": 0.8693996189079112,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 3,
+        "uniprot_id": "Q54X63",
+        "gene": NaN,
+        "protein_name": "Cation-transporting ATPase (EC 7.2.2.-)",
+        "combined": 0.6914177541593866,
+        "learned_score": 0.7939093542165074,
+        "p_ip_given_site": 0.8709026420802565,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 4,
+        "uniprot_id": "Q558S9",
+        "gene": NaN,
+        "protein_name": "F-box domain-containing protein",
+        "combined": 0.6908332931785139,
+        "learned_score": 0.7960369654913931,
+        "p_ip_given_site": 0.867840719874187,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 5,
+        "uniprot_id": "Q54EV4",
+        "gene": "mcfA",
+        "protein_name": "Mitochondrial substrate carrier family protein A",
+        "combined": 0.68530436552695,
+        "learned_score": 0.842274505886883,
+        "p_ip_given_site": 0.8136354130834704,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 6,
+        "uniprot_id": "Q54IQ2",
+        "gene": NaN,
+        "protein_name": "ATP-dependent protease ATPase subunit HslU",
+        "combined": 0.6816083527256259,
+        "learned_score": 0.7857961152231271,
+        "p_ip_given_site": 0.8674112018638358,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 7,
+        "uniprot_id": "Q54BM7",
+        "gene": "ppkA",
+        "protein_name": "Polyphosphate kinase (EC 2.7.4.1) (ATP-polyphosphate phosphotransferase) (Polyphosphate kinase 1) (PPK1) (Polyphosphoric acid kinase)",
+        "combined": 0.6766405982405509,
+        "learned_score": 0.8070894322732193,
+        "p_ip_given_site": 0.8383712773127869,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 8,
+        "uniprot_id": "Q54CD1",
+        "gene": "ctaA",
+        "protein_name": "P-type ATPase A domain-containing protein",
+        "combined": 0.6753097681586765,
+        "learned_score": 0.78841442329069,
+        "p_ip_given_site": 0.8565416210171086,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 9,
+        "uniprot_id": "Q54PE8",
+        "gene": NaN,
+        "protein_name": "Calcium-transporting ATPase (EC 7.2.2.10)",
+        "combined": 0.6702654443789083,
+        "learned_score": 0.8419836852857854,
+        "p_ip_given_site": 0.7960551446450027,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 10,
+        "uniprot_id": "Q554V8",
+        "gene": NaN,
+        "protein_name": "FNIP repeat-containing protein",
+        "combined": 0.669539740805258,
+        "learned_score": 0.7885334550469874,
+        "p_ip_given_site": 0.8490949071594702,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 11,
+        "uniprot_id": "Q869U6",
+        "gene": "DG1112",
+        "protein_name": "RasGTPase-activating protein",
+        "combined": 0.6646800588199525,
+        "learned_score": 0.7583404694769883,
+        "p_ip_given_site": 0.8764929284050587,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 12,
+        "uniprot_id": "Q54L34",
+        "gene": NaN,
+        "protein_name": "2'-phosphotransferase (EC 2.7.1.160)",
+        "combined": 0.6625890979624842,
+        "learned_score": 0.8348566679504905,
+        "p_ip_given_site": 0.7936561129577966,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 13,
+        "uniprot_id": "Q54JX1",
+        "gene": NaN,
+        "protein_name": "Uncharacterized protein",
+        "combined": 0.6624177297860394,
+        "learned_score": 0.8091358233372732,
+        "p_ip_given_site": 0.8186730962595422,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 14,
+        "uniprot_id": "Q54ZK5",
+        "gene": NaN,
+        "protein_name": "Reverse transcriptase domain-containing protein",
+        "combined": 0.6602614343539845,
+        "learned_score": 0.7587723924584113,
+        "p_ip_given_site": 0.8701706083622089,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 15,
+        "uniprot_id": "Q86HQ2",
+        "gene": "abcG8",
+        "protein_name": "ABC transporter G family member 8 (ABC transporter ABCG.8)",
+        "combined": 0.6561023163096514,
+        "learned_score": 0.760202459787253,
+        "p_ip_given_site": 0.863062606365764,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 16,
+        "uniprot_id": "Q54V51",
+        "gene": NaN,
+        "protein_name": "FNIP repeat-containing protein",
+        "combined": 0.6555747835453235,
+        "learned_score": 0.7642039212455558,
+        "p_ip_given_site": 0.8578532055643204,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 17,
+        "uniprot_id": "Q54S10",
+        "gene": "mcfU",
+        "protein_name": "Mitochondrial substrate carrier family protein U",
+        "combined": 0.6451384347945256,
+        "learned_score": 0.8028337477592775,
+        "p_ip_given_site": 0.8035766266616442,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 18,
+        "uniprot_id": "Q55FR9",
+        "gene": "copa",
+        "protein_name": "Coatomer subunit alpha (Alpha-coat protein) (Alpha-COP)",
+        "combined": 0.64352026296914,
+        "learned_score": 0.7291621744310096,
+        "p_ip_given_site": 0.8825475121104589,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 19,
+        "uniprot_id": "Q54DB2",
+        "gene": "psmE4",
+        "protein_name": "Proteasome activator complex subunit 4",
+        "combined": 0.6428420043464393,
+        "learned_score": 0.7334547729822233,
+        "p_ip_given_site": 0.8764575922420507,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 20,
+        "uniprot_id": "Q54ZL1",
+        "gene": NaN,
+        "protein_name": "Uncharacterized protein",
+        "combined": 0.6426706955129889,
+        "learned_score": 0.7225878549331132,
+        "p_ip_given_site": 0.8894014632621776,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 21,
+        "uniprot_id": "Q54RD7",
+        "gene": NaN,
+        "protein_name": "DUF1446-domain-containing protein",
+        "combined": 0.6414911709957841,
+        "learned_score": 0.7578735670449925,
+        "p_ip_given_site": 0.8464356046840473,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 22,
+        "uniprot_id": "Q55AR6",
+        "gene": "nfaA",
+        "protein_name": "Neurofibromin-A (DdNF1)",
+        "combined": 0.6360687487296126,
+        "learned_score": 0.7359301869885168,
+        "p_ip_given_site": 0.8643058267964997,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 23,
+        "uniprot_id": "Q55E68",
+        "gene": "nudt21",
+        "protein_name": "Cleavage and polyadenylation specificity factor subunit 5",
+        "combined": 0.6218725339229294,
+        "learned_score": 0.6989898709561687,
+        "p_ip_given_site": 0.889673169472759,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 24,
+        "uniprot_id": "Q557D2",
+        "gene": "g6pd-1; g6pd-2",
+        "protein_name": "Glucose-6-phosphate 1-dehydrogenase (G6PD) (EC 1.1.1.49)",
+        "combined": 0.620545884784635,
+        "learned_score": 0.7972484911635062,
+        "p_ip_given_site": 0.7783594345584888,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "dictyostelium",
+        "rank": 25,
+        "uniprot_id": "Q552Q7",
+        "gene": "pds5",
+        "protein_name": "Sister chromatid cohesion protein PDS5 homolog (Precocious dissociation of sisters protein 5 homolog)",
+        "combined": 0.6201216301317618,
+        "learned_score": 0.7040772124738839,
+        "p_ip_given_site": 0.8807579895291154,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 1,
+        "uniprot_id": "Q8TBH0",
+        "gene": "ARRDC2",
+        "protein_name": "Arrestin domain-containing protein 2",
+        "combined": 0.7515302307669759,
+        "learned_score": 0.8369623473192135,
+        "p_ip_given_site": 0.8979259738196392,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 2,
+        "uniprot_id": "P12271",
+        "gene": "RLBP1",
+        "protein_name": "Retinaldehyde-binding protein 1 (Cellular retinaldehyde-binding protein)",
+        "combined": 0.7423325140060034,
+        "learned_score": 0.8374854522825501,
+        "p_ip_given_site": 0.8863825777305036,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 4,
+        "uniprot_id": "Q5TC63",
+        "gene": "GRTP1",
+        "protein_name": "Growth hormone-regulated TBC protein 1 (TBC1 domain family member 6)",
+        "combined": 0.7095004013366202,
+        "learned_score": 0.8283508324335209,
+        "p_ip_given_site": 0.8565216253266226,
+        "precision_at_rank": 0.25,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 5,
+        "uniprot_id": "Q8NCG5",
+        "gene": "CHST4",
+        "protein_name": "Carbohydrate sulfotransferase 4 (EC 2.8.2.-) (Galactose/N-acetylglucosamine/N-acetylglucosamine 6-O-sulfotransferase 3) (GST-3) (High endothelial cells N-acetylglucosamine 6-O-sulfotransferase) (HEC-GlcNAc6ST) (L-selectin ligand sulfotransferase) (LSST) (N-acetylglucosamine 6-O-sulfotransferase 2) (GlcNAc6ST-2) (Gn6st-2)",
+        "combined": 0.6998419447523206,
+        "learned_score": 0.8154179552573038,
+        "p_ip_given_site": 0.8582616316456837,
+        "precision_at_rank": 0.2,
+        "explained": true
+      },
+      {
+        "organism_key": "human",
+        "rank": 6,
+        "uniprot_id": "P13807",
+        "gene": "GYS1",
+        "protein_name": "Glycogen [starch] synthase, muscle (EC 2.4.1.11) (Glycogen synthase 1)",
+        "combined": 0.6996099040470224,
+        "learned_score": 0.8340466210536511,
+        "p_ip_given_site": 0.8388139060658326,
+        "precision_at_rank": 0.16666666666666666,
+        "explained": true
+      },
+      {
+        "organism_key": "human",
+        "rank": 7,
+        "uniprot_id": "Q9ULH1",
+        "gene": "ASAP1",
+        "protein_name": "Arf-GAP with SH3 domain, ANK repeat and PH domain-containing protein 1 (130 kDa phosphatidylinositol 4,5-bisphosphate-dependent ARF1 GTPase-activating protein) (ADP-ribosylation factor-directed GTPase-activating protein 1) (ARF GTPase-activating protein 1) (Development and differentiation-enhancing factor 1) (DEF-1) (Differentiation-enhancing factor 1) (PIP2-dependent ARF1 GAP)",
+        "combined": 0.6987526578035365,
+        "learned_score": 0.8118039202890968,
+        "p_ip_given_site": 0.8607406792944522,
+        "precision_at_rank": 0.14285714285714285,
+        "explained": true
+      },
+      {
+        "organism_key": "human",
+        "rank": 8,
+        "uniprot_id": "Q8N271",
+        "gene": "PROM2",
+        "protein_name": "Prominin-2 (PROM-2) (Prominin-like protein 2) (hPROML2)",
+        "combined": 0.6969643370152026,
+        "learned_score": 0.8111909970636655,
+        "p_ip_given_site": 0.8591864795566784,
+        "precision_at_rank": 0.125,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 9,
+        "uniprot_id": "Q01638",
+        "gene": "IL1RL1",
+        "protein_name": "Interleukin-1 receptor-like 1 (EC 3.2.2.6) (Protein ST2)",
+        "combined": 0.693125346914906,
+        "learned_score": 0.8271837937543748,
+        "p_ip_given_site": 0.8379339055580237,
+        "precision_at_rank": 0.1111111111111111,
+        "explained": true
+      },
+      {
+        "organism_key": "human",
+        "rank": 11,
+        "uniprot_id": "Q16394",
+        "gene": "EXT1",
+        "protein_name": "Exostosin-1 (EC 2.4.1.225) (Exostosin glycosyltransferase 1) (Heparan sulfate co-polymerase subunit EXT1) (Multiple exostoses protein 1) (N-acetylglucosaminyl-proteoglycan 4-beta-glucuronosyltransferase)",
+        "combined": 0.6794175345133743,
+        "learned_score": 0.8228719139343786,
+        "p_ip_given_site": 0.8256662100239767,
+        "precision_at_rank": 0.18181818181818182,
+        "explained": true
+      },
+      {
+        "organism_key": "human",
+        "rank": 12,
+        "uniprot_id": "Q96MK3",
+        "gene": "FAM20A",
+        "protein_name": "Pseudokinase FAM20A",
+        "combined": 0.6787209498743251,
+        "learned_score": 0.8104200442249156,
+        "p_ip_given_site": 0.8374927973597354,
+        "precision_at_rank": 0.16666666666666666,
+        "explained": true
+      },
+      {
+        "organism_key": "human",
+        "rank": 13,
+        "uniprot_id": "Q05048",
+        "gene": "CSTF1",
+        "protein_name": "Cleavage stimulation factor subunit 1 (CF-1 50 kDa subunit) (Cleavage stimulation factor 50 kDa subunit) (CSTF 50 kDa subunit) (CstF-50)",
+        "combined": 0.6711004450346851,
+        "learned_score": 0.8277604622988571,
+        "p_ip_given_site": 0.8107423289714809,
+        "precision_at_rank": 0.15384615384615385,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 14,
+        "uniprot_id": "P54840",
+        "gene": "GYS2",
+        "protein_name": "Glycogen [starch] synthase, liver (EC 2.4.1.11) (Glycogen synthase 2)",
+        "combined": 0.6709221728003693,
+        "learned_score": 0.7809378536742128,
+        "p_ip_given_site": 0.8591236417133146,
+        "precision_at_rank": 0.14285714285714285,
+        "explained": true
+      },
+      {
+        "organism_key": "human",
+        "rank": 15,
+        "uniprot_id": "O15213",
+        "gene": "WDR46",
+        "protein_name": "WD repeat-containing protein 46 (WD repeat-containing protein BING4)",
+        "combined": 0.6681834265285415,
+        "learned_score": 0.807760906768818,
+        "p_ip_given_site": 0.8272044622726169,
+        "precision_at_rank": 0.13333333333333333,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 16,
+        "uniprot_id": "Q8TF62",
+        "gene": "ATP8B4",
+        "protein_name": "Probable phospholipid-transporting ATPase IM (EC 7.6.2.1) (ATPase class I type 8B member 4) (P4-ATPase flippase complex alpha subunit ATP8B4)",
+        "combined": 0.6666504521008385,
+        "learned_score": 0.8009311940888236,
+        "p_ip_given_site": 0.8323442226011073,
+        "precision_at_rank": 0.125,
+        "explained": true
+      },
+      {
+        "organism_key": "human",
+        "rank": 17,
+        "uniprot_id": "Q9Y6T7",
+        "gene": "DGKB",
+        "protein_name": "Diacylglycerol kinase beta (DAG kinase beta) (EC 2.7.1.107) (90 kDa diacylglycerol kinase) (Diglyceride kinase beta) (DGK-beta)",
+        "combined": 0.6607591912852551,
+        "learned_score": 0.7981657019497551,
+        "p_ip_given_site": 0.827847137093408,
+        "precision_at_rank": 0.11764705882352941,
+        "explained": true
+      },
+      {
+        "organism_key": "human",
+        "rank": 18,
+        "uniprot_id": "P53621",
+        "gene": "COPA",
+        "protein_name": "Coatomer subunit alpha (Alpha-coat protein) (Alpha-COP) (HEP-COP) (HEPCOP) [Cleaved into: Xenin (Xenopsin-related peptide); Proxenin]",
+        "combined": 0.6578768124084354,
+        "learned_score": 0.8182069596840187,
+        "p_ip_given_site": 0.8040469524513691,
+        "precision_at_rank": 0.1111111111111111,
+        "explained": true
+      },
+      {
+        "organism_key": "human",
+        "rank": 19,
+        "uniprot_id": "Q7Z7A3",
+        "gene": "CTU1",
+        "protein_name": "Cytoplasmic tRNA 2-thiolation protein 1 (EC 2.7.7.-) (ATP-binding domain-containing protein 3) (Cancer-associated gene protein) (Cytoplasmic tRNA adenylyltransferase 1)",
+        "combined": 0.654451190546127,
+        "learned_score": 0.7893692864400299,
+        "p_ip_given_site": 0.8290811433741374,
+        "precision_at_rank": 0.10526315789473684,
+        "explained": true
+      },
+      {
+        "organism_key": "human",
+        "rank": 20,
+        "uniprot_id": "Q13621",
+        "gene": "SLC12A1",
+        "protein_name": "Solute carrier family 12 member 1 (Bumetanide-sensitive sodium-(potassium)-chloride cotransporter 1) (BSC1) (Kidney-specific Na-K-Cl symporter) (Na-K-2Cl cotransporter 2) (NKCC2)",
+        "combined": 0.6538407737420764,
+        "learned_score": 0.784341957137712,
+        "p_ip_given_site": 0.8336169801856937,
+        "precision_at_rank": 0.1,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 21,
+        "uniprot_id": "Q5JTH9",
+        "gene": "RRP12",
+        "protein_name": "RRP12-like protein",
+        "combined": 0.6505662435382029,
+        "learned_score": 0.7819656695704352,
+        "p_ip_given_site": 0.831962666462819,
+        "precision_at_rank": 0.09523809523809523,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 22,
+        "uniprot_id": "Q8IZ81",
+        "gene": "ELMOD2",
+        "protein_name": "ELMO domain-containing protein 2",
+        "combined": 0.6500975067113612,
+        "learned_score": 0.7384249079738251,
+        "p_ip_given_site": 0.8803840440528656,
+        "precision_at_rank": 0.09090909090909091,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 23,
+        "uniprot_id": "P49683",
+        "gene": "PRLHR",
+        "protein_name": "Prolactin-releasing peptide receptor (PrRP receptor) (PrRPR) (G protein-coupled receptor 10) (hGR3)",
+        "combined": 0.6495598490357032,
+        "learned_score": 0.734647103974197,
+        "p_ip_given_site": 0.8841794182836902,
+        "precision_at_rank": 0.08695652173913043,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 24,
+        "uniprot_id": "P0C7X1",
+        "gene": "TBC1D3H",
+        "protein_name": "TBC1 domain family member 3H",
+        "combined": 0.6491028508417713,
+        "learned_score": 0.7395657987929606,
+        "p_ip_given_site": 0.8776810013404716,
+        "precision_at_rank": 0.08333333333333333,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 25,
+        "uniprot_id": "B9A6J9",
+        "gene": "TBC1D3L",
+        "protein_name": "TBC1 domain family member 3L",
+        "combined": 0.6443166144930365,
+        "learned_score": 0.7300960875107989,
+        "p_ip_given_site": 0.8825093374897812,
+        "precision_at_rank": 0.08,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 26,
+        "uniprot_id": "Q86WG3",
+        "gene": "ATCAY",
+        "protein_name": "Caytaxin (Ataxia cayman type protein) (BNIP-2-homology) (BNIP-H)",
+        "combined": 0.6429126834620817,
+        "learned_score": 0.7320432542020605,
+        "p_ip_given_site": 0.878244119827137,
+        "precision_at_rank": 0.07692307692307693,
+        "explained": false
+      },
+      {
+        "organism_key": "human",
+        "rank": 27,
+        "uniprot_id": "P10632",
+        "gene": "CYP2C8",
+        "protein_name": "Cytochrome P450 2C8 (EC 1.14.14.1) (CYPIIC8) (Cytochrome P450 IIC2) (Cytochrome P450 MP-12) (Cytochrome P450 MP-20) (Cytochrome P450 form 1) (S-mephenytoin 4-hydroxylase)",
+        "combined": 0.6419729236053732,
+        "learned_score": 0.7216813766054465,
+        "p_ip_given_site": 0.8895517390583143,
+        "precision_at_rank": 0.07407407407407407,
+        "explained": true
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 1,
+        "uniprot_id": "P36124",
+        "gene": "SET3",
+        "protein_name": "Histone reader SET3 (SET domain-containing protein 3)",
+        "combined": 0.7203554246774052,
+        "learned_score": 0.853472062439866,
+        "p_ip_given_site": 0.8440292967740348,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 2,
+        "uniprot_id": "P18238",
+        "gene": "AAC3",
+        "protein_name": "ADP/ATP translocase 3 (ADP,ATP carrier protein 3) (Adenine nucleotide translocator 3) (ANT 3)",
+        "combined": 0.6908981996843662,
+        "learned_score": 0.8069993786027635,
+        "p_ip_given_site": 0.8561322573514064,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 3,
+        "uniprot_id": "Q12251",
+        "gene": NaN,
+        "protein_name": "Uncharacterized mitochondrial carrier YPR011C",
+        "combined": 0.6867999142077541,
+        "learned_score": 0.8125560450817819,
+        "p_ip_given_site": 0.8452338990827756,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 4,
+        "uniprot_id": "P27472",
+        "gene": "GSY2",
+        "protein_name": "Glycogen [starch] synthase isoform 2 (EC 2.4.1.11)",
+        "combined": 0.6797340464799504,
+        "learned_score": 0.7985599257665035,
+        "p_ip_given_site": 0.8511997967184526,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 5,
+        "uniprot_id": "P53622",
+        "gene": "COP1",
+        "protein_name": "Coatomer subunit alpha (Alpha-coat protein) (Alpha-COP) (Retrieval from endoplasmic reticulum protein 1) (Secretory protein 22) (Suppressor of osmo-sensitivity 1)",
+        "combined": 0.6673585815369751,
+        "learned_score": 0.7947747058388556,
+        "p_ip_given_site": 0.839682713395619,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 6,
+        "uniprot_id": "Q03162",
+        "gene": "MUB1",
+        "protein_name": "MYND-type zinc finger protein MUB1 (Multi-budding protein)",
+        "combined": 0.6598503105293294,
+        "learned_score": 0.7791196814574662,
+        "p_ip_given_site": 0.8469177794289259,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 7,
+        "uniprot_id": "P46970",
+        "gene": "NMD5",
+        "protein_name": "Nonsense-mediated mRNA decay protein 5 (Karyopherin-119)",
+        "combined": 0.6517861301524942,
+        "learned_score": 0.7863534877027352,
+        "p_ip_given_site": 0.8288716720219961,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 8,
+        "uniprot_id": "P25626",
+        "gene": "IMG1",
+        "protein_name": "Large ribosomal subunit protein bL19m (54S ribosomal protein IMG1, mitochondrial) (Integrity of mitochondrial genome protein 1) (PetCR46)",
+        "combined": 0.6514567476603386,
+        "learned_score": 0.7418652334760484,
+        "p_ip_given_site": 0.8781335453717165,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 9,
+        "uniprot_id": "P53273",
+        "gene": "VSB1",
+        "protein_name": "Vacuolar basic amino acid transporter VSB1 (Vacuolar storage of basic amino acids 1)",
+        "combined": 0.645884171956378,
+        "learned_score": 0.7665693419478943,
+        "p_ip_given_site": 0.8425645751957042,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 10,
+        "uniprot_id": "P53244",
+        "gene": "ART5",
+        "protein_name": "Arrestin-related trafficking adapter 5",
+        "combined": 0.6456719249368487,
+        "learned_score": 0.7492798598156244,
+        "p_ip_given_site": 0.8617233153654089,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 11,
+        "uniprot_id": "Q03619",
+        "gene": "TY1B-ER2",
+        "protein_name": "Transposon Ty1-ER2 Gag-Pol polyprotein (Gag-Pol-p199) (TY1A-TY1B) (Transposon Ty1 TYA-TYB polyprotein) (p190) [Cleaved into: Capsid protein (CA) (Gag-p45) (p54); Ty1 protease (PR) (EC 3.4.23.-) (Pol-p20) (p23); Integrase (IN) (Pol-p71) (p84) (p90); Reverse transcriptase/ribonuclease H (RT) (RT-RH) (EC 2.7.7.49) (EC 2.7.7.7) (EC 3.1.26.4) (Pol-p63) (p60)]",
+        "combined": 0.6422014382762394,
+        "learned_score": 0.7451275798060052,
+        "p_ip_given_site": 0.8618677602075033,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 12,
+        "uniprot_id": "P35207",
+        "gene": "SKI2",
+        "protein_name": "Antiviral helicase SKI2 (EC 3.6.4.13) (Superkiller protein 2)",
+        "combined": 0.6402080822878168,
+        "learned_score": 0.738652576272891,
+        "p_ip_given_site": 0.8667242257763351,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 13,
+        "uniprot_id": "Q03429",
+        "gene": "MZM1",
+        "protein_name": "Mitochondrial zinc maintenance protein 1, mitochondrial (Altered inheritance of mitochondria protein 8) (Found in mitochondrial proteome protein 36)",
+        "combined": 0.633557564449915,
+        "learned_score": 0.7364509270090688,
+        "p_ip_given_site": 0.8602848353018819,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 14,
+        "uniprot_id": "Q99315",
+        "gene": "TY3B-G",
+        "protein_name": "Transposon Ty3-G Gag-Pol polyprotein (Gag3-Pol3) (Transposon Ty3-1 TYA-TYB polyprotein) [Cleaved into: Capsid protein (CA) (p24); Spacer peptide p3; Nucleocapsid protein p11 (NC); Ty3 protease (PR) (EC 3.4.23.-) (p16); Spacer peptide J; Reverse transcriptase/ribonuclease H (RT) (RT-RH) (EC 2.7.7.49) (EC 2.7.7.7) (EC 3.1.26.4) (p55); Integrase p61 (IN); Integrase p58 (IN)]",
+        "combined": 0.6328341621923519,
+        "learned_score": 0.7841254887146487,
+        "p_ip_given_site": 0.8070572520601313,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 15,
+        "uniprot_id": "P52918",
+        "gene": "MSN5",
+        "protein_name": "Protein MSN5",
+        "combined": 0.6234312210051698,
+        "learned_score": 0.759801320603829,
+        "p_ip_given_site": 0.8205187383850778,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 16,
+        "uniprot_id": "P04710",
+        "gene": "AAC1",
+        "protein_name": "ADP/ATP translocase 1 (ADP,ATP carrier protein 1) (Adenine nucleotide translocator 1) (ANT 1)",
+        "combined": 0.6167960167816079,
+        "learned_score": 0.7160012772809821,
+        "p_ip_given_site": 0.861445414069502,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 17,
+        "uniprot_id": "P25374",
+        "gene": "NFS1",
+        "protein_name": "Cysteine desulfurase (EC 2.8.1.7) (tRNA-splicing protein SPL1)",
+        "combined": 0.6083340323086054,
+        "learned_score": 0.6889909521006327,
+        "p_ip_given_site": 0.8829347184515034,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 18,
+        "uniprot_id": "P36144",
+        "gene": "UTP30",
+        "protein_name": "Ribosome biogenesis protein UTP30 (U3 snoRNP-associated protein UTP30)",
+        "combined": 0.6063911531214097,
+        "learned_score": 0.694653402783183,
+        "p_ip_given_site": 0.8729405926637029,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 19,
+        "uniprot_id": "P11412",
+        "gene": "ZWF1",
+        "protein_name": "Glucose-6-phosphate 1-dehydrogenase (G6PD) (EC 1.1.1.49)",
+        "combined": 0.6040247554681951,
+        "learned_score": 0.7749258033995166,
+        "p_ip_given_site": 0.7794614049737448,
+        "precision_at_rank": 0.0,
+        "explained": true
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 20,
+        "uniprot_id": "Q06538",
+        "gene": "CSC1",
+        "protein_name": "Calcium permeable stress-gated cation channel 1 (ScCSC1)",
+        "combined": 0.603065826135348,
+        "learned_score": 0.7306604721766866,
+        "p_ip_given_site": 0.8253708105199319,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 21,
+        "uniprot_id": "Q06142",
+        "gene": "KAP95",
+        "protein_name": "Importin subunit beta-1 (Importin-95) (Karyopherin subunit beta-1) (Karyopherin-95)",
+        "combined": 0.6014225142627176,
+        "learned_score": 0.6817869197328597,
+        "p_ip_given_site": 0.882126800699505,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 22,
+        "uniprot_id": "P38177",
+        "gene": NaN,
+        "protein_name": "Uncharacterized protein YBL086C",
+        "combined": 0.5994806589163583,
+        "learned_score": 0.6903241754069985,
+        "p_ip_given_site": 0.8684045558203418,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 23,
+        "uniprot_id": "Q04093",
+        "gene": NaN,
+        "protein_name": "Putative lipase YDR444W (EC 3.1.-.-)",
+        "combined": 0.5940308381996219,
+        "learned_score": 0.6735457314041857,
+        "p_ip_given_site": 0.8819458137774938,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 24,
+        "uniprot_id": "Q12462",
+        "gene": "PEX11",
+        "protein_name": "Peroxisomal membrane protein PMP27 (Peroxin-11)",
+        "combined": 0.5934925874987681,
+        "learned_score": 0.7967825148071236,
+        "p_ip_given_site": 0.7448614602724236,
+        "precision_at_rank": 0.0,
+        "explained": false
+      },
+      {
+        "organism_key": "yeast",
+        "rank": 25,
+        "uniprot_id": "Q99231",
+        "gene": "TY1B-DR3",
+        "protein_name": "Transposon Ty1-DR3 Gag-Pol polyprotein (Gag-Pol-p199) (TY1A-TY1B) (Transposon Ty1 TYA-TYB polyprotein) (p190) [Cleaved into: Capsid protein (CA) (Gag-p45) (p54); Ty1 protease (PR) (EC 3.4.23.-) (Pol-p20) (p23); Integrase (IN) (Pol-p71) (p84) (p90); Reverse transcriptase/ribonuclease H (RT) (RT-RH) (EC 2.7.7.49) (EC 2.7.7.7) (EC 3.1.26.4) (Pol-p63) (p60)]",
+        "combined": 0.5921006532487095,
+        "learned_score": 0.7454369693914659,
+        "p_ip_given_site": 0.7943000918401837,
+        "precision_at_rank": 0.0,
+        "explained": true
+      }
+    ]
+  }
+}

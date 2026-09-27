@@ -1,0 +1,291 @@
+{
+  "data": {
+    "pockets": 1644,
+    "entries": 665,
+    "holdout_entries": 58,
+    "development": {
+      "ip": {
+        "pockets": 372,
+        "groups": {
+          "sequence": 32,
+          "strict": 20
+        }
+      },
+      "other": {
+        "pockets": 1131,
+        "groups": {
+          "sequence": 210,
+          "strict": 96
+        }
+      }
+    },
+    "holdout": {
+      "ip": {
+        "pockets": 86,
+        "groups": {
+          "sequence": 8,
+          "strict": 8
+        }
+      },
+      "other": {
+        "pockets": 55,
+        "groups": {
+          "sequence": 20,
+          "strict": 20
+        }
+      }
+    },
+    "largest_group_share": {
+      "ip": {
+        "sequence": 0.1424731182795699,
+        "strict": 0.17204301075268819
+      },
+      "other": {
+        "sequence": 0.046861184792219276,
+        "strict": 0.08576480990274093
+      }
+    },
+    "tasks": {
+      "ip_site": {
+        "largest_group_positive_share": {
+          "sequence": 0.1424731182795699,
+          "strict": 0.17204301075268819
+        }
+      }
+    }
+  },
+  "evaluations": {
+    "ip_site/full/sequence/cv": {
+      "pockets": 1503,
+      "positives": 372,
+      "groups": 240,
+      "positive_groups": 32,
+      "repeats": 3,
+      "roc_auc": {
+        "point": 0.8302157509610235,
+        "low": 0.7312987164008767,
+        "high": 0.9016871591352338,
+        "p_value": 0.0
+      },
+      "rule_roc_auc": {
+        "point": 0.7690738997746784,
+        "low": 0.6877903072973675,
+        "high": 0.833364932906924,
+        "p_value": 0.0
+      },
+      "ml_minus_rule_roc_auc": {
+        "point": 0.061141851186345075,
+        "low": -0.0032421916088539865,
+        "high": 0.12205064634537573,
+        "p_value": 0.065
+      },
+      "pr_auc": {
+        "point": 0.6950285971095691,
+        "low": 0.4914019669856553,
+        "high": 0.8215615948319241,
+        "p_value": 0.001
+      },
+      "rule_pr_auc": {
+        "point": 0.5828293760361418,
+        "low": 0.3709220604124084,
+        "high": 0.7351602103973318,
+        "p_value": 0.006
+      },
+      "ml_minus_rule_pr_auc": {
+        "point": 0.11219922107342728,
+        "low": 0.02198886907994339,
+        "high": 0.23023607580708594,
+        "p_value": 0.011
+      },
+      "mcc": 0.5452756475211848,
+      "rule_mcc": 0.3440209651371382,
+      "brier": 0.12652002836773793,
+      "ece": 0.03808898099061996,
+      "families_chosen": {
+        "extra_trees": 7,
+        "logistic_regression": 5,
+        "hist_gradient_boosting": 3
+      }
+    },
+    "ip_site/full/sequence/cv/permuted": {
+      "pockets": 1503,
+      "positives": 372,
+      "groups": 240,
+      "positive_groups": 151,
+      "repeats": 1,
+      "roc_auc": {
+        "point": 0.5145888594164456,
+        "low": 0.4801544085956812,
+        "high": 0.548613091101644,
+        "p_value": 0.422
+      },
+      "rule_roc_auc": {
+        "point": 0.5188053202513714,
+        "low": 0.4867034712110341,
+        "high": 0.55093568625886,
+        "p_value": 0.249
+      },
+      "ml_minus_rule_roc_auc": {
+        "point": -0.004216460834925773,
+        "low": -0.05361162215814381,
+        "high": 0.04329959572078112,
+        "p_value": 0.844
+      },
+      "pr_auc": {
+        "point": 0.26444129656519433,
+        "low": 0.2316155329932774,
+        "high": 0.3030797594107537,
+        "p_value": 0.301
+      },
+      "rule_pr_auc": {
+        "point": 0.25539735061589286,
+        "low": 0.2279311299144976,
+        "high": 0.2881614964959651,
+        "p_value": 0.557
+      },
+      "ml_minus_rule_pr_auc": {
+        "point": 0.009043945949301468,
+        "low": -0.02699902928271775,
+        "high": 0.04601147569739104,
+        "p_value": 0.637
+      },
+      "mcc": 0.024800945464984448,
+      "rule_mcc": -0.031137989595304342,
+      "brier": 0.18605194271363215,
+      "ece": 0.002583438841403208,
+      "families_chosen": {
+        "hist_gradient_boosting": 3,
+        "logistic_regression": 1,
+        "extra_trees": 1
+      }
+    },
+    "ip_site/full/sequence/holdout": {
+      "pockets": 141,
+      "positives": 86,
+      "groups": 28,
+      "positive_groups": 8,
+      "repeats": 1,
+      "roc_auc": {
+        "point": 0.7418604651162791,
+        "low": 0.6243468514516034,
+        "high": 0.84373477124183,
+        "p_value": 0.0
+      },
+      "rule_roc_auc": {
+        "point": 0.5496828752642706,
+        "low": 0.40213561776061774,
+        "high": 0.7041140482975514,
+        "p_value": 0.468
+      },
+      "ml_minus_rule_roc_auc": {
+        "point": 0.1921775898520085,
+        "low": 0.04463996063660112,
+        "high": 0.3302101391162029,
+        "p_value": 0.008
+      },
+      "pr_auc": {
+        "point": 0.8102442410716076,
+        "low": 0.5266012377840598,
+        "high": 0.9268208314419111,
+        "p_value": 0.113
+      },
+      "rule_pr_auc": {
+        "point": 0.6372022124093242,
+        "low": 0.3209525103700838,
+        "high": 0.8400933179982571,
+        "p_value": 0.795
+      },
+      "ml_minus_rule_pr_auc": {
+        "point": 0.17304202866228346,
+        "low": 0.004652868765716772,
+        "high": 0.3309933227840435,
+        "p_value": 0.043
+      },
+      "mcc": 0.2912341544755444,
+      "rule_mcc": 0.09582745455645503,
+      "brier": 0.34635777516684085,
+      "ece": 0.3293749506370123,
+      "families_chosen": {
+        "hist_gradient_boosting": 1
+      }
+    },
+    "ip_site/full/strict/cv": {
+      "pockets": 1503,
+      "positives": 372,
+      "groups": 110,
+      "positive_groups": 20,
+      "repeats": 1,
+      "roc_auc": {
+        "point": 0.7572991833281043,
+        "low": 0.5801961317844244,
+        "high": 0.8783509284260275,
+        "p_value": 0.008
+      },
+      "rule_roc_auc": {
+        "point": 0.7690738997746784,
+        "low": 0.6709640952913916,
+        "high": 0.8384280529203451,
+        "p_value": 0.0
+      },
+      "ml_minus_rule_roc_auc": {
+        "point": -0.01177471644657413,
+        "low": -0.14618483292484202,
+        "high": 0.09580935999433088,
+        "p_value": 0.863
+      },
+      "pr_auc": {
+        "point": 0.6565130721841189,
+        "low": 0.40036460459298084,
+        "high": 0.8014716376139828,
+        "p_value": 0.004
+      },
+      "rule_pr_auc": {
+        "point": 0.5828293760361418,
+        "low": 0.28088003520621285,
+        "high": 0.7592142265669264,
+        "p_value": 0.033
+      },
+      "ml_minus_rule_pr_auc": {
+        "point": 0.0736836961479771,
+        "low": -0.04185736971082295,
+        "high": 0.21643047813528052,
+        "p_value": 0.237
+      },
+      "mcc": 0.5389208367587408,
+      "rule_mcc": 0.3628775359834095,
+      "brier": 0.13395522461993195,
+      "ece": 0.061836749960477944,
+      "families_chosen": {
+        "extra_trees": 4,
+        "hist_gradient_boosting": 1
+      }
+    }
+  },
+  "hypotheses": {
+    "H1": {
+      "task": "cryptic_ip_site",
+      "development": {},
+      "holm_p": null,
+      "decision": "inconclusive"
+    },
+    "H2": {
+      "task": "burial",
+      "development": {},
+      "holm_p": null,
+      "decision": "inconclusive"
+    }
+  },
+  "permutation": {
+    "ip_site": {
+      "roc_auc": {
+        "point": 0.5145888594164456,
+        "low": 0.4801544085956812,
+        "high": 0.548613091101644,
+        "p_value": 0.422
+      },
+      "passes": true
+    }
+  },
+  "not_evaluable": {},
+  "smoke": false
+}
