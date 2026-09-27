@@ -1274,6 +1274,12 @@ null was pre-registered as a real and reportable answer.
   and it demotes exactly one candidate: **P53244 (yeast ART5)**, one of study B's two
   original α-arrestin leads. Study B already found ART5 not supported on the site-overlap
   criterion; this is an independent reason to set it aside.
+
+  **The 24-protein shortlist is unchanged by this.** ART5 is candidate #10 in yeast and
+  unexplained, but it had already failed study H's conservation criterion and so was never
+  on the shortlist. The disorder QC removed a protein the previous filter had removed too.
+  Its practical effect is therefore nil: it agreed with study H rather than adding to it,
+  and the only fair claim is that two independent filters concur on one protein.
 - **I3, motif support: weak, and reported as weak.** −0.132 [−0.348, 0.053] over only 16
   pairs in 15 clusters, because **74 of the 150 proteins produced no shark-capture result**.
   The interval spans zero and the coverage is under a fifth of the arms. Nothing is
