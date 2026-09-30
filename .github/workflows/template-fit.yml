@@ -1,0 +1,287 @@
+name: Template fit
+
+# docs/TEMPLATE_PLAN.md: study N asks whether a candidate pocket is geometrically
+# capable of holding IP6, by transplanting a real crystal IP6 site onto it with a
+# rigid superposition and a clash test. No scoring function is involved, which is
+# the one component studies F and G showed to be broken here.
+#
+#   templates  anchors and ligand coordinates for every eligible IHP copy
+#   binders    the annotated-binder and matched-control arms, 5 shards each
+#   guard      N1; its verdict gates everything below it
+#   candidates the candidate and matched-control arms, 10 shards each
+#   report     N1-N3; printed between markers
+#
+# The candidate arm is gated on the guard, not merely reported after it: if the
+# method cannot recognise a site it is shown, no candidate ranking is computed at
+# all, so none can be reported selectively.
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/TEMPLATE_PLAN.md'
+      - 'scripts/template_fit.py'
+      - '.github/workflows/template-fit.yml'
+  workflow_dispatch:
+    inputs:
+      specificity_run:
+        description: 'specificity run holding proteins_combined.csv.gz (the specificity-rerank artifact)'
+        default: '36020458866'
+
+concurrency:
+  group: template-fit-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  SPECIFICITY_RUN: ${{ inputs.specificity_run || '36020458866' }}
+  BINDER_SHARDS: '5'
+  CANDIDATE_SHARDS: '10'
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      binders: ${{ steps.plan.outputs.binders }}
+      candidates: ${{ steps.plan.outputs.candidates }}
+    steps:
+      - id: plan
+        run: |
+          echo "binders=$(python3 -c "import json,os;print(json.dumps(list(range(int(os.environ['BINDER_SHARDS'])))))")" >> "$GITHUB_OUTPUT"
+          echo "candidates=$(python3 -c "import json,os;print(json.dumps(list(range(int(os.environ['CANDIDATE_SHARDS'])))))")" >> "$GITHUB_OUTPUT"
+
+  templates:
+    name: Templates
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Entries holding an eligible IP6 copy
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          c = pd.read_csv("results/redocking/census.csv")
+          keep = c[(c.comp_id == "IHP") & (c.status == "eligible")
+                   & (c.complete.astype(str).str.lower() == "true")
+                   & (c.symmetry_contact.astype(str).str.lower() != "true")]
+          ids = sorted(set(keep.pdb_id.str.upper()))
+          open("template_ids.txt", "w").write("\n".join(ids) + "\n")
+          print(len(keep), "copies in", len(ids), "entries")
+          PY
+      - name: Cache template structures
+        uses: actions/cache@v5
+        with:
+          path: data/template/structures
+          key: template-structures-${{ hashFiles('results/redocking/census.csv') }}
+      - name: Fetch entries
+        run: |
+          python scripts/fetch_structures.py rcsb --out data/template/structures --ids-file template_ids.txt \
+            --manifest template_manifest.json
+      - name: Anchors and ligands
+        run: |
+          python scripts/template_fit.py templates --census results/redocking/census.csv \
+            --structures data/template/structures --out templates.json.gz
+      - uses: actions/upload-artifact@v6
+        with:
+          name: template-library
+          path: |
+            templates.json.gz
+            template_manifest.json
+          retention-days: 90
+
+  binders:
+    name: Binders ${{ matrix.arm }} ${{ matrix.shard }}
+    needs: [plan, templates]
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [annotated, annotated_controls]
+        shard: ${{ fromJson(needs.plan.outputs.binders) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v6
+        with:
+          name: template-library
+      - name: Study C's scored proteins, which carry the matching columns
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$SPECIFICITY_RUN" --repo "$GITHUB_REPOSITORY" --name specificity-rerank --dir screen
+          find screen -name 'proteins_combined.csv.gz' | head -1
+      - name: Models this shard needs
+        run: |
+          python scripts/template_fit.py accessions --arm "${{ matrix.arm }}" \
+            --proteins "$(find screen -name 'proteins_combined.csv.gz' | head -1)" \
+            --shard "${{ matrix.shard }}" --shards "$BINDER_SHARDS" --out accessions.txt
+          python scripts/fetch_structures.py alphafold --out models --ids-file accessions.txt
+      - name: Fit
+        run: |
+          python scripts/template_fit.py fit --arm "${{ matrix.arm }}" --templates templates.json.gz \
+            --proteins "$(find screen -name 'proteins_combined.csv.gz' | head -1)" --af-dir models \
+            --shard "${{ matrix.shard }}" --shards "$BINDER_SHARDS" \
+            --out "fits-${{ matrix.arm }}-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: template-fits-${{ matrix.arm }}-${{ matrix.shard }}
+          path: fits-${{ matrix.arm }}-${{ matrix.shard }}.json
+          retention-days: 90
+
+  guard:
+    name: Guard
+    needs: binders
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      verdict: ${{ steps.guard.outputs.verdict }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: template-fits-annotated*
+          path: parts
+      - name: N1
+        id: guard
+        run: |
+          python scripts/template_fit.py merge --parts parts --out binder_fits.json
+          python scripts/template_fit.py guard --fits binder_fits.json --out guard.json \
+            --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: template-guard
+          path: |
+            binder_fits.json
+            guard.json
+          retention-days: 90
+
+  candidates:
+    name: Candidates ${{ matrix.arm }} ${{ matrix.shard }}
+    needs: [plan, templates, guard]
+    if: ${{ needs.guard.outputs.verdict == 'pass' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [candidates, controls]
+        shard: ${{ fromJson(needs.plan.outputs.candidates) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v6
+        with:
+          name: template-library
+      - name: Study C's scored proteins, which carry the matching columns
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$SPECIFICITY_RUN" --repo "$GITHUB_REPOSITORY" --name specificity-rerank --dir screen
+          find screen -name 'proteins_combined.csv.gz' | head -1
+      - name: Models this shard needs
+        run: |
+          python scripts/template_fit.py accessions --arm "${{ matrix.arm }}" \
+            --candidates results/triage/triaged_candidates.csv \
+            --proteins "$(find screen -name 'proteins_combined.csv.gz' | head -1)" \
+            --shard "${{ matrix.shard }}" --shards "$CANDIDATE_SHARDS" --out accessions.txt
+          python scripts/fetch_structures.py alphafold --out models --ids-file accessions.txt
+      - name: Fit
+        run: |
+          python scripts/template_fit.py fit --arm "${{ matrix.arm }}" --templates templates.json.gz \
+            --candidates results/triage/triaged_candidates.csv \
+            --proteins "$(find screen -name 'proteins_combined.csv.gz' | head -1)" --af-dir models \
+            --shard "${{ matrix.shard }}" --shards "$CANDIDATE_SHARDS" \
+            --out "fits-${{ matrix.arm }}-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: template-fits-${{ matrix.arm }}-${{ matrix.shard }}
+          path: fits-${{ matrix.arm }}-${{ matrix.shard }}.json
+          retention-days: 90
+
+  report:
+    name: Report
+    needs: [guard, candidates]
+    # always(), not !cancelled(): a job killed by timeout-minutes is marked CANCELLED,
+    # and the report matters most exactly when a shard ran out of budget. The candidate
+    # job is also skipped whenever the guard fails, which is a result, not a fault.
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v6
+        with:
+          pattern: template-fits-*
+          path: parts
+      - name: N1, N2 and N3
+        run: |
+          python scripts/template_fit.py merge --parts parts --out fits.json
+          python scripts/template_fit.py report --fits fits.json --out template.json \
+            --markdown TEMPLATE.md
+      - name: Print the results, markdown first and the numbers last
+        run: |
+          python scripts/extract_log_block.py emit TEMPLATE_MD_B64 TEMPLATE.md
+          python scripts/extract_log_block.py emit TEMPLATE_JSON template.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: template-report
+          path: |
+            fits.json
+            template.json
+            TEMPLATE.md
+          retention-days: 90
