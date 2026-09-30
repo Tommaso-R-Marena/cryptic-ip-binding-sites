@@ -125,7 +125,7 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install -r requirements.txt
           python -m pip install -e .
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: template-library
       - name: Study C's scored proteins, which carry the matching columns
@@ -172,7 +172,7 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install -r requirements.txt
           python -m pip install -e .
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           pattern: template-fits-annotated*
           path: parts
@@ -213,7 +213,7 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install -r requirements.txt
           python -m pip install -e .
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: template-library
       - name: Study C's scored proteins, which carry the matching columns
@@ -263,7 +263,7 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install -r requirements.txt
           python -m pip install -e .
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           pattern: template-fits-*
           path: parts
