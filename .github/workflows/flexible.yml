@@ -1,6 +1,7 @@
 name: Flexible receptor
 
-# docs/FLEXIBLE_PLAN.md (study J), as amended by docs/FLEXIBLE_PLAN_AMENDMENT_1.md.
+# docs/FLEXIBLE_PLAN.md (study J), as amended by docs/FLEXIBLE_PLAN_AMENDMENT_1.md and
+# docs/FLEXIBLE_PLAN_AMENDMENT_2.md.
 #
 # Every docking run in studies A, F and G held the receptor rigid. This asks whether
 # rotamer freedom in the pocket recovers study F's failures, and it is the last structural
@@ -24,6 +25,7 @@ on:
     paths:
       - 'docs/FLEXIBLE_PLAN.md'
       - 'docs/FLEXIBLE_PLAN_AMENDMENT_1.md'
+      - 'docs/FLEXIBLE_PLAN_AMENDMENT_2.md'
       - 'scripts/flexible.py'
       - '.github/workflows/flexible.yml'
   workflow_dispatch:
@@ -170,9 +172,13 @@ jobs:
           python scripts/flexible.py report --records records.json --out flexible.json \
             --markdown FLEXIBLE.md
       - name: Print the results, markdown first and the numbers last
+        # Both blocks go out base64-wrapped. A plain JSON block is one enormous line, and
+        # a log-fetching tool that returns the tail drops it whole: run 36847445067 printed
+        # the per-copy tracebacks and none of them could be read back. The wrapped form is
+        # many short lines, so the tail keeps it.
         run: |
           python scripts/extract_log_block.py emit FLEXIBLE_MD_B64 FLEXIBLE.md
-          python scripts/extract_log_block.py emit FLEXIBLE_JSON flexible.json
+          python scripts/extract_log_block.py emit FLEXIBLE_JSON_B64 flexible.json
       - uses: actions/upload-artifact@v6
         if: always()
         with:

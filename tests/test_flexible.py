@@ -268,7 +268,8 @@ def peptide(tmp_path_factory):
 def test_no_flexible_residues_yields_no_flex_file(fx, peptide):
     """The plan's pinning: with nothing flexible, "rigid" must mean rigid."""
     protonated, work = peptide
-    rigid, flex, applied = fx.prepare_pair(protonated, work / "rigid_only", ())
+    rigid, flex, applied, dropped = fx.prepare_pair(protonated, work / "rigid_only", ())
+    assert dropped == []
     assert flex is None
     assert applied == []
     assert rigid.exists() and rigid.read_text().strip()
@@ -284,8 +285,8 @@ def test_a_flexible_lysine_moves_out_of_the_rigid_file_into_a_torsion_tree(fx, p
     assert lysines, "the fixture peptide should contain a lysine"
     record = {"chain": lysines[0][0], "resseq": lysines[0][1], "icode": ""}
 
-    rigid_only, _none, _ = fx.prepare_pair(protonated, work / "baseline", ())
-    rigid, flex, applied = fx.prepare_pair(protonated, work / "flexed", [record])
+    rigid_only, _none, _, _ = fx.prepare_pair(protonated, work / "baseline", ())
+    rigid, flex, applied, _ = fx.prepare_pair(protonated, work / "flexed", [record])
 
     assert applied == [fx.meeko_residue_id(record)]
     assert flex is not None
@@ -300,7 +301,7 @@ def test_a_flexible_lysine_moves_out_of_the_rigid_file_into_a_torsion_tree(fx, p
 @requires_tools
 def test_an_unknown_residue_id_is_skipped_rather_than_crashing_the_copy(fx, peptide):
     protonated, work = peptide
-    _rigid, flex, applied = fx.prepare_pair(
+    _rigid, flex, applied, _ = fx.prepare_pair(
         protonated, work / "bogus", [{"chain": "Z", "resseq": 9999, "icode": ""}])
     assert applied == [] and flex is None
 
@@ -543,3 +544,227 @@ def test_the_report_tables_the_causes_a_run_failed_for(fx, tmp_path):
     assert "Copies not docked, by cause" in text
     assert "| PolymerCreationError | 2 |" in text
     assert "| ValueError | 1 |" in text
+
+
+# ------------------------------------------- PDB2PQR columns against Meeko's reader
+GLUED = "ATOM      1  N   GLY A2401       0.000   0.000   0.000  0.2943 1.8240"
+SPACED = "ATOM      1  N   GLY A   1       1.458  -2.000   0.500 -0.0100 1.9080"
+
+
+def test_a_four_digit_residue_number_is_separated_from_its_chain(fx):
+    """PDB2PQR writes 'A2401' on PDB columns; Meeko splits on whitespace and reads the
+    chain as 'A2401' and the x coordinate as the residue number."""
+    line = fx.canonical_pqr(GLUED).splitlines()[0]
+    assert line.split() == ["ATOM", "1", "N", "GLY", "A", "2401",
+                            "0.000", "0.000", "0.000", "0.2943", "1.8240"]
+
+
+def test_a_three_digit_residue_number_survives_unchanged_in_meaning(fx):
+    fields = fx.canonical_pqr(SPACED).splitlines()[0].split()
+    assert fields[:6] == ["ATOM", "1", "N", "GLY", "A", "1"]
+    assert [float(v) for v in fields[6:9]] == [1.458, -2.000, 0.500]
+
+
+def test_an_insertion_code_stays_its_own_field(fx):
+    line = (f"{'ATOM':<6}{7:5d} {' CA ':<4}{'LYS':>4} {'A':1}{42:4d}{'A':1}   "
+            f"{1.0:8.3f}{2.0:8.3f}{3.0:8.3f} -0.2000 1.9080")
+    assert fx.canonical_pqr(line).splitlines()[0].split()[:7] == [
+        "ATOM", "7", "CA", "LYS", "A", "42", "A"]
+
+
+def test_lines_that_are_not_pdb_columns_are_passed_through_untouched(fx):
+    text = "REMARK something\nATOM 1 N GLY A 1 0.0 0.0 0.0 0.1 1.8\nEND"
+    assert fx.canonical_pqr(text).splitlines()[:3] == text.splitlines()[:3]
+
+
+@requires_tools
+def test_meeko_rejects_the_raw_pqr_of_a_four_digit_chain_and_accepts_the_canonical_one(fx, tmp_path):
+    """The failure itself, end to end through real PDB2PQR and real Meeko.
+
+    Four of shard 1's eight failures in run 36828409167 were this, and they were exactly
+    the four copies whose residue numbers reach four digits.
+    """
+    import numpy as np
+    from meeko import MoleculePreparation, Polymer
+
+    from cryptic_ip.docking.receptor import Atom, _pdb_atom_line, protonate
+
+    xyz = {"N": (0.0, 0.0, 0.0), "CA": (1.458, 0.0, 0.0), "C": (2.009, 1.420, 0.0),
+           "O": (1.251, 2.390, 0.0)}
+
+    def peptide_text(first):
+        lines, serial = [], 1
+        for i in range(3):
+            for name, (x, y, z) in xyz.items():
+                atom = Atom("ATOM", name, "GLY", "A", first + i, "",
+                            np.array([x + 3.3 * i, y, z]), name[0], 0.0)
+                lines.append(_pdb_atom_line(serial, atom))
+                serial += 1
+        return "\n".join(lines) + "\nTER\nEND\n"
+
+    def pqr_text(first, tag):
+        work = tmp_path / tag
+        work.mkdir()
+        src = work / "pep.pdb"
+        src.write_text(peptide_text(first))
+        return Path(protonate(src, work)[1]).read_text()
+
+    raw = pqr_text(2401, "four")
+    assert "A2401" in raw, "PDB2PQR no longer glues the chain to a four-digit number"
+    with pytest.raises(ValueError, match="invalid literal for int"):
+        Polymer.from_pqr_string(raw, mk_prep=MoleculePreparation())
+
+    # The canonical form gets past the reader, and to the same place a three-digit
+    # numbering reaches: whatever happens next, it is no longer the parse.
+    def outcome(text):
+        try:
+            polymer = Polymer.from_pqr_string(fx.canonical_pqr(text), mk_prep=MoleculePreparation())
+        except Exception as exc:  # noqa: BLE001 - the type is the comparison
+            return type(exc).__name__
+        return sorted(key.split(":")[0] for key in polymer.monomers)
+
+    four, three = outcome(raw), outcome(pqr_text(101, "three"))
+    assert "ValueError" not in (four, three)
+    assert four == three
+
+
+# --------------------------------- residues Meeko will not type (amendment 2)
+def _pqr(rows):
+    """rows: (chain, resseq, x, y, z) -> a canonical PQR body."""
+    return "\n".join(
+        f"ATOM {i + 1} CA GLY {chain} {resseq} {x:.3f} {y:.3f} {z:.3f} 0.0000 1.9080"
+        for i, (chain, resseq, x, y, z) in enumerate(rows)) + "\n"
+
+
+def test_a_residue_inside_the_box_is_at_zero_distance(fx):
+    gaps = fx.residue_box_distance(_pqr([("A", 1, 0.0, 0.0, 0.0)]), [0, 0, 0], [20, 20, 20])
+    assert gaps["A:1"] == pytest.approx(0.0)
+
+
+def test_distance_is_measured_from_the_box_edge_not_its_centre(fx):
+    gaps = fx.residue_box_distance(_pqr([("A", 7, 18.0, 0.0, 0.0)]), [0, 0, 0], [20, 20, 20])
+    assert gaps["A:7"] == pytest.approx(8.0)
+
+
+def test_a_residue_contributes_its_closest_atom(fx):
+    text = _pqr([("B", 4, 40.0, 0.0, 0.0), ("B", 4, 14.0, 0.0, 0.0)])
+    assert fx.residue_box_distance(text, [0, 0, 0], [20, 20, 20])["B:4"] == pytest.approx(4.0)
+
+
+def test_the_drop_radius_is_vinas_interaction_cutoff(fx):
+    assert fx.DROP_RADIUS == 8.0
+
+
+def test_hydrogen_anomalies_are_read_out_of_meekos_message(fx):
+    message = ("Residue A:174 matched with template 'None' has H discrepancy: 3 missing, "
+               "0 excess. \nResidue B:279 matched with template 'None' has H discrepancy: 1 "
+               "missing, 0 excess. \n")
+    assert sorted(set(fx.H_ANOMALY.findall(message))) == ["A:174", "B:279"]
+
+
+def _fake_meeko(monkeypatch, fx, *, anomalies, calls):
+    """A Polymer.from_pqr_string that fails on hydrogen anomalies until they are deleted."""
+    import types as _types
+
+    class Polymer:
+        monomers: dict = {}
+
+        @staticmethod
+        def from_pqr_string(text, mk_prep=None, residues_to_delete=None, **options):
+            calls.append({"residues_to_delete": residues_to_delete, **options})
+            left = [rid for rid in anomalies if rid not in (residues_to_delete or [])]
+            if left:
+                raise RuntimeError("".join(
+                    f"Residue {rid} matched with template 'None' has H discrepancy: 1 "
+                    f"missing, 0 excess. \n" for rid in left))
+            return Polymer()
+
+    class Writer:
+        @staticmethod
+        def write_string_from_polymer(polymer):
+            return ("REMARK rigid\n", "", None)
+
+    fake = _types.ModuleType("meeko")
+    fake.Polymer = Polymer
+    fake.MoleculePreparation = lambda *a, **k: object()
+    fake.PDBQTWriterLegacy = Writer
+    monkeypatch.setitem(sys.modules, "meeko", fake)
+
+
+def test_an_untypable_residue_far_from_the_box_is_deleted_and_reported(fx, tmp_path, monkeypatch):
+    pqr = tmp_path / "receptor.pqr"
+    pqr.write_text(_pqr([("A", 174, 60.0, 0.0, 0.0), ("A", 2, 0.0, 0.0, 0.0)]))
+    calls = []
+    _fake_meeko(monkeypatch, fx, anomalies=["A:174"], calls=calls)
+
+    rigid, flex, applied, dropped = fx.prepare_pair(
+        (tmp_path / "receptor_h.pdb", pqr), tmp_path / "work", (),
+        box_centre=[0, 0, 0], box_size=[20, 20, 20])
+
+    assert dropped == ["A:174"], "the deletion must be returned, not swallowed"
+    assert flex is None and applied == [] and rigid.exists()
+    assert calls[0]["residues_to_delete"] is None, "it should try the whole receptor first"
+    assert calls[1]["residues_to_delete"] == ["A:174"]
+    # The box options travel with both attempts, so Meeko's own box-radius rule applies to
+    # the residues it cannot template at all.
+    assert calls[1]["delete_bad_res_from_box_radius"] == fx.DROP_RADIUS
+
+
+def test_an_untypable_residue_near_the_box_fails_the_copy(fx, tmp_path, monkeypatch):
+    pqr = tmp_path / "receptor.pqr"
+    pqr.write_text(_pqr([("A", 174, 14.0, 0.0, 0.0)]))
+    _fake_meeko(monkeypatch, fx, anomalies=["A:174"], calls=[])
+
+    with pytest.raises(RuntimeError, match="within 8.0 A of the box"):
+        fx.prepare_pair((tmp_path / "receptor_h.pdb", pqr), tmp_path / "work", (),
+                        box_centre=[0, 0, 0], box_size=[20, 20, 20])
+
+
+def test_without_a_box_nothing_is_deleted_and_the_error_stands(fx, tmp_path, monkeypatch):
+    pqr = tmp_path / "receptor.pqr"
+    pqr.write_text(_pqr([("A", 174, 60.0, 0.0, 0.0)]))
+    _fake_meeko(monkeypatch, fx, anomalies=["A:174"], calls=[])
+
+    with pytest.raises(RuntimeError, match="H discrepancy"):
+        fx.prepare_pair((tmp_path / "receptor_h.pdb", pqr), tmp_path / "work", ())
+
+
+def test_an_error_that_is_not_a_hydrogen_anomaly_is_never_retried(fx, tmp_path, monkeypatch):
+    import types as _types
+
+    pqr = tmp_path / "receptor.pqr"
+    pqr.write_text(_pqr([("A", 1, 0.0, 0.0, 0.0)]))
+    calls = []
+
+    class Polymer:
+        @staticmethod
+        def from_pqr_string(text, mk_prep=None, **options):
+            calls.append(options)
+            raise RuntimeError("Template matching failed for: ['B:351']")
+
+    fake = _types.ModuleType("meeko")
+    fake.Polymer = Polymer
+    fake.MoleculePreparation = lambda *a, **k: object()
+    fake.PDBQTWriterLegacy = object()
+    monkeypatch.setitem(sys.modules, "meeko", fake)
+
+    with pytest.raises(RuntimeError, match="Template matching failed"):
+        fx.prepare_pair((tmp_path / "receptor_h.pdb", pqr), tmp_path / "work", (),
+                        box_centre=[0, 0, 0], box_size=[20, 20, 20])
+    assert len(calls) == 1
+
+
+def test_the_report_states_how_much_receptor_was_deleted(fx, tmp_path):
+    import json
+
+    records = tmp_path / "records.json"
+    records.write_text(json.dumps([
+        {"copy_key": "1AAA:A:1", "residues_dropped": ["A:174", "B:279"], "runs": {}},
+        {"copy_key": "2BBB:A:1", "residues_dropped": [], "runs": {}}]))
+    out, md = tmp_path / "flexible.json", tmp_path / "FLEXIBLE.md"
+    assert fx.main(["report", "--records", str(records), "--out", str(out),
+                    "--markdown", str(md)]) == 0
+    block = json.loads(out.read_text())["residues_dropped"]
+    assert block == {"copies": 1, "residues": 2, "drop_radius": 8.0,
+                     "by_copy": {"1AAA:A:1": ["A:174", "B:279"]}}
+    assert "Receptor residues deleted to satisfy Meeko" in md.read_text()

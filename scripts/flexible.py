@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -60,6 +61,9 @@ NO_MATERIAL_CHANGE = 0.05
 FLEX_RADIUS = 4.0
 #: Vina's flexible sampling degrades beyond roughly this many movable side chains.
 MAX_FLEX = 8
+#: Amendment 2: a residue Meeko cannot type is deleted only this far beyond the box
+#: edge, which is Vina's own interaction cutoff, so no pose can feel it.
+DROP_RADIUS = 8.0
 #: No rotatable side chain to speak of, so never made flexible.
 NO_SIDECHAIN = ("GLY", "ALA", "PRO")
 #: A CYS whose SG is this close to another SG is in a disulphide and stays fixed.
@@ -140,20 +144,157 @@ def meeko_residue_id(record: Dict[str, object]) -> str:
 
 
 # ------------------------------------------------------------------ receptor
+def canonical_pqr(text: str) -> str:
+    """Re-space a PDB2PQR file so Meeko's PQR reader cannot mis-split its fields.
+
+    PDB2PQR writes the PQR on PDB columns, where the chain occupies column 22 and the
+    residue number columns 23 to 26. A four-digit residue number therefore fills its field
+    and the two run together - ``GLY A2401`` - while Meeko reads the PQR by splitting on
+    whitespace::
+
+        token = items.pop(0)
+        try: resnum = int(token)          # "A2401" is not an int
+        except ValueError:
+            chainid = token               # so the chain becomes "A2401"
+            resnum = int(items.pop(0))    # and the x coordinate becomes the residue number
+
+    which raises ``ValueError: invalid literal for int() with base 10: '0.000'``. That is
+    four of the eight failures in shard 1 of run 36828409167, and exactly the four copies
+    whose residue numbers reach four digits. Studies A, F and G never saw it because they
+    read the same file by column.
+
+    Had the int() happened to succeed the damage would have been worse than a crash: the
+    chain would have been "A2401" and every monomer key wrong, so no flexible residue would
+    have been found and both arms would have docked rigidly under a "flex" label. The
+    fields go out separated by single spaces, read off the columns PDB2PQR wrote them in.
+    """
+    out: List[str] = []
+    for line in text.splitlines():
+        if not line.startswith(("ATOM", "HETATM")):
+            out.append(line)
+            continue
+        fields = _pqr_fields(line)
+        if fields is None:  # not the layout we expect; leave it for Meeko to read as before
+            out.append(line)
+            continue
+        record, serial, name, resname, chain, resseq, icode, tail = fields
+        head = [record, serial, name, resname]
+        if chain:
+            head.append(chain)
+        head.append(resseq)
+        if icode:
+            head.append(icode)
+        out.append(" ".join(head + tail))
+    return "\n".join(out) + ("\n" if out else "")
+
+
+def _pqr_fields(line: str):
+    """``(record, serial, name, resname, chain, resseq, icode, [x, y, z, charge, radius])``.
+
+    ``None`` when the line does not read as PDB columns, so a PQR written some other way is
+    passed through untouched rather than mangled.
+    """
+    if len(line) < 54:
+        return None
+    serial, name, resname = line[6:11].strip(), line[12:16].strip(), line[17:20].strip()
+    chain, resseq, icode = line[21:22].strip(), line[22:26].strip(), line[26:27].strip()
+    try:
+        int(resseq)
+        xyz = [f"{float(line[30 + 8 * i:38 + 8 * i]):.3f}" for i in range(3)]
+    except ValueError:
+        return None
+    rest = line[54:].split()
+    if len(rest) != 2 or not name or not resname:
+        return None
+    try:
+        charge, radius = (f"{float(value):.4f}" for value in rest)
+    except ValueError:
+        return None
+    return (line[:6].strip(), serial, name, resname, chain, resseq, icode,
+            xyz + [charge, radius])
+
+
+H_ANOMALY = re.compile(r"Residue (\S+) matched with template")
+
+
+def residue_box_distance(pqr_text: str, box_centre: Sequence[float],
+                         box_size: Sequence[float]) -> Dict[str, float]:
+    """Each residue's smallest distance from the docking box, by ``chain:resseq`` key.
+
+    Zero for a residue with an atom inside the box. Read off the canonical PQR, so it is
+    the same coordinates Meeko is given.
+    """
+    low = np.asarray(box_centre, dtype=float) - np.asarray(box_size, dtype=float) / 2.0
+    high = np.asarray(box_centre, dtype=float) + np.asarray(box_size, dtype=float) / 2.0
+    best: Dict[str, float] = {}
+    for line in pqr_text.splitlines():
+        if not line.startswith(("ATOM", "HETATM")):
+            continue
+        fields = line.split()
+        if len(fields) < 10:
+            continue
+        chain, resseq = fields[4], fields[5]
+        try:
+            xyz = np.asarray([float(v) for v in fields[-5:-2]], dtype=float)
+        except ValueError:
+            continue
+        gap = float(np.linalg.norm(np.maximum(np.maximum(low - xyz, xyz - high), 0.0)))
+        key = f"{chain}:{resseq}"
+        if gap < best.get(key, np.inf):
+            best[key] = gap
+    return best
+
+
 def prepare_pair(protonated: Tuple[Path, Path], workdir: Path,
-                 flexres: Sequence[Dict[str, object]]) -> Tuple[Path, Optional[Path], List[str]]:
+                 flexres: Sequence[Dict[str, object]], *,
+                 box_centre: Optional[Sequence[float]] = None,
+                 box_size: Optional[Sequence[float]] = None,
+                 drop_radius: float = DROP_RADIUS
+                 ) -> Tuple[Path, Optional[Path], List[str], List[str]]:
     """Rigid and flexible PDBQT from the project's own PDB2QR output, via Meeko.
 
     With ``flexres`` empty the writer emits an empty flex string and ``None`` is returned in
     its place, so the rigid arm takes the single-receptor path - the pinning the plan asks
     for, so that "rigid" means rigid.
+
+    Meeko refuses a receptor outright over residues elsewhere in the protein: ones it has
+    no template for, and ones whose PQR hydrogens disagree with the template it matched,
+    which makes the PQR charges inapplicable. Three of shard 1's ten copies died that way
+    in run 36828409167. Given the box, such a residue is deleted when it lies more than
+    ``drop_radius`` beyond the box edge, and the copy still fails when one lies closer; see
+    docs/FLEXIBLE_PLAN_AMENDMENT_2.md. The deleted ids are returned, not swallowed.
     """
     from meeko import MoleculePreparation, PDBQTWriterLegacy, Polymer
 
     workdir.mkdir(parents=True, exist_ok=True)
     _pdb, pqr = protonated
     mk = MoleculePreparation()
-    polymer = Polymer.from_pqr_string(Path(pqr).read_text(), mk_prep=mk)
+    text = canonical_pqr(Path(pqr).read_text())
+    boxed = box_centre is not None and box_size is not None
+    options: Dict[str, object] = {}
+    if boxed:
+        options = {"box_center": [float(c) for c in box_centre],
+                   "box_size": [float(s) for s in box_size],
+                   "delete_bad_res_from_box_radius": float(drop_radius)}
+    dropped: List[str] = []
+    try:
+        polymer = Polymer.from_pqr_string(text, mk_prep=mk, **options)
+    except Exception as exc:  # noqa: BLE001 - one recoverable shape, re-raised otherwise
+        anomalous = sorted(set(H_ANOMALY.findall(str(exc))))
+        if not boxed or not anomalous:
+            raise
+        gaps = residue_box_distance(text, box_centre, box_size)
+        near = [rid for rid in anomalous if gaps.get(rid, 0.0) <= drop_radius]
+        if near:
+            raise RuntimeError(
+                f"hydrogens disagree with Meeko's template within {drop_radius} A of the "
+                f"box, at {', '.join(near)}") from exc
+        polymer = Polymer.from_pqr_string(text, mk_prep=mk, residues_to_delete=anomalous,
+                                          **options)
+        dropped = anomalous
+        LOGGER.warning("deleted %d residue(s) with PQR/template hydrogen discrepancies, all "
+                       "more than %.1f A beyond the box: %s", len(dropped), drop_radius,
+                       ", ".join(dropped))
     applied: List[str] = []
     for record in flexres:
         rid = meeko_residue_id(record)
@@ -166,10 +307,10 @@ def prepare_pair(protonated: Tuple[Path, Path], workdir: Path,
     rigid = workdir / "rigid.pdbqt"
     rigid.write_text(rigid_text)
     if not flex_text.strip():
-        return rigid, None, applied
+        return rigid, None, applied, dropped
     flex = workdir / "flex.pdbqt"
     flex.write_text(flex_text)
-    return rigid, flex, applied
+    return rigid, flex, applied, dropped
 
 
 def strip_flex_residues(pdbqt: str) -> str:
@@ -330,6 +471,12 @@ def build(records: Sequence[dict], n_bootstrap: int = N_BOOTSTRAP) -> Dict[str, 
             "mean": float(frame[frame.arm == "flex"]["n_flex"].mean()),
             "max": int(frame[frame.arm == "flex"]["n_flex"].max()),
             "zero": int((frame[frame.arm == "flex"]["n_flex"] == 0).sum())}
+    # Amendment 2: how much receptor was deleted to make Meeko accept it, never implicit.
+    deleted = {str(r["copy_key"]): list(r["residues_dropped"]) for r in records
+               if r.get("residues_dropped")}
+    result["residues_dropped"] = {
+        "copies": len(deleted), "residues": int(sum(len(v) for v in deleted.values())),
+        "by_copy": dict(sorted(deleted.items())[:20]), "drop_radius": DROP_RADIUS}
     result["J1"] = paired(frame, "success", n_bootstrap=n_bootstrap)
     result["J2"] = paired(frame, "ceiling", n_bootstrap=n_bootstrap)
     # Amendment 1: the rigid arm under this receptor pipeline, against study F's 0.110
@@ -355,8 +502,9 @@ def build(records: Sequence[dict], n_bootstrap: int = N_BOOTSTRAP) -> Dict[str, 
 def markdown(r: Dict[str, object]) -> str:
     lines = ["# Study J: does a flexible receptor recover study A's failures?", "",
              f"Pre-registered in `docs/FLEXIBLE_PLAN.md`, amended in "
-             f"`docs/FLEXIBLE_PLAN_AMENDMENT_1.md`. Seed {r['seed']}, {r['n_bootstrap']} resamples "
-             f"of strict homology groups, exhaustiveness {r['exhaustiveness']}.",
+             f"`docs/FLEXIBLE_PLAN_AMENDMENT_1.md` and "
+             f"`docs/FLEXIBLE_PLAN_AMENDMENT_2.md`. Seed {r['seed']}, {r['n_bootstrap']} "
+             f"resamples of strict homology groups, exhaustiveness {r['exhaustiveness']}.",
              f"Flexible side chains: within {r['flex_radius']} A of the ligand, at most "
              f"{r['max_flex']}.", ""]
     flex = r.get("flex_residues_per_copy")
@@ -392,18 +540,31 @@ def markdown(r: Dict[str, object]) -> str:
                      if per_group else "-")
             lines.append(f"| {burial} | {block.get('decision')} | {shown} | "
                          f"{block.get('n_copies', '-')} | {block.get('estimate', {}).get('groups', '-')} |")
+    dropped = r.get("residues_dropped") or {}
+    if dropped.get("copies"):
+        lines += ["", "## Receptor residues deleted to satisfy Meeko", "",
+                  f"{dropped['residues']} residue(s) across {dropped['copies']} copies, each "
+                  f"more than {dropped['drop_radius']} A beyond the docking box, where Vina's "
+                  "own interaction cutoff puts them out of reach of any pose. Both arms of a "
+                  "copy see the same deletions or the copy fails. Per "
+                  "docs/FLEXIBLE_PLAN_AMENDMENT_2.md."]
     if r.get("error_classes"):
         lines += ["", "## Copies not docked, by cause", "",
                   "| cause | copies | examples |", "| --- | --- | --- |"]
-        for name, entry in sorted(r["error_classes"].items(),
-                                  key=lambda kv: (-int(kv[1]["n"]), kv[0])):
+        ordered = sorted(r["error_classes"].items(), key=lambda kv: (-int(kv[1]["n"]), kv[0]))
+        for name, entry in ordered:
             lines.append(f"| {name} | {entry['n']} | {', '.join(entry['copies'])} |")
+        for name, entry in ordered:
+            if entry.get("traceback"):
+                lines += ["", f"### {name}, at {entry.get('example_copy')}", "", "```",
+                          *str(entry["traceback"]).splitlines(), "```"]
     if r.get("errors"):
         lines += ["", "## Copies not docked", ""] + [f"- {e}" for e in r["errors"]]
     return "\n".join(lines) + "\n"
 
 
-def dock_copy(ctx, flexres: Sequence[Dict[str, object]]) -> Tuple[Dict[str, List[dict]], List[str]]:
+def dock_copy(ctx, flexres: Sequence[Dict[str, object]]
+              ) -> Tuple[Dict[str, List[dict]], List[str], List[str]]:
     """Both arms for one copy: the same receptor, differing only in movable side chains."""
     from cryptic_ip.docking import engine
     from cryptic_ip.docking.ligand import start_pose, to_pdbqt
@@ -415,14 +576,24 @@ def dock_copy(ctx, flexres: Sequence[Dict[str, object]]) -> Tuple[Dict[str, List
     if not all(path.exists() for path in protonated):
         raise RuntimeError("the protonated receptor pair was not cached")
 
+    size = [ctx.side] * 3
+    box = {"box_centre": [float(c) for c in ctx.centre], "box_size": size}
+
     # Prepared twice into separate directories: flexibilising mutates the polymer, and the
     # rigid arm must see a receptor with no flexible residues at all.
-    rigid_only, none_flex, _ = prepare_pair(protonated, ctx.work / "arm_rigid", ())
+    rigid_only, none_flex, _, dropped_rigid = prepare_pair(protonated, ctx.work / "arm_rigid",
+                                                           (), **box)
     if none_flex is not None:
         raise RuntimeError("the rigid arm was given a flexible receptor")
-    rigid_part, flex_part, applied = prepare_pair(protonated, ctx.work / "arm_flex", flexres)
+    rigid_part, flex_part, applied, dropped_flex = prepare_pair(protonated,
+                                                                ctx.work / "arm_flex",
+                                                                flexres, **box)
+    # The arms must differ in side-chain freedom and nothing else, so a residue deleted
+    # from one receptor and not the other is a defect, not a difference to report.
+    if sorted(dropped_rigid) != sorted(dropped_flex):
+        raise RuntimeError(f"the arms dropped different residues: {sorted(dropped_rigid)} "
+                           f"against {sorted(dropped_flex)}")
 
-    size = [ctx.side] * 3
     runs: Dict[str, List[dict]] = {arm: [] for arm in ARMS}
     for arm, (rigid, flex) in (("rigid", (rigid_only, None)), ("flex", (rigid_part, flex_part))):
         for seed in engine.SEEDS:
@@ -431,7 +602,7 @@ def dock_copy(ctx, flexres: Sequence[Dict[str, object]]) -> Tuple[Dict[str, List
             table = engine.pose_table(result, ctx.crystal, site_centroid=ctx.centre)
             runs[arm].append({"seed": seed, "vina": table.scores, "rmsd": table.rmsd,
                               "seconds": result.seconds})
-    return runs, applied
+    return runs, applied, dropped_flex
 
 
 def cmd_dock_one(args: argparse.Namespace) -> int:
@@ -449,9 +620,10 @@ def cmd_dock_one(args: argparse.Namespace) -> int:
         ctx = Context(row, args.structures_dir, args.ccd_dir, args.work_dir)
         flexres = flexible_residues(ctx.arrays, ctx.xyz)
         record["flex_residues"] = flexres
-        runs, applied = dock_copy(ctx, flexres)
+        runs, applied, dropped = dock_copy(ctx, flexres)
         record["n_flex"] = len(applied)
         record["flex_applied"] = applied
+        record["residues_dropped"] = dropped
         record["runs"] = runs
     except Exception as exc:  # noqa: BLE001 - recorded as this copy's failure reason
         record["error"] = f"{type(exc).__name__}: {exc}"[:500]
