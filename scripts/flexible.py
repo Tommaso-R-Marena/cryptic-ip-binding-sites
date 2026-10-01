@@ -290,6 +290,30 @@ def paired(frame: pd.DataFrame, column: str, n_bootstrap: int = N_BOOTSTRAP) -> 
     return out
 
 
+def error_classes(records: Sequence[dict]) -> Dict[str, object]:
+    """One entry per exception type, with a count and one worked example.
+
+    The per-copy traceback is the only thing that says *where* a copy died, and it reached
+    nobody: it sat in the shard artifact while the report printed the message alone. Run
+    36828409167 cost a second run to recover what this would have printed the first time.
+    """
+    out: Dict[str, object] = {}
+    for record in records:
+        error = record.get("error")
+        if not error:
+            continue
+        name = str(error).split(":", 1)[0].strip() or "unknown"
+        entry = out.setdefault(name, {"n": 0, "copies": []})
+        entry["n"] = int(entry["n"]) + 1
+        copies = entry["copies"]
+        if len(copies) < 3:
+            copies.append(str(record.get("copy_key")))
+        if "traceback" not in entry and record.get("traceback"):
+            entry["example_copy"] = str(record.get("copy_key"))
+            entry["traceback"] = str(record["traceback"])[-1200:]
+    return out
+
+
 def build(records: Sequence[dict], n_bootstrap: int = N_BOOTSTRAP) -> Dict[str, object]:
     from cryptic_ip.benchmark import protocol
 
@@ -299,6 +323,7 @@ def build(records: Sequence[dict], n_bootstrap: int = N_BOOTSTRAP) -> Dict[str, 
         "flex_radius": FLEX_RADIUS, "max_flex": MAX_FLEX,
         "n_records": len(records), "n_copies_scored": int(frame["copy_key"].nunique()) if not frame.empty else 0,
         "errors": sorted({str(r["error"]) for r in records if r.get("error")}),
+        "error_classes": error_classes(records),
     }
     if not frame.empty:
         result["flex_residues_per_copy"] = {
@@ -367,6 +392,12 @@ def markdown(r: Dict[str, object]) -> str:
                      if per_group else "-")
             lines.append(f"| {burial} | {block.get('decision')} | {shown} | "
                          f"{block.get('n_copies', '-')} | {block.get('estimate', {}).get('groups', '-')} |")
+    if r.get("error_classes"):
+        lines += ["", "## Copies not docked, by cause", "",
+                  "| cause | copies | examples |", "| --- | --- | --- |"]
+        for name, entry in sorted(r["error_classes"].items(),
+                                  key=lambda kv: (-int(kv[1]["n"]), kv[0])):
+            lines.append(f"| {name} | {entry['n']} | {', '.join(entry['copies'])} |")
     if r.get("errors"):
         lines += ["", "## Copies not docked", ""] + [f"- {e}" for e in r["errors"]]
     return "\n".join(lines) + "\n"
@@ -431,9 +462,20 @@ def cmd_dock_one(args: argparse.Namespace) -> int:
 
 
 def cmd_dock(args: argparse.Namespace) -> int:
-    """A shard of copies, each in its own process so one crash cannot take the shard."""
+    """A shard of copies, each in its own process so one crash cannot take the shard.
+
+    Three things protect the shard's work, all of them learned from run 36828409167, where
+    thirteen shards each threw away every copy they had already docked:
+
+    * a copy that overruns its timeout is this copy's failure, not the shard's;
+    * the output file is rewritten after every copy, so a shard the runner kills still
+      uploads what it had;
+    * the shard stops on its own wall-clock budget rather than being killed by
+      ``timeout-minutes``, and the copies it never reached say so.
+    """
     import subprocess
     import tempfile
+    import time
 
     from redocking import _json_default, shard_entries
 
@@ -441,27 +483,51 @@ def cmd_dock(args: argparse.Namespace) -> int:
     rows = census[census["selected"].astype(str).str.lower() == "true"]
     keys = shard_entries(sorted(rows["copy_key"].astype(str)), args.shard, args.shards)
     LOGGER.info("shard %d/%d: %d copies", args.shard, args.shards, len(keys))
+    deadline = time.time() + args.shard_budget
     out: List[dict] = []
+    target = Path(args.out)
+
+    def flush() -> None:
+        target.write_text(json.dumps(out, default=_json_default))
+
+    flush()
     with tempfile.TemporaryDirectory() as tmp:
-        for key in keys:
+        for index, key in enumerate(keys):
+            left = deadline - time.time()
+            if left < args.min_copy_seconds:
+                for unreached in keys[index:]:
+                    out.append({"copy_key": unreached,
+                                "error": "not reached: the shard's budget ran out"})
+                LOGGER.info("budget spent with %d copies unreached", len(keys) - index)
+                break
             row = rows[rows["copy_key"].astype(str) == key].iloc[0].to_dict()
             row_json = Path(tmp) / "row.json"
             out_json = Path(tmp) / "out.json"
             row_json.write_text(json.dumps(row, default=_json_default))
-            proc = subprocess.run(
-                [sys.executable, str(Path(__file__).resolve()), "dock-one",
-                 "--row-json", str(row_json), "--out-json", str(out_json),
-                 "--structures-dir", str(args.structures_dir), "--ccd-dir", str(args.ccd_dir),
-                 "--work-dir", str(args.work_dir)],
-                capture_output=True, text=True, timeout=args.per_copy_timeout)
-            if out_json.exists():
-                out.append(json.loads(out_json.read_text()))
-                out_json.unlink()
+            timeout = min(args.per_copy_timeout, left)
+            try:
+                proc = subprocess.run(
+                    [sys.executable, str(Path(__file__).resolve()), "dock-one",
+                     "--row-json", str(row_json), "--out-json", str(out_json),
+                     "--structures-dir", str(args.structures_dir), "--ccd-dir", str(args.ccd_dir),
+                     "--work-dir", str(args.work_dir)],
+                    capture_output=True, text=True, timeout=timeout)
+            except subprocess.TimeoutExpired:
+                # One copy overrunning is this copy's failure. Before this was caught, it
+                # raised out of the loop and discarded every copy the shard had docked.
+                out.append({"copy_key": key, "error": f"timed out after {timeout:.0f} s"})
             else:
-                out.append({"copy_key": key, "error": f"child exited {proc.returncode}",
-                            "stderr": (proc.stderr or "")[-800:]})
-            LOGGER.info("%s -> %s", key, "error" if out[-1].get("error") else "ok")
-    Path(args.out).write_text(json.dumps(out, default=_json_default))
+                if out_json.exists():
+                    out.append(json.loads(out_json.read_text()))
+                    out_json.unlink()
+                else:
+                    out.append({"copy_key": key, "error": f"child exited {proc.returncode}",
+                                "stderr": (proc.stderr or "")[-800:]})
+            flush()
+            # The reason, not just the fact: an error visible only inside the artifact
+            # cannot be diagnosed from the logs.
+            LOGGER.info("%s -> %s", key, out[-1].get("error") or "ok")
+    flush()
     return 0
 
 
@@ -529,6 +595,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--shard", type=int, default=0)
     p.add_argument("--shards", type=int, default=1)
     p.add_argument("--per-copy-timeout", type=int, default=5400)
+    # Under the job's own timeout-minutes, so the shard stops itself and writes its output
+    # instead of being killed with the file unwritten.
+    p.add_argument("--shard-budget", type=int, default=19800)
+    p.add_argument("--min-copy-seconds", type=int, default=600)
     p.add_argument("--out", required=True)
     p.set_defaults(func=cmd_dock)
 

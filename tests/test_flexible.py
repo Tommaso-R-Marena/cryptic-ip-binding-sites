@@ -394,3 +394,152 @@ def test_the_report_survives_records_that_are_all_errors(fx, tmp_path):
     result = json.loads(out.read_text())
     assert result["J1"]["decision"] == "not evaluable"
     assert result["errors"] == ["ReceptorError: no polymer atoms"]
+
+
+# ------------------------------------------------- the shard's own protections
+#
+# Run 36828409167 lost thirteen shards' docking work: one copy overran the per-copy
+# timeout, subprocess.TimeoutExpired raised out of the loop, and the output file - written
+# only after the loop - was never written at all. Each of these pins one of the three
+# protections added in response.
+def _shard_census(tmp_path, keys):
+    import pandas as pd
+
+    census = tmp_path / "census.csv"
+    pd.DataFrame([{"copy_key": key, "pdb_id": key.split(":")[0], "chain": "A", "resseq": 1,
+                   "icode": None, "selected": "True", "homology_group_strict": "g1",
+                   "burial_class": "buried"} for key in keys]).to_csv(census, index=False)
+    return census
+
+
+def _dock_argv(tmp_path, census, out, extra=()):
+    return ["dock", "--census", str(census), "--structures-dir", str(tmp_path),
+            "--ccd-dir", str(tmp_path), "--work-dir", str(tmp_path / "work"),
+            "--shard", "0", "--shards", "1", "--out", str(out), *extra]
+
+
+def _fake_run(monkeypatch, behaviour):
+    """behaviour(call_index, out_json) -> None to succeed, or raises."""
+    import subprocess
+    import types as _types
+
+    calls = {"n": 0}
+
+    def run(cmd, **kwargs):
+        index = calls["n"]
+        calls["n"] += 1
+        out_json = Path(cmd[cmd.index("--out-json") + 1])
+        behaviour(index, out_json, kwargs)
+        return _types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    return calls
+
+
+def test_a_copy_that_overruns_its_timeout_does_not_take_the_shard(fx, tmp_path, monkeypatch):
+    import json
+    import subprocess
+
+    census = _shard_census(tmp_path, ["1AAA:A:1", "2BBB:A:1", "3CCC:A:1"])
+    out = tmp_path / "flexible-0.json"
+
+    def behaviour(index, out_json, kwargs):
+        if index == 1:
+            raise subprocess.TimeoutExpired(cmd="dock-one", timeout=5400)
+        out_json.write_text(json.dumps({"copy_key": "k", "runs": {}}))
+
+    calls = _fake_run(monkeypatch, behaviour)
+    assert fx.main(_dock_argv(tmp_path, census, out)) == 0
+    assert calls["n"] == 3, "the shard stopped at the overrunning copy"
+    records = json.loads(out.read_text())
+    assert len(records) == 3
+    assert "timed out after 5400 s" == records[1]["error"]
+    assert [bool(r.get("error")) for r in records] == [False, True, False]
+
+
+def test_the_output_file_is_rewritten_after_every_copy(fx, tmp_path, monkeypatch):
+    import json
+
+    census = _shard_census(tmp_path, ["1AAA:A:1", "2BBB:A:1"])
+    out = tmp_path / "flexible-0.json"
+    seen = []
+
+    def behaviour(index, out_json, kwargs):
+        # What the file holds at the moment this copy starts, before it has written anything.
+        seen.append(len(json.loads(out.read_text())))
+        out_json.write_text(json.dumps({"copy_key": "k", "runs": {}}))
+
+    _fake_run(monkeypatch, behaviour)
+    assert fx.main(_dock_argv(tmp_path, census, out)) == 0
+    assert seen == [0, 1], "a shard killed mid-copy would have uploaded nothing"
+    assert len(json.loads(out.read_text())) == 2
+
+
+def test_copies_the_budget_never_reached_say_so(fx, tmp_path, monkeypatch):
+    import json
+
+    census = _shard_census(tmp_path, ["1AAA:A:1", "2BBB:A:1", "3CCC:A:1"])
+    out = tmp_path / "flexible-0.json"
+
+    def behaviour(index, out_json, kwargs):
+        out_json.write_text(json.dumps({"copy_key": "k", "runs": {}}))
+
+    calls = _fake_run(monkeypatch, behaviour)
+    # A budget under --min-copy-seconds: no copy may be started at all.
+    assert fx.main(_dock_argv(tmp_path, census, out,
+                              ("--shard-budget", "0", "--min-copy-seconds", "600"))) == 0
+    assert calls["n"] == 0
+    records = json.loads(out.read_text())
+    assert len(records) == 3
+    assert all(r["error"] == "not reached: the shard's budget ran out" for r in records)
+
+
+def test_the_per_copy_timeout_never_exceeds_the_budget_left(fx, tmp_path, monkeypatch):
+    import json
+
+    census = _shard_census(tmp_path, ["1AAA:A:1"])
+    out = tmp_path / "flexible-0.json"
+    timeouts = []
+
+    def behaviour(index, out_json, kwargs):
+        timeouts.append(kwargs["timeout"])
+        out_json.write_text(json.dumps({"copy_key": "k", "runs": {}}))
+
+    _fake_run(monkeypatch, behaviour)
+    assert fx.main(_dock_argv(tmp_path, census, out,
+                              ("--shard-budget", "900", "--per-copy-timeout", "5400"))) == 0
+    assert 0 < timeouts[0] <= 900
+
+
+def test_error_classes_count_causes_and_keep_one_traceback_each(fx):
+    records = [
+        {"copy_key": "A", "error": "PolymerCreationError: template matching failed",
+         "traceback": "Traceback\n  polymer.py line 1\nPolymerCreationError"},
+        {"copy_key": "B", "error": "PolymerCreationError: H discrepancy"},
+        {"copy_key": "C", "error": "ValueError: invalid literal for int()",
+         "traceback": "Traceback\n  pdbutils.py line 9\nValueError"},
+        {"copy_key": "D", "runs": {}},
+    ]
+    classes = fx.error_classes(records)
+    assert classes["PolymerCreationError"]["n"] == 2
+    assert classes["PolymerCreationError"]["copies"] == ["A", "B"]
+    assert "polymer.py" in classes["PolymerCreationError"]["traceback"]
+    assert classes["ValueError"]["n"] == 1
+    assert "D" not in str(classes)
+
+
+def test_the_report_tables_the_causes_a_run_failed_for(fx, tmp_path):
+    import json
+
+    records = tmp_path / "records.json"
+    records.write_text(json.dumps([
+        {"copy_key": "A", "error": "PolymerCreationError: template matching failed"},
+        {"copy_key": "B", "error": "PolymerCreationError: H discrepancy"},
+        {"copy_key": "C", "error": "ValueError: invalid literal for int()"}]))
+    out, md = tmp_path / "flexible.json", tmp_path / "FLEXIBLE.md"
+    assert fx.main(["report", "--records", str(records), "--out", str(out),
+                    "--markdown", str(md)]) == 0
+    text = md.read_text()
+    assert "Copies not docked, by cause" in text
+    assert "| PolymerCreationError | 2 |" in text
+    assert "| ValueError | 1 |" in text
