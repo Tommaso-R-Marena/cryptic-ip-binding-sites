@@ -1,0 +1,404 @@
+name: Template transplant 2
+
+# docs/TEMPLATE2_PLAN.md: study O, the corrected version of study N. Chebyshev acceptance
+# with pruning at 2*eps (lossless by pruning_complete in formal/), burial required of the
+# PLACED ligand against a threshold read off the crystal IP6 classes, and controls matched
+# on basic-residue count - the quantity the fit score structurally requires and which
+# study N's controls were never matched on.
+#
+#   templates  anchors, ligands and ligand atom identities for every eligible IHP copy
+#   pool       each arm's queries plus 5 candidate controls each (no structures needed)
+#   counts     basic-residue count per pocket, 10 shards
+#   select     keep the basic-count-closest control per query
+#   binders    the annotated-binder and matched-control arms, 5 shards each
+#   guard      O1; its verdict gates everything below it
+#   candidates the candidate and matched-control arms, 10 shards each
+#   report     O1-O3; printed between markers
+#
+# As in study N the candidate arm is gated on the guard rather than merely reported after
+# it, so a failing guard leaves no candidate ranking in existence to report selectively.
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/TEMPLATE2_PLAN.md'
+      - 'scripts/template_chebyshev.py'
+      - '.github/workflows/template2.yml'
+  workflow_dispatch:
+    inputs:
+      specificity_run:
+        description: 'specificity run holding proteins_combined.csv.gz (the specificity-rerank artifact)'
+        default: '36020458866'
+
+concurrency:
+  group: template2-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  SPECIFICITY_RUN: ${{ inputs.specificity_run || '36020458866' }}
+  COUNT_SHARDS: '10'
+  BINDER_SHARDS: '5'
+  CANDIDATE_SHARDS: '10'
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      counts: ${{ steps.plan.outputs.counts }}
+      binders: ${{ steps.plan.outputs.binders }}
+      candidates: ${{ steps.plan.outputs.candidates }}
+    steps:
+      - id: plan
+        run: |
+          emit() { echo "$1=$(python3 -c "import json,os;print(json.dumps(list(range(int(os.environ['$2'])))))")" >> "$GITHUB_OUTPUT"; }
+          emit counts COUNT_SHARDS
+          emit binders BINDER_SHARDS
+          emit candidates CANDIDATE_SHARDS
+
+  templates:
+    name: Templates
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Entries holding an eligible IP6 copy
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          c = pd.read_csv("results/redocking/census.csv")
+          keep = c[(c.comp_id == "IHP") & (c.status == "eligible")
+                   & (c.complete.astype(str).str.lower() == "true")
+                   & (c.symmetry_contact.astype(str).str.lower() != "true")]
+          ids = sorted(set(keep.pdb_id.str.upper()))
+          open("template_ids.txt", "w").write("\n".join(ids) + "\n")
+          print(len(keep), "copies in", len(ids), "entries,",
+                keep.homology_group_strict.nunique(), "strict groups")
+          PY
+      - name: Cache template structures
+        uses: actions/cache@v5
+        with:
+          path: data/template/structures
+          key: template-structures-${{ hashFiles('results/redocking/census.csv') }}
+      - name: Fetch entries
+        run: |
+          python scripts/fetch_structures.py rcsb --out data/template/structures \
+            --ids-file template_ids.txt --manifest template_manifest.json
+      - name: Anchors, ligands and ligand atom identities
+        run: |
+          python scripts/template_chebyshev.py templates --census results/redocking/census.csv \
+            --structures data/template/structures --out templates.json.gz
+      - uses: actions/upload-artifact@v6
+        with:
+          name: template2-library
+          path: |
+            templates.json.gz
+            template_manifest.json
+          retention-days: 90
+
+  pool:
+    name: Pool
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Study C's scored proteins, which carry the matching columns
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$SPECIFICITY_RUN" --repo "$GITHUB_REPOSITORY" --name specificity-rerank --dir screen
+          find screen -name 'proteins_combined.csv.gz' | head -1
+      - name: Queries and their control pools
+        run: |
+          python scripts/template_chebyshev.py pool \
+            --proteins "$(find screen -name 'proteins_combined.csv.gz' | head -1)" \
+            --candidates results/triage/triaged_candidates.csv --out pool.csv
+      - uses: actions/upload-artifact@v6
+        with:
+          name: template2-pool
+          path: pool.csv
+          retention-days: 90
+
+  counts:
+    name: Counts ${{ matrix.shard }}
+    needs: [plan, pool]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.counts) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: template2-pool
+      - name: Models this shard needs
+        run: |
+          python scripts/template_chebyshev.py counts --rows pool.csv --list-only \
+            --shard "${{ matrix.shard }}" --shards "$COUNT_SHARDS" --out accessions.txt
+          python scripts/fetch_structures.py alphafold --out models --ids-file accessions.txt
+      - name: Basic-residue counts
+        run: |
+          python scripts/template_chebyshev.py counts --rows pool.csv --af-dir models \
+            --shard "${{ matrix.shard }}" --shards "$COUNT_SHARDS" \
+            --out "counts-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: template2-counts-${{ matrix.shard }}
+          path: counts-${{ matrix.shard }}.json
+          retention-days: 90
+
+  select:
+    name: Select controls
+    needs: counts
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: template2-pool
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: template2-counts-*
+          path: counts
+      - name: Basic-count-closest control per query
+        run: |
+          python scripts/template_chebyshev.py select --pool pool.csv --counts counts --out arms.csv
+      - uses: actions/upload-artifact@v6
+        with:
+          name: template2-arms
+          path: arms.csv
+          retention-days: 90
+
+  binders:
+    name: Binders ${{ matrix.arm }} ${{ matrix.shard }}
+    needs: [plan, templates, select]
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [annotated, annotated_controls]
+        shard: ${{ fromJson(needs.plan.outputs.binders) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: template2-library
+      - uses: actions/download-artifact@v7
+        with:
+          name: template2-arms
+      - name: Models this shard needs
+        run: |
+          python - <<'PY'
+          import pandas as pd, sys
+          sys.path.insert(0, "scripts")
+          import template_fit as tf
+          rows = pd.read_csv("arms.csv")
+          rows = rows[rows.arm == "${{ matrix.arm }}"]
+          part = tf.shard(list(rows.to_dict("records")), ${{ matrix.shard }}, int("${{ env.BINDER_SHARDS }}"))
+          open("accessions.txt", "w").write("\n".join(sorted({str(r["uniprot_id"]) for r in part})) + "\n")
+          PY
+          python scripts/fetch_structures.py alphafold --out models --ids-file accessions.txt
+      - name: Fit
+        run: |
+          python scripts/template_chebyshev.py fit --arm "${{ matrix.arm }}" \
+            --templates templates.json.gz --arms arms.csv --af-dir models \
+            --shard "${{ matrix.shard }}" --shards "$BINDER_SHARDS" \
+            --out "fits-${{ matrix.arm }}-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: template2-fits-${{ matrix.arm }}-${{ matrix.shard }}
+          path: fits-${{ matrix.arm }}-${{ matrix.shard }}.json
+          retention-days: 90
+
+  guard:
+    name: Guard
+    needs: binders
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      verdict: ${{ steps.guard.outputs.verdict }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: template2-fits-annotated*
+          path: parts
+      - name: O1
+        id: guard
+        run: |
+          python scripts/template_chebyshev.py merge --parts parts --out binder_fits.json
+          python scripts/template_chebyshev.py guard --fits binder_fits.json --out guard.json \
+            --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: template2-guard
+          path: |
+            binder_fits.json
+            guard.json
+          retention-days: 90
+
+  candidates:
+    name: Candidates ${{ matrix.arm }} ${{ matrix.shard }}
+    needs: [plan, templates, select, guard]
+    if: ${{ needs.guard.outputs.verdict == 'pass' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [candidates, controls]
+        shard: ${{ fromJson(needs.plan.outputs.candidates) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: template2-library
+      - uses: actions/download-artifact@v7
+        with:
+          name: template2-arms
+      - name: Models this shard needs
+        run: |
+          python - <<'PY'
+          import pandas as pd, sys
+          sys.path.insert(0, "scripts")
+          import template_fit as tf
+          rows = pd.read_csv("arms.csv")
+          rows = rows[rows.arm == "${{ matrix.arm }}"]
+          part = tf.shard(list(rows.to_dict("records")), ${{ matrix.shard }}, int("${{ env.CANDIDATE_SHARDS }}"))
+          open("accessions.txt", "w").write("\n".join(sorted({str(r["uniprot_id"]) for r in part})) + "\n")
+          PY
+          python scripts/fetch_structures.py alphafold --out models --ids-file accessions.txt
+      - name: Fit
+        run: |
+          python scripts/template_chebyshev.py fit --arm "${{ matrix.arm }}" \
+            --templates templates.json.gz --arms arms.csv --af-dir models \
+            --shard "${{ matrix.shard }}" --shards "$CANDIDATE_SHARDS" \
+            --out "fits-${{ matrix.arm }}-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: template2-fits-${{ matrix.arm }}-${{ matrix.shard }}
+          path: fits-${{ matrix.arm }}-${{ matrix.shard }}.json
+          retention-days: 90
+
+  report:
+    name: Report
+    needs: [guard, candidates]
+    # always(), not !cancelled(): a job killed by timeout-minutes is marked CANCELLED, and
+    # the candidate job is also skipped whenever the guard fails, which is a result rather
+    # than a fault.
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: template2-fits-*
+          path: parts
+      - name: O1, O2 and O3
+        run: |
+          python scripts/template_chebyshev.py merge --parts parts --out fits.json
+          python scripts/template_chebyshev.py report --fits fits.json --out template2.json \
+            --markdown TEMPLATE2.md
+      - name: Print the results, markdown first and the numbers last
+        run: |
+          python scripts/extract_log_block.py emit TEMPLATE2_MD_B64 TEMPLATE2.md
+          python scripts/extract_log_block.py emit TEMPLATE2_JSON template2.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: template2-report
+          path: |
+            fits.json
+            template2.json
+            TEMPLATE2.md
+          retention-days: 90

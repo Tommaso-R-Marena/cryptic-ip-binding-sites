@@ -87,3 +87,13 @@ study N **pre-registration**, not to a silent edit of a study already run.
   was re-derived numerically as above. Anyone with Lean 4.28 can run `lake build` here.
 - These theorems concern the **search**, not the biology. They say the enumeration misses
   nothing under a stated criterion. They say nothing about whether a pocket binds IP6.
+
+## Correction, 2026-10-01: the template library size
+
+This note originally repeated the plan's figure of 131 copies in 77 entries and 14 strict
+homology groups. That was wrong. The filter the code applies keeps copies whose
+`symmetry_contact` flag is empty, which is the 91 cryo-EM copies (no unit cell, so the
+symmetry-contact test is inapplicable rather than failed), so the library that ran was
+**222 copies across 137 PDB entries in 17 strict homology groups**. See
+`docs/TEMPLATE_PLAN_AMENDMENT_2.md`. No result changes: the run always used the larger
+library, only its description was wrong.

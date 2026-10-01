@@ -2,7 +2,7 @@
 
 **Run.** Template fit run 36743030815, commit `549d08e`, branch
 `claude/ip-binding-studies-26p6u4`. Report job 109987757920, guard job 109986231214.
-Templates fetched 77 RCSB entries; 5 shards per binder arm, 10 per candidate arm; 276
+Templates fetched 137 RCSB entries; 5 shards per binder arm, 10 per candidate arm; 276
 fit records. Plan: `docs/TEMPLATE_PLAN.md`, pre-registered before any template was
 extracted.
 
@@ -56,3 +56,13 @@ residues each pocket has.
 The diagnostics that would settle it are recorded in
 `docs/TEMPLATE_PLAN_AMENDMENT_1.md` and are explicitly post-hoc: they were written after
 these results were read and can support no hypothesis test.
+
+## Correction, 2026-10-01: the template library size
+
+This note originally repeated the plan's figure of 131 copies in 77 entries and 14 strict
+homology groups. That was wrong. The filter the code applies keeps copies whose
+`symmetry_contact` flag is empty, which is the 91 cryo-EM copies (no unit cell, so the
+symmetry-contact test is inapplicable rather than failed), so the library that ran was
+**222 copies across 137 PDB entries in 17 strict homology groups**. See
+`docs/TEMPLATE_PLAN_AMENDMENT_2.md`. No result changes: the run always used the larger
+library, only its description was wrong.
