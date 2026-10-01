@@ -360,3 +360,37 @@ def test_the_residues_census_records_a_bad_copy_instead_of_aborting_the_shard(fx
     assert records[1]["n_flex"] == 1
     # And the icode reached find_copy as empty, never as "nan".
     assert set(seen.values()) == {""}
+
+
+def test_the_report_survives_a_run_whose_shards_all_failed(fx, tmp_path):
+    """The report job runs on always() so a dead run still reports; it must not crash.
+
+    pivot_table raises KeyError on an empty frame, so the emptiness guard has to come
+    before the pivot rather than after it.
+    """
+    import json
+
+    records = tmp_path / "records.json"
+    records.write_text("[]")
+    out, md = tmp_path / "flexible.json", tmp_path / "FLEXIBLE.md"
+    assert fx.main(["report", "--records", str(records), "--out", str(out),
+                    "--markdown", str(md)]) == 0
+    result = json.loads(out.read_text())
+    assert result["J1"]["decision"] == "not evaluable"
+    assert result["J2"]["decision"] == "not evaluable"
+    assert result["n_copies_scored"] == 0
+    assert "holm" not in result
+    assert "not evaluable" in md.read_text()
+
+
+def test_the_report_survives_records_that_are_all_errors(fx, tmp_path):
+    import json
+
+    records = tmp_path / "records.json"
+    records.write_text(json.dumps([{"copy_key": "X", "error": "ReceptorError: no polymer atoms"}]))
+    out, md = tmp_path / "flexible.json", tmp_path / "FLEXIBLE.md"
+    assert fx.main(["report", "--records", str(records), "--out", str(out),
+                    "--markdown", str(md)]) == 0
+    result = json.loads(out.read_text())
+    assert result["J1"]["decision"] == "not evaluable"
+    assert result["errors"] == ["ReceptorError: no polymer atoms"]

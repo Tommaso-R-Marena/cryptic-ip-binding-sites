@@ -290,3 +290,19 @@ def test_placed_relative_sasa_separates_a_buried_from_an_exposed_ligand(tc, tmp_
     assert buried is not None and exposed is not None
     assert buried < exposed
     assert exposed > tc.BURIED_MAX_REL_SASA
+
+
+def test_the_report_survives_a_run_with_nothing_scored(tc, tmp_path):
+    """Study J's report crashed on an empty frame; this pins the sibling against it."""
+    import json
+
+    for payload in ([], [{"uniprot_id": "X", "arm": "candidates", "score": None,
+                          "error": "no AlphaFold model"}]):
+        fits = tmp_path / "fits.json"
+        fits.write_text(json.dumps(payload))
+        out, md = tmp_path / "o.json", tmp_path / "O.md"
+        assert tc.main(["report", "--fits", str(fits), "--out", str(out), "--markdown", str(md)]) == 0
+        result = json.loads(out.read_text())
+        assert result["O1"]["verdict"] == "not evaluable"
+        assert result["O2"]["decision"] == "not run"
+        assert md.read_text().strip()

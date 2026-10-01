@@ -259,6 +259,12 @@ def paired(frame: pd.DataFrame, column: str, n_bootstrap: int = N_BOOTSTRAP) -> 
     """Paired flex - rigid difference in ``column``, resampling whole strict groups."""
     from cryptic_ip.docking.stats import MIN_GROUPS, paired_difference
 
+    # Guard before pivoting, not after: pivot_table raises KeyError on an empty frame, and
+    # the report job runs on always() precisely so that a run whose shards all died still
+    # produces a "not evaluable" report rather than a second failure.
+    needed = {"copy_key", "homology_group_strict", "arm", column}
+    if frame.empty or not needed <= set(frame.columns):
+        return {"decision": "not evaluable", "reason": "no copy was scored"}
     wide = frame.pivot_table(index=["copy_key", "homology_group_strict"], columns="arm",
                              values=column, aggfunc="first").dropna()
     if wide.empty or not {"flex", "rigid"} <= set(wide.columns):
