@@ -502,9 +502,9 @@ def build(records: Sequence[dict], n_bootstrap: int = N_BOOTSTRAP) -> Dict[str, 
 def markdown(r: Dict[str, object]) -> str:
     lines = ["# Study J: does a flexible receptor recover study A's failures?", "",
              f"Pre-registered in `docs/FLEXIBLE_PLAN.md`, amended in "
-             f"`docs/FLEXIBLE_PLAN_AMENDMENT_1.md` and "
-             f"`docs/FLEXIBLE_PLAN_AMENDMENT_2.md`. Seed {r['seed']}, {r['n_bootstrap']} "
-             f"resamples of strict homology groups, exhaustiveness {r['exhaustiveness']}.",
+             f"`docs/FLEXIBLE_PLAN_AMENDMENT_1.md`, `_2.md` and `_3.md`. "
+             f"Seed {r['seed']}, {r['n_bootstrap']} resamples of strict homology groups, "
+             f"exhaustiveness {r['exhaustiveness']}.",
              f"Flexible side chains: within {r['flex_radius']} A of the ligand, at most "
              f"{r['max_flex']}.", ""]
     flex = r.get("flex_residues_per_copy")

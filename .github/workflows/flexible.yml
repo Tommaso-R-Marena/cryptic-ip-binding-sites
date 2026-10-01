@@ -1,7 +1,7 @@
 name: Flexible receptor
 
 # docs/FLEXIBLE_PLAN.md (study J), as amended by docs/FLEXIBLE_PLAN_AMENDMENT_1.md and
-# docs/FLEXIBLE_PLAN_AMENDMENT_2.md.
+# docs/FLEXIBLE_PLAN_AMENDMENT_2.md and docs/FLEXIBLE_PLAN_AMENDMENT_3.md.
 #
 # Every docking run in studies A, F and G held the receptor rigid. This asks whether
 # rotamer freedom in the pocket recovers study F's failures, and it is the last structural
@@ -26,6 +26,7 @@ on:
       - 'docs/FLEXIBLE_PLAN.md'
       - 'docs/FLEXIBLE_PLAN_AMENDMENT_1.md'
       - 'docs/FLEXIBLE_PLAN_AMENDMENT_2.md'
+      - 'docs/FLEXIBLE_PLAN_AMENDMENT_3.md'
       - 'scripts/flexible.py'
       - '.github/workflows/flexible.yml'
   workflow_dispatch:
@@ -48,12 +49,12 @@ permissions:
 env:
   CENSUS_RUN: ${{ inputs.census_run || '36020459246' }}
   PY_DOCKING: 'rdkit==2026.3.6 vina==1.2.7 meeko==0.8.0 gemmi==0.7.5 pdb2pqr==3.6.1 propka==3.5.1'
-  # 272 copies at no more than 3 a shard. A flexible copy that finishes costs 64-84 min
-  # (run 36828409167, shard 1), so ten copies a shard could never fit a 355-minute job:
-  # thirteen shards died on the first copy to overrun and the rest would have been killed
-  # mid-shard. Three copies at the 90-minute per-copy cap is 270 minutes, inside the
-  # shard's own 330-minute budget, which is inside timeout-minutes.
-  DOCK_SHARDS: '100'
+  # One copy a shard, 272 shards. Three a shard at a 90-minute per-copy cap censored 5 of
+  # the 12 copies readable in run 36850024210 - and the copies it cut are the slow ones,
+  # which are the larger receptors, so the cap was choosing the analysed set. Successful
+  # copies there took 30 to 86 minutes, so 90 minutes sat inside the body of the
+  # distribution rather than beyond its tail. See docs/FLEXIBLE_PLAN_AMENDMENT_3.md.
+  DOCK_SHARDS: '272'
 
 jobs:
   plan:
@@ -112,7 +113,7 @@ jobs:
           python scripts/flexible.py dock --census census/census.csv \
             --structures-dir data/redock/structures --ccd-dir census/ccd --work-dir work \
             --shard "${{ matrix.shard }}" --shards "$DOCK_SHARDS" \
-            --per-copy-timeout 5400 --shard-budget 19800 \
+            --per-copy-timeout 18000 --shard-budget 19800 \
             --out "flexible-${{ matrix.shard }}.json"
       - uses: actions/upload-artifact@v6
         if: always()
