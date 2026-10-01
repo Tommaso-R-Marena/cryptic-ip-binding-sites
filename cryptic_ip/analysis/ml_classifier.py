@@ -109,6 +109,32 @@ TOP_FRACTIONS: Tuple[float, ...] = (0.01, 0.05, 0.10)
 # --------------------------------------------------------------------- metrics
 
 
+def _frozen(estimator):
+    """Wrap an already-fitted estimator so a calibrator will not refit it.
+
+    scikit-learn deprecated ``CalibratedClassifierCV(cv="prefit")`` in 1.6 and
+    **removed** it in 1.8, where passing it raises ``InvalidParameterError``
+    rather than warning, so the calibration step died outright on a current
+    install. ``sklearn.frozen.FrozenEstimator`` is the documented replacement
+    and exists from 1.6, covering the pinned 1.7.2 and every later version; the
+    ``cv="prefit"`` path below remains only for older installs.
+    """
+    try:
+        from sklearn.frozen import FrozenEstimator
+    except ImportError:  # scikit-learn < 1.6
+        return estimator
+    return FrozenEstimator(estimator)
+
+
+def _frozen_kwargs() -> Dict[str, object]:
+    """``cv="prefit"`` only where :func:`_frozen` could not freeze the estimator."""
+    try:
+        import sklearn.frozen  # noqa: F401
+    except ImportError:  # scikit-learn < 1.6
+        return {"cv": "prefit"}
+    return {}
+
+
 def expected_calibration_error(
     y_true: np.ndarray, y_prob: np.ndarray, *, n_bins: int = 10
 ) -> float:
@@ -1040,7 +1066,7 @@ class CrypticSiteMLClassifier:
         # Isotonic regression needs a few hundred points to beat Platt scaling;
         # below that it overfits the calibration set.
         method = "isotonic" if int(np.sum(y[calib_idx] == 1)) >= 50 else "sigmoid"
-        calibrated = CalibratedClassifierCV(base, method=method, cv="prefit")
+        calibrated = CalibratedClassifierCV(_frozen(base), method=method, **_frozen_kwargs())
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             calibrated.fit(X.iloc[calib_idx], y[calib_idx])
