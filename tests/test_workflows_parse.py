@@ -99,3 +99,52 @@ def test_matrices_stay_small(path):
             if isinstance(values, list):
                 size *= len(values)
         assert size <= 30, f"{path.name}: {name} has {size} matrix entries"
+
+
+#: GitHub generates at most this many jobs from one matrix. Past it the job is dropped
+#: without failing the run, which is how study J's 272-shard matrix produced a green run
+#: with no docking in it (run 36883632819).
+MATRIX_JOB_LIMIT = 256
+
+
+def _flexible():
+    path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "flexible.yml"
+    return path, yaml.safe_load(path.read_text())
+
+
+def test_the_shard_halves_tile_every_shard_exactly_once():
+    """The split must cover range(DOCK_SHARDS) with no gap and no overlap.
+
+    A gap silently drops copies from the study; an overlap docks them twice.
+    """
+    _path, data = _flexible()
+    n = int(data["env"]["DOCK_SHARDS"])
+    half = (n + 1) // 2
+    first, second = list(range(half)), list(range(half, n))
+    assert first + second == list(range(n))
+    assert not set(first) & set(second)
+
+
+def test_neither_shard_matrix_can_reach_the_matrix_job_limit():
+    _path, data = _flexible()
+    n = int(data["env"]["DOCK_SHARDS"])
+    half = (n + 1) // 2
+    assert half <= MATRIX_JOB_LIMIT, f"first half is {half} jobs"
+    assert n - half <= MATRIX_JOB_LIMIT, f"second half is {n - half} jobs"
+
+
+def test_both_shard_matrices_are_wired_to_their_own_half():
+    _path, data = _flexible()
+    jobs = data["jobs"]
+    for job, output in (("dock_a", "dock_a"), ("dock_b", "dock_b")):
+        matrix = jobs[job]["strategy"]["matrix"]["shard"]
+        assert f"needs.plan.outputs.{output}" in matrix, f"{job} reads {matrix}"
+    assert set(jobs["report"]["needs"]) == {"dock_a", "dock_b"}
+
+
+def test_the_report_fails_when_no_shard_produced_a_file():
+    """A dropped matrix must not look like a run whose copies all failed."""
+    _path, data = _flexible()
+    merge = [s for s in data["jobs"]["report"]["steps"] if s.get("name") == "Merge the shards"]
+    assert merge, "the report no longer has a merge step"
+    assert "no shard produced an output file" in merge[0]["run"]

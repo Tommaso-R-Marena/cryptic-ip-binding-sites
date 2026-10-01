@@ -61,13 +61,24 @@ jobs:
     name: Plan
     runs-on: ubuntu-latest
     outputs:
-      dock: ${{ steps.plan.outputs.dock }}
+      dock_a: ${{ steps.plan.outputs.dock_a }}
+      dock_b: ${{ steps.plan.outputs.dock_b }}
     steps:
+      # A matrix generates at most 256 jobs per run. 272 shards in one matrix does not
+      # fail - the Dock job is dropped, the report runs on nothing and the run goes green
+      # (run 36883632819). The shards are split across two matrices so neither can reach
+      # the cap, and tests/test_workflows_parse.py pins that they tile the range exactly.
       - id: plan
         run: |
-          echo "dock=$(python3 -c "import json,os;print(json.dumps(list(range(int(os.environ['DOCK_SHARDS'])))))")" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          n = int(os.environ["DOCK_SHARDS"])
+          half = (n + 1) // 2
+          print("dock_a=" + json.dumps(list(range(half))))
+          print("dock_b=" + json.dumps(list(range(half, n))))
+          PY
 
-  dock:
+  dock_a:
     name: Dock ${{ matrix.shard }}
     needs: plan
     if: ${{ !inputs.dock_run }}
@@ -77,7 +88,64 @@ jobs:
       fail-fast: false
       max-parallel: 20
       matrix:
-        shard: ${{ fromJson(needs.plan.outputs.dock) }}
+        shard: ${{ fromJson(needs.plan.outputs.dock_a) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+          which pdb2pqr
+      - name: Census and inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-census --dir census
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-inputs --dir bench
+      - name: Restore structures
+        uses: actions/cache/restore@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch anything the cache lacks
+        run: python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file bench/table_ids.txt
+      - name: Which side chains move
+        run: |
+          python scripts/flexible.py residues --census census/census.csv \
+            --structures data/redock/structures --out "residues-${{ matrix.shard }}.json"
+      - name: Dock both arms
+        env:
+          OMP_NUM_THREADS: '1'
+        run: |
+          python scripts/flexible.py dock --census census/census.csv \
+            --structures-dir data/redock/structures --ccd-dir census/ccd --work-dir work \
+            --shard "${{ matrix.shard }}" --shards "$DOCK_SHARDS" \
+            --per-copy-timeout 18000 --shard-budget 19800 \
+            --out "flexible-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: flexible-arms-${{ matrix.shard }}
+          path: |
+            flexible-${{ matrix.shard }}.json
+            residues-${{ matrix.shard }}.json
+          retention-days: 90
+
+  dock_b:
+    name: Dock ${{ matrix.shard }}
+    needs: plan
+    if: ${{ !inputs.dock_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.dock_b) }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -126,7 +194,7 @@ jobs:
 
   report:
     name: Report
-    needs: dock
+    needs: [dock_a, dock_b]
     # always(), not !cancelled(): a shard killed by timeout-minutes is marked CANCELLED,
     # and the report matters most when a shard ran out of budget.
     if: ${{ always() }}
@@ -161,12 +229,18 @@ jobs:
           import json
           from pathlib import Path
           records = []
-          for path in sorted(Path("parts").rglob("flexible-*.json")):
+          parts = sorted(Path("parts").rglob("flexible-*.json"))
+          for path in parts:
               payload = json.loads(path.read_text())
               if isinstance(payload, list):
                   records.extend(payload)
           Path("records.json").write_text(json.dumps(records))
-          print(len(records), "copy records merged")
+          print(len(parts), "shard files,", len(records), "copy records merged")
+          # No shard file at all is a structural failure, not a degenerate result: it is
+          # what a dropped matrix looks like. A run where shards ran and every copy failed
+          # still has files, and still reports. Failing here stops that going green.
+          if not parts:
+              raise SystemExit("no shard produced an output file - did the matrix run?")
           PY
       - name: J1, J2 and J3
         run: |
