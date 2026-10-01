@@ -303,3 +303,60 @@ def test_an_unknown_residue_id_is_skipped_rather_than_crashing_the_copy(fx, pept
     _rigid, flex, applied = fx.prepare_pair(
         protonated, work / "bogus", [{"chain": "Z", "resseq": 9999, "icode": ""}])
     assert applied == [] and flex is None
+
+
+# ------------------------------------------------------- the residues census
+def test_nan_text_reads_as_empty_not_as_the_string_nan(fx):
+    """`NaN or ""` is NaN, so formatting it gives "nan" and matches no copy.
+
+    This cost a whole study J shard: every census row without an insertion code carries
+    NaN there, so find_copy was asked for "A:281nan".
+    """
+    assert fx._text(float("nan")) == ""
+    assert fx._text(None) == ""
+    assert fx._text("  A ") == "A"
+
+
+def test_the_residues_census_records_a_bad_copy_instead_of_aborting_the_shard(fx, tmp_path, monkeypatch):
+    """find_copy raises rather than returning None, which killed the whole step."""
+    import redocking
+
+    census = tmp_path / "census.csv"
+    pd_mod = pytest.importorskip("pandas")
+    pd_mod.DataFrame([
+        {"copy_key": "1AAA:A:1", "pdb_id": "1AAA", "chain": "A", "resseq": 1,
+         "icode": float("nan"), "selected": True},
+        {"copy_key": "1BBB:A:2", "pdb_id": "1BBB", "chain": "A", "resseq": 2,
+         "icode": float("nan"), "selected": True},
+    ]).to_csv(census, index=False)
+
+    structures = tmp_path / "structures"
+    structures.mkdir()
+    (structures / "1AAA.pdb").write_text("END\n")
+    (structures / "1BBB.pdb").write_text("END\n")
+
+    seen = {}
+
+    def fake_find_copy(arrays, chain, resseq, icode):
+        seen[resseq] = icode
+        if resseq == 1:
+            raise LookupError(f"copy {chain}:{resseq}{icode} not found")
+        return ("k", "IHP", np.array([0]))
+
+    monkeypatch.setattr(redocking, "find_copy", fake_find_copy)
+    monkeypatch.setattr(redocking, "structure_path", lambda d, p: Path(d) / f"{p}.pdb")
+    monkeypatch.setattr(fx, "flexible_residues", lambda arrays, xyz: [{"resseq": 5}])
+    monkeypatch.setattr(
+        "cryptic_ip.analysis.structure_arrays.load_structure_arrays",
+        lambda path: types.SimpleNamespace(elements=np.array(["P"]), coords=np.zeros((1, 3))))
+
+    out = tmp_path / "residues.json"
+    assert fx.main(["residues", "--census", str(census), "--structures", str(structures),
+                    "--out", str(out)]) == 0
+    import json
+    records = json.loads(out.read_text())
+    # The raising copy is recorded as its own failure; the good copy still gets counted.
+    assert records[0]["error"].startswith("LookupError")
+    assert records[1]["n_flex"] == 1
+    # And the icode reached find_copy as empty, never as "nan".
+    assert set(seen.values()) == {""}

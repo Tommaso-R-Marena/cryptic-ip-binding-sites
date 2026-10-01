@@ -69,6 +69,13 @@ ARMS = ("rigid", "flex")
 
 
 # ------------------------------------------------------------------ residue choice
+def _text(value: object) -> str:
+    """A CSV cell as text, with pandas' NaN read as empty rather than the string "nan"."""
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return ""
+    return str(value).strip()
+
+
 def flexible_residues(arrays, ligand_xyz: np.ndarray, *, radius: float = FLEX_RADIUS,
                       cap: int = MAX_FLEX) -> List[Dict[str, object]]:
     """The plan's rule, in order: within ``radius``, side-chain-bearing, not a disulphide CYS.
@@ -466,13 +473,18 @@ def cmd_residues(args: argparse.Namespace) -> int:
         if path is None:
             out.append({"copy_key": row["copy_key"], "error": "structure missing"})
             continue
-        arrays = load_structure_arrays(path)
-        found = redocking.find_copy(arrays, str(row["chain"]), int(row["resseq"]),
-                                    str(row.get("icode") or "").strip())
-        if found is None:
-            out.append({"copy_key": row["copy_key"], "error": "copy not found"})
+        try:
+            arrays = load_structure_arrays(path)
+            # find_copy *raises* when the copy is absent, and the icode cell is NaN for
+            # every copy without an insertion code - `NaN or ""` is NaN, so formatting it
+            # produces the string "nan" and matches nothing. Both cost a whole shard once.
+            _key, _comp_id, atoms = redocking.find_copy(
+                arrays, _text(row["chain"]), int(row["resseq"]), _text(row.get("icode")))
+            heavy = atoms[arrays.elements[atoms] != "H"]
+            chosen = flexible_residues(arrays, arrays.coords[heavy])
+        except Exception as exc:  # noqa: BLE001 - one copy's failure is not the shard's
+            out.append({"copy_key": row["copy_key"], "error": f"{type(exc).__name__}: {exc}"[:300]})
             continue
-        chosen = flexible_residues(arrays, arrays.coords[found])
         out.append({"copy_key": row["copy_key"], "n_flex": len(chosen), "residues": chosen})
     Path(args.out).write_text(json.dumps(out, indent=2, default=str))
     counts = [r.get("n_flex", 0) for r in out]
