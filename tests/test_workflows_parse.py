@@ -41,14 +41,15 @@ ANALYSES = {
     "proteome-screen.yml", "train-real-data.yml", "yeast-rescreen.yml", "transfer.yml",
     "transfer-secondary.yml", "learned-screen.yml", "redocking.yml", "arrestin.yml", "specificity.yml",
     "hull-gate.yml", "redocking-audit.yml", "rerank.yml", "sampling.yml", "triage.yml",
-    "orthogonal.yml", "coevolution.yml", "kinase.yml", "cofold-probe.yml", "template-fit.yml", "template2.yml",
+    "orthogonal.yml", "coevolution.yml", "kinase.yml", "cofold-probe.yml",
+    "template-fit.yml", "template2.yml", "flexible.yml",
 }
 
 #: Workflows written under the conventions below from the start; older ones are
 #: not edited, because touching their files would re-run their analyses.
 STRICT = {"redocking.yml", "arrestin.yml", "specificity.yml", "hull-gate.yml", "redocking-audit.yml",
           "rerank.yml", "sampling.yml", "triage.yml", "orthogonal.yml", "coevolution.yml", "kinase.yml",
-          "cofold-probe.yml", "template-fit.yml", "template2.yml"}
+          "cofold-probe.yml", "template-fit.yml", "template2.yml", "flexible.yml"}
 
 
 @pytest.mark.parametrize("path", [p for p in WORKFLOWS if p.name in ANALYSES], ids=lambda p: p.name)
