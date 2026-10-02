@@ -43,8 +43,21 @@ def parse_positions(text: object) -> List[int]:
     return [int(t) for t in text.replace(";", ",").split(",") if t.strip().lstrip("-").isdigit()]
 
 
-def matched_controls(candidates: pd.DataFrame, proteins: pd.DataFrame) -> pd.DataFrame:
-    """One pLDDT- and depth-matched, low-ranking protein per candidate (the plan's rule)."""
+def matched_controls(candidates: pd.DataFrame, proteins: pd.DataFrame, *,
+                     n_per_candidate: int = 1) -> pd.DataFrame:
+    """pLDDT- and depth-matched, low-ranking proteins per candidate (the plan's rule).
+
+    With ``n_per_candidate = 1`` - the default, and what studies H, I and N ran - this
+    returns exactly one control per candidate and its behaviour is unchanged.
+
+    Larger values return a *pool*, ordered by accession, from which a caller can select
+    on a further criterion. Study O needs that: its fit score is undefined for a pocket
+    with fewer than four basic residues, so a control arm matched only on pLDDT and hull
+    depth is systematically unscoreable where the candidates - selected by a screen that
+    rewards basic pockets - are not. Matching on basic-residue count directly is not
+    possible here, because that count needs a structure per protein and the pool spans
+    whole proteomes; drawing a small pool and measuring only those is affordable.
+    """
     required = ("uniprot_id", "organism_key", "top_pocket_residues", "plddt_mean", "hull_depth", "combined")
     missing = [c for c in required if c not in proteins.columns]
     if missing:
@@ -68,11 +81,12 @@ def matched_controls(candidates: pd.DataFrame, proteins: pd.DataFrame) -> pd.Dat
                     & ~same["uniprot_id"].isin(used)]
         if near.empty:
             continue
-        pick = near.sort_values("uniprot_id").iloc[0]
-        used.add(pick["uniprot_id"])
-        rows.append({"uniprot_id": pick["uniprot_id"], "organism_key": pick["organism_key"],
-                     "top_pocket_residues": pick.get("top_pocket_residues"), "cluster": pick.get("cluster"),
-                     "role": "control", "matched_to": cand["uniprot_id"]})
+        for rank, (_, pick) in enumerate(near.sort_values("uniprot_id").head(n_per_candidate).iterrows()):
+            used.add(pick["uniprot_id"])
+            rows.append({"uniprot_id": pick["uniprot_id"], "organism_key": pick["organism_key"],
+                         "top_pocket_residues": pick.get("top_pocket_residues"),
+                         "cluster": pick.get("cluster"), "role": "control",
+                         "matched_to": cand["uniprot_id"], "pool_rank": rank})
     return pd.DataFrame(rows)
 
 

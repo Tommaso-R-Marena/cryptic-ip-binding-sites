@@ -1,0 +1,584 @@
+{
+  "N1": {
+    "auc": {
+      "evidence": true,
+      "groups": 93,
+      "negatives": 63,
+      "positives": 62,
+      "roc_auc": {
+        "high": 0.6517068657755591,
+        "low": 0.5462741591212561,
+        "p_value": 0.001,
+        "point": 0.5988223246287763
+      }
+    },
+    "n": 125,
+    "n_binders": 62,
+    "n_controls": 63,
+    "verdict": "pass"
+  },
+  "N2": {
+    "decision": "better in candidates",
+    "estimate": {
+      "copies": 75,
+      "evidence": true,
+      "groups": 65,
+      "per_copy": {
+        "high": 1.7925383204326362,
+        "low": 1.0512531986135625,
+        "p_value": 0.0,
+        "point": 1.4199636648711902
+      },
+      "per_group": {
+        "high": 1.833791061885529,
+        "low": 1.056487775891919,
+        "p_value": 0.0,
+        "point": 1.4534149513794183
+      }
+    },
+    "n_pairs": 75
+  },
+  "N3": {
+    "members": [
+      {
+        "buried_fraction": 0.027777777777777776,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS263",
+          "A:LYS804",
+          "A:ARG271",
+          "A:LYS803"
+        ],
+        "rmsd": 0.2930689798103884,
+        "score": -0.2930689798103884,
+        "template": "8YJA:A:3802",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q8TF62"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS287",
+          "A:LYS209",
+          "A:LYS260",
+          "A:LYS229"
+        ],
+        "rmsd": 0.3973489584669907,
+        "score": -0.3973489584669907,
+        "template": "3W8L:B:500",
+        "template_burial": "surface",
+        "uniprot_id": "Q54V51"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS67",
+          "A:ARG41",
+          "A:LYS45",
+          "A:ARG63"
+        ],
+        "rmsd": 0.4482448630482313,
+        "score": -0.4482448630482313,
+        "template": "9T4L:A:201",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q5TC63"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS322",
+          "A:LYS83",
+          "A:LYS30",
+          "A:LYS269"
+        ],
+        "rmsd": 0.4540644551270675,
+        "score": -0.4540644551270675,
+        "template": "8E0F:B:801",
+        "template_burial": "cryptic",
+        "uniprot_id": "Q54ZL1"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS844",
+          "A:ARG826",
+          "A:LYS816",
+          "A:ARG876"
+        ],
+        "rmsd": 0.4790648178664874,
+        "score": -0.4790648178664874,
+        "template": "6ID0:A:3000",
+        "template_burial": "surface",
+        "uniprot_id": "Q55AR6"
+      },
+      {
+        "buried_fraction": 0.1111111111111111,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:ARG215",
+          "A:ARG319",
+          "A:ARG200",
+          "A:HIS451"
+        ],
+        "rmsd": 0.5165203629121751,
+        "score": -0.5165203629121751,
+        "template": "9T4G:A:201",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "O15213"
+      },
+      {
+        "buried_fraction": 0.05555555555555555,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:ARG132",
+          "A:ARG136",
+          "A:LYS203",
+          "A:ARG227"
+        ],
+        "rmsd": 0.6051174791235564,
+        "score": -0.6051174791235564,
+        "template": "8E4X:A:801",
+        "template_burial": "cryptic",
+        "uniprot_id": "Q96MK3"
+      },
+      {
+        "buried_fraction": 0.027777777777777776,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:ARG1280",
+          "A:LYS1149",
+          "A:ARG1152",
+          "A:ARG1273"
+        ],
+        "rmsd": 0.608544498670902,
+        "score": -0.608544498670902,
+        "template": "9R7L:Q:101",
+        "template_burial": "surface",
+        "uniprot_id": "Q99315"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:ARG111",
+          "A:LYS113",
+          "A:LYS162",
+          "A:ARG158"
+        ],
+        "rmsd": 0.6129498020465274,
+        "score": -0.6129498020465274,
+        "template": "3MMJ:B:1901",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q04093"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS442",
+          "A:ARG439",
+          "A:HIS445",
+          "A:HIS619"
+        ],
+        "rmsd": 0.627106246468258,
+        "score": -0.627106246468258,
+        "template": "9T4K:A:201",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q86HQ2"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS104",
+          "A:LYS261",
+          "A:ARG265",
+          "A:LYS236"
+        ],
+        "rmsd": 0.6415300989249378,
+        "score": -0.6415300989249378,
+        "template": "6BHT:D:301",
+        "template_burial": "surface",
+        "uniprot_id": "P12271"
+      },
+      {
+        "buried_fraction": 0.027777777777777776,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS95",
+          "A:LYS92",
+          "A:LYS25",
+          "A:LYS78"
+        ],
+        "rmsd": 0.649812267288268,
+        "score": -0.649812267288268,
+        "template": "8XUQ:E:901",
+        "template_burial": "surface",
+        "uniprot_id": "Q55E68"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS317",
+          "A:LYS293",
+          "A:ARG265",
+          "A:LYS236"
+        ],
+        "rmsd": 0.6501287778851373,
+        "score": -0.6501287778851373,
+        "template": "9T4H:A:201",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q558S9"
+      },
+      {
+        "buried_fraction": 0.1388888888888889,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS180",
+          "A:ARG177",
+          "A:LYS176",
+          "A:LYS173"
+        ],
+        "rmsd": 0.6781975672446166,
+        "score": -0.6781975672446166,
+        "template": "7XZJ:A:2001",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q552Q7"
+      },
+      {
+        "buried_fraction": 0.05555555555555555,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS452",
+          "A:LYS363",
+          "A:LYS459",
+          "A:LYS496"
+        ],
+        "rmsd": 0.6789605988498321,
+        "score": -0.6789605988498321,
+        "template": "9QZ0:BA:501",
+        "template_burial": "surface",
+        "uniprot_id": "Q54WR2"
+      },
+      {
+        "buried_fraction": 0.05555555555555555,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS167",
+          "A:LYS114",
+          "A:LYS305",
+          "A:LYS260"
+        ],
+        "rmsd": 0.6961271358485699,
+        "score": -0.6961271358485699,
+        "template": "9DWD:G:401",
+        "template_burial": "surface",
+        "uniprot_id": "Q54EV4"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS424",
+          "A:LYS443",
+          "A:LYS421",
+          "A:ARG450"
+        ],
+        "rmsd": 0.7194543772684246,
+        "score": -0.7194543772684246,
+        "template": "7SDB:A:500",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q869U6"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:ARG313",
+          "A:LYS160",
+          "A:ARG314",
+          "A:ARG316"
+        ],
+        "rmsd": 0.7202272000236425,
+        "score": -0.7202272000236425,
+        "template": "9T4K:A:201",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "P25374"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS937",
+          "A:ARG933",
+          "A:LYS742",
+          "A:LYS856"
+        ],
+        "rmsd": 0.750755638716382,
+        "score": -0.750755638716382,
+        "template": "9QZ0:BA:501",
+        "template_burial": "surface",
+        "uniprot_id": "Q54DB2"
+      },
+      {
+        "buried_fraction": 0.2777777777777778,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:ARG245",
+          "A:ARG152",
+          "A:HIS171",
+          "A:ARG211"
+        ],
+        "rmsd": 0.8214747276357621,
+        "score": -0.8214747276357621,
+        "template": "9OP3:B:801",
+        "template_burial": "cryptic",
+        "uniprot_id": "Q7Z7A3"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:ARG156",
+          "A:ARG137",
+          "A:ARG73",
+          "A:LYS71"
+        ],
+        "rmsd": 0.8345679064629351,
+        "score": -0.8345679064629351,
+        "template": "9R7L:F:101",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q54L34"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:HIS70",
+          "A:LYS66",
+          "A:ARG192",
+          "A:LYS27"
+        ],
+        "rmsd": 0.8429096799819631,
+        "score": -0.8429096799819631,
+        "template": "8YJA:A:3802",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q12462"
+      },
+      {
+        "buried_fraction": 0.08333333333333333,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS349",
+          "A:LYS224",
+          "A:ARG353",
+          "A:ARG470"
+        ],
+        "rmsd": 0.8862507884976847,
+        "score": -0.8862507884976847,
+        "template": "9QZ0:AA:501",
+        "template_burial": "surface",
+        "uniprot_id": "P11412"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS132",
+          "A:ARG50",
+          "A:ARG146",
+          "A:ARG54"
+        ],
+        "rmsd": 0.9042806455952745,
+        "score": -0.9042806455952745,
+        "template": "9T4H:A:201",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q8TBH0"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS1020",
+          "A:LYS985",
+          "A:LYS1017",
+          "A:ARG986"
+        ],
+        "rmsd": 0.9102338592552272,
+        "score": -0.9102338592552272,
+        "template": "9N58:B:401",
+        "template_burial": "surface",
+        "uniprot_id": "P35207"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:ARG68",
+          "A:ARG181",
+          "A:ARG177",
+          "A:LYS66"
+        ],
+        "rmsd": 0.9985681842676782,
+        "score": -0.9985681842676782,
+        "template": "9T4K:A:201",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "P36144"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS1747",
+          "A:ARG1508",
+          "A:LYS1506",
+          "A:LYS1589"
+        ],
+        "rmsd": 1.0168191494488439,
+        "score": -1.0168191494488439,
+        "template": "9T4G:A:201",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q99231"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:ARG283",
+          "A:LYS37",
+          "A:ARG85",
+          "A:LYS27"
+        ],
+        "rmsd": 1.0535835680314107,
+        "score": -1.0535835680314107,
+        "template": "9R7L:Q:101",
+        "template_burial": "surface",
+        "uniprot_id": "P18238"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS100",
+          "A:ARG97",
+          "A:ARG74",
+          "A:LYS77"
+        ],
+        "rmsd": 1.2378761512562977,
+        "score": -1.2378761512562977,
+        "template": "9QZ0:AA:501",
+        "template_burial": "surface",
+        "uniprot_id": "P0C7X1"
+      },
+      {
+        "buried_fraction": 0.16666666666666666,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:ARG412",
+          "A:ARG227",
+          "A:ARG432",
+          "A:HIS407"
+        ],
+        "rmsd": 1.2465087078772876,
+        "score": -1.2465087078772876,
+        "template": "5HP2:A:801",
+        "template_burial": "cryptic",
+        "uniprot_id": "Q06538"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:ARG443",
+          "A:LYS476",
+          "A:ARG371",
+          "A:ARG362"
+        ],
+        "rmsd": 1.2657776898246254,
+        "score": -1.2657776898246254,
+        "template": "3MMJ:B:1901",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q01638"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:LYS100",
+          "A:ARG97",
+          "A:ARG74",
+          "A:LYS77"
+        ],
+        "rmsd": 1.3014348281230979,
+        "score": -1.3014348281230979,
+        "template": "9QZ0:AA:501",
+        "template_burial": "surface",
+        "uniprot_id": "B9A6J9"
+      },
+      {
+        "buried_fraction": 0.2222222222222222,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:ARG208",
+          "A:LYS69",
+          "A:ARG367",
+          "A:LYS83"
+        ],
+        "rmsd": 1.4536763589802117,
+        "score": -1.4536763589802117,
+        "template": "9R7L:F:101",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q54S10"
+      },
+      {
+        "buried_fraction": 0.16666666666666666,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:ARG86",
+          "A:ARG285",
+          "A:ARG243",
+          "A:ARG244"
+        ],
+        "rmsd": 1.9216313169999641,
+        "score": -1.9216313169999641,
+        "template": "9RSQ:A:2501",
+        "template_burial": "surface",
+        "uniprot_id": "P04710"
+      },
+      {
+        "buried_fraction": 0.0,
+        "n_anchors": 4.0,
+        "query_anchor_labels": [
+          "A:HIS355",
+          "A:LYS282",
+          "A:ARG221",
+          "A:ARG193"
+        ],
+        "rmsd": 2.448238692994424,
+        "score": -2.448238692994424,
+        "template": "9T4L:A:201",
+        "template_burial": "semi_cryptic",
+        "uniprot_id": "Q05048"
+      }
+    ],
+    "n_candidates_scored": 75,
+    "n_controls_scored": 75,
+    "percentile": 95.0,
+    "threshold": -4.0
+  },
+  "errors": [
+    "no AlphaFold model"
+  ],
+  "holm": {
+    "N1": 0.001,
+    "N2": 0.0
+  },
+  "n_bootstrap": 2000,
+  "n_records": 276,
+  "seed": 20261006
+}

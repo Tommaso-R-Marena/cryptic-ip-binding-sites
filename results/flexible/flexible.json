@@ -1,0 +1,350 @@
+{
+  "J1": {
+    "decision": "worse",
+    "estimate": {
+      "copies": 209,
+      "evidence": true,
+      "groups": 29,
+      "per_copy": {
+        "high": -0.035712413896376166,
+        "low": -0.10606609574000878,
+        "p_value": 0.0,
+        "point": -0.07017543859649122
+      },
+      "per_group": {
+        "high": -0.030832976024344986,
+        "low": -0.14023663176135132,
+        "p_value": 0.001,
+        "point": -0.07796428863109378
+      }
+    },
+    "flex_mean": 0.025518341307814992,
+    "n_copies": 209,
+    "rigid_mean": 0.09569377990430622
+  },
+  "J2": {
+    "decision": "worse",
+    "estimate": {
+      "copies": 209,
+      "evidence": true,
+      "groups": 29,
+      "per_copy": {
+        "high": -0.1147824826632774,
+        "low": -0.265830440996325,
+        "p_value": 0.0,
+        "point": -0.18819776714513553
+      },
+      "per_group": {
+        "high": -0.0994992087569802,
+        "low": -0.24335239650511897,
+        "p_value": 0.0,
+        "point": -0.17008741650045203
+      }
+    },
+    "flex_mean": 0.17862838915470491,
+    "n_copies": 209,
+    "rigid_mean": 0.36682615629984044
+  },
+  "J3": {
+    "cryptic": {
+      "decision": "not evaluable",
+      "estimate": {
+        "copies": 11,
+        "evidence": false,
+        "groups": 4,
+        "per_copy": {
+          "high": 0.16666666666666666,
+          "low": -0.4166666666666667,
+          "p_value": 0.16,
+          "point": -0.2424242424242424
+        },
+        "per_group": {
+          "high": 0.17708333333333334,
+          "low": -0.5,
+          "p_value": 0.427,
+          "point": -0.15625
+        }
+      },
+      "flex_mean": 0.1212121212121212,
+      "n_copies": 11,
+      "reason": "4 strict groups, fewer than the 5 required",
+      "rigid_mean": 0.36363636363636365
+    },
+    "semi_cryptic": {
+      "decision": "worse",
+      "estimate": {
+        "copies": 44,
+        "evidence": true,
+        "groups": 11,
+        "per_copy": {
+          "high": -0.049975490196078554,
+          "low": -0.18895061728395057,
+          "p_value": 0.003,
+          "point": -0.11363636363636362
+        },
+        "per_group": {
+          "high": -0.053268398268398326,
+          "low": -0.2257742257742258,
+          "p_value": 0.0,
+          "point": -0.13688533688533694
+        }
+      },
+      "flex_mean": 0.04545454545454545,
+      "n_copies": 44,
+      "rigid_mean": 0.1590909090909091
+    },
+    "surface": {
+      "decision": "worse",
+      "estimate": {
+        "copies": 154,
+        "evidence": true,
+        "groups": 22,
+        "per_copy": {
+          "high": -0.0045045045045045045,
+          "low": -0.06383448405429523,
+          "p_value": 0.02,
+          "point": -0.045454545454545456
+        },
+        "per_group": {
+          "high": -0.00505050505050505,
+          "low": -0.043900518341307815,
+          "p_value": 0.02,
+          "point": -0.021677299308878253
+        }
+      },
+      "flex_mean": 0.012987012987012988,
+      "n_copies": 154,
+      "rigid_mean": 0.05844155844155844
+    }
+  },
+  "error_classes": {
+    "AtomValenceException": {
+      "copies": [
+        "6J6G:A:3000",
+        "2P1N:B:601"
+      ],
+      "example_copy": "6J6G:A:3000",
+      "n": 2,
+      "traceback": "_pair(protonated, ctx.work / \"arm_rigid\",\n                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/runner/work/cryptic-ip-binding-sites/cryptic-ip-binding-sites/scripts/flexible.py\", line 281, in prepare_pair\n    polymer = Polymer.from_pqr_string(text, mk_prep=mk, **options)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/meeko/polymer.py\", line 1769, in from_pqr_string\n    tmp_raw_input_mols = cls._pqr_to_residue_mols(\n                         ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/meeko/polymer.py\", line 2695, in _pqr_to_residue_mols\n    pdbmol, _, missed_altloc, needed_altloc = _aux_altloc_mol_build(\n                                              ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/meeko/utils/rdkitutils.py\", line 415, in _aux_altloc_mol_build\n    _ = Chem.SanitizeMol(pdbmol)\n        ^^^^^^^^^^^^^^^^^^^^^^^^\nrdkit.Chem.rdchem.AtomValenceException: Explicit valence for atom # 1 C, 5, is greater than permitted\n"
+    },
+    "PolymerCreationError": {
+      "copies": [
+        "5ICN:A:401",
+        "9D5K:A:801",
+        "9D5K:B:801"
+      ],
+      "example_copy": "5ICN:A:401",
+      "n": 9,
+      "traceback": "ptic-ip-binding-sites/scripts/flexible.py\", line 281, in prepare_pair\n    polymer = Polymer.from_pqr_string(text, mk_prep=mk, **options)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/meeko/polymer.py\", line 1829, in from_pqr_string\n    handle_parsing_situations(\n  File \"/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/meeko/polymer.py\", line 908, in handle_parsing_situations\n    raise PolymerCreationError(err, recs)\nmeeko.polymer.PolymerCreationError: \nError: Creation of data structure for receptor failed.\n\nDetails:\n\nBad res C:18 is within radius of box edge (0.0000 <= delete_bad_res_from_box_radius=8.0000 A).\nThese residues can be ignored with option --delete_bad_res or --delete_bad_res_from_box_radius.\n\nRecommendations:\n1. (for batch processing) Use -a/--allow_bad_res to automatically remove residues\nthat do not match templates, and --default_altloc to set\na default altloc variant. Use these at your own risk.\n\n2. (processing individual structure) Inspecting and fixing the input structure is recommended.\nUse --wanted_altloc to set variants for specific residues.\n\n\n"
+    },
+    "ReceptorError": {
+      "copies": [
+        "5ED1:A:801",
+        "5HP2:A:801",
+        "5Y88:A:3000"
+      ],
+      "example_copy": "5ED1:A:801",
+      "n": 19,
+      "traceback": "flexres)\n                             ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/runner/work/cryptic-ip-binding-sites/cryptic-ip-binding-sites/scripts/flexible.py\", line 574, in dock_copy\n    ctx.receptor()\n  File \"/home/runner/work/cryptic-ip-binding-sites/cryptic-ip-binding-sites/scripts/redocking.py\", line 340, in receptor\n    prepared = prepare_receptor(self.arrays, self.work, keep_metals=metals, protonated=protonated, name=name)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/runner/work/cryptic-ip-binding-sites/cryptic-ip-binding-sites/cryptic_ip/docking/receptor.py\", line 299, in prepare_receptor\n    protonated = protonate(workdir / \"polymer.pdb\", workdir, ph=ph)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/runner/work/cryptic-ip-binding-sites/cryptic-ip-binding-sites/cryptic_ip/docking/receptor.py\", line 174, in protonate\n    raise ReceptorError(f\"pdb2pqr failed: {' | '.join(tail)}\"[:400])\ncryptic_ip.docking.receptor.ReceptorError: pdb2pqr failed:     newcoords = hatom.coords |                 ^^^^^^^^^^^^ | AttributeError: 'NoneType' object has no attribute 'coords'\n"
+    },
+    "RuntimeError": {
+      "copies": [
+        "1FHW:B:1002",
+        "5J16:A:303",
+        "9HZG:A:701"
+      ],
+      "example_copy": "1FHW:B:1002",
+      "n": 12,
+      "traceback": "PolymerCreationError: \nError: Creation of data structure for receptor failed.\n\nDetails:\nResidue A:265 matched with template 'PRO' has H discrepancy: 0 missing, 2 excess. \nThese discrepancies may compromise the validity of the charge assignment from PQR, making the charges inapplicable to the processed receptor. \n\n\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/home/runner/work/cryptic-ip-binding-sites/cryptic-ip-binding-sites/scripts/flexible.py\", line 623, in cmd_dock_one\n    runs, applied, dropped = dock_copy(ctx, flexres)\n                             ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/runner/work/cryptic-ip-binding-sites/cryptic-ip-binding-sites/scripts/flexible.py\", line 584, in dock_copy\n    rigid_only, none_flex, _, dropped_rigid = prepare_pair(protonated, ctx.work / \"arm_rigid\",\n                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/runner/work/cryptic-ip-binding-sites/cryptic-ip-binding-sites/scripts/flexible.py\", line 289, in prepare_pair\n    raise RuntimeError(\nRuntimeError: hydrogens disagree with Meeko's template within 8.0 A of the box, at A:265\n"
+    },
+    "TypeError": {
+      "copies": [
+        "6QW6:5A:2401",
+        "9DTR:A:2500"
+      ],
+      "example_copy": "6QW6:5A:2401",
+      "n": 2,
+      "traceback": ".py\", line 601, in dock_copy\n    result = dock_arm(rigid, flex, to_pdbqt(pose.mol), ctx.centre, size, seed=seed)\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/runner/work/cryptic-ip-binding-sites/cryptic-ip-binding-sites/scripts/flexible.py\", line 348, in dock_arm\n    v.set_receptor(rigid_pdbqt_filename=str(rigid))\n  File \"/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/vina/vina.py\", line 157, in set_receptor\n    self._vina.set_receptor(rigid_pdbqt_filename)\n  File \"/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/vina/vina_wrapper.py\", line 704, in set_receptor\n    return _vina_wrapper.Vina_set_receptor(self, *args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: \n\nPDBQT parsing error: Coordinate \"5 198.33\" is not valid.\n > ATOM  100000  N   LYS j 291     169.943 235.945 198.335  1.00  0.00    -0.344 N \n\nAdditional information:\nWrong number or type of arguments for overloaded function 'Vina_set_receptor'.\n  Possible C/C++ prototypes are:\n    Vina::set_receptor(std::string const &,std::string const &)\n    Vina::set_receptor(std::string const &)\n    Vina::set_receptor()\n\n"
+    },
+    "ValueError": {
+      "copies": [
+        "7XZI:A:2001",
+        "7XZJ:A:2001"
+      ],
+      "example_copy": "7XZI:A:2001",
+      "n": 2,
+      "traceback": "eko/polymer.py\", line 1769, in from_pqr_string\n    tmp_raw_input_mols = cls._pqr_to_residue_mols(\n                         ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/meeko/polymer.py\", line 2685, in _pqr_to_residue_mols\n    raise ValueError(msg)\nValueError: each residue key must have exactly 1 resname\nbut got violations={':3': {'LEU', 'ALA', 'LYN', 'PHE', 'SER', 'HIE', 'HID', 'VAL', 'GLN', 'GLU', 'GLY', 'TRP', 'LYS', 'THR', 'ASH', 'ILE', 'TYR', 'ASN', 'ARG', 'MET', 'GLH', 'ASP', 'PRO'}, ':4': {'LEU', 'ALA', 'PHE', 'SER', 'HIE', 'HID', 'VAL', 'GLU', 'GLN', 'GLY', 'TRP', 'LYS', 'THR', 'CYS', 'ILE', 'TYR', 'ASN', 'ARG', 'MET', 'ASP', 'PRO'}, ':5': {'LEU', 'ALA', 'PHE', 'SER', 'HIE', 'HID', 'VAL', 'GLY', 'GLN', 'GLU', 'TRP', 'LYS', 'THR', 'ILE', 'TYR', 'ASN', 'ARG', 'GLH', 'ASP', 'PRO'}, ':7': {'LEU', 'ALA', 'LYN', 'PHE', 'SER', 'HIE', 'HID', 'VAL', 'GLU', 'GLY', 'GLN', 'TRP', 'LYS', 'THR', 'CYS', 'ILE', 'TYR', 'ASN', 'ARG', 'MET', 'GLH', 'ASP', 'PRO'}, ':9': {'LEU', 'ALA', 'PHE', 'SER', 'HIE', 'HID', 'VAL', 'GLU', 'GLN', 'GLY', 'HIP', 'TRP', 'LYS', 'THR', 'CYS', 'ASH', 'ILE', 'TYR', 'ASN', 'ARG', 'MET', 'GLH', 'ASP', 'PRO'}}\n"
+    },
+    "timed out after 18000 s": {
+      "copies": [
+        "5DGH:A:402",
+        "6KWY:c:1901",
+        "7MOF:A:501"
+      ],
+      "n": 17
+    }
+  },
+  "errors": [
+    "AtomValenceException: Explicit valence for atom # 1 C, 5, is greater than permitted",
+    "AtomValenceException: Explicit valence for atom # 4 C, 5, is greater than permitted",
+    "PolymerCreationError: \nError: Creation of data structure for receptor failed.\n\nDetails:\n\nBad res A:130 is within radius of box edge (6.3553 <= delete_bad_res_from_box_radius=8.0000 A).\nThese residues can be ignored with option --delete_bad_res or --delete_bad_res_from_box_radius.\n\nRecommendations:\n1. (for batch processing) Use -a/--allow_bad_res to automatically remove residues\nthat do not match templates, and --default_altloc to set\na default altloc variant. Use these at your own risk.\n\n2. (pro",
+    "PolymerCreationError: \nError: Creation of data structure for receptor failed.\n\nDetails:\n\nBad res A:531 is within radius of box edge (0.0000 <= delete_bad_res_from_box_radius=8.0000 A).\n\nBad res A:534 is within radius of box edge (0.0000 <= delete_bad_res_from_box_radius=8.0000 A).\nThese residues can be ignored with option --delete_bad_res or --delete_bad_res_from_box_radius.\n\nRecommendations:\n1. (for batch processing) Use -a/--allow_bad_res to automatically remove residues\nthat do not match temp",
+    "PolymerCreationError: \nError: Creation of data structure for receptor failed.\n\nDetails:\n\nBad res B:146 is within radius of box edge (0.4384 <= delete_bad_res_from_box_radius=8.0000 A).\n\nBad res D:146 is within radius of box edge (0.0000 <= delete_bad_res_from_box_radius=8.0000 A).\nThese residues can be ignored with option --delete_bad_res or --delete_bad_res_from_box_radius.\n\nRecommendations:\n1. (for batch processing) Use -a/--allow_bad_res to automatically remove residues\nthat do not match temp",
+    "PolymerCreationError: \nError: Creation of data structure for receptor failed.\n\nDetails:\n\nBad res B:146 is within radius of box edge (0.8325 <= delete_bad_res_from_box_radius=8.0000 A).\n\nBad res D:146 is within radius of box edge (0.0000 <= delete_bad_res_from_box_radius=8.0000 A).\nThese residues can be ignored with option --delete_bad_res or --delete_bad_res_from_box_radius.\n\nRecommendations:\n1. (for batch processing) Use -a/--allow_bad_res to automatically remove residues\nthat do not match temp",
+    "PolymerCreationError: \nError: Creation of data structure for receptor failed.\n\nDetails:\n\nBad res B:146 is within radius of box edge (1.9982 <= delete_bad_res_from_box_radius=8.0000 A).\n\nBad res D:146 is within radius of box edge (0.0000 <= delete_bad_res_from_box_radius=8.0000 A).\nThese residues can be ignored with option --delete_bad_res or --delete_bad_res_from_box_radius.\n\nRecommendations:\n1. (for batch processing) Use -a/--allow_bad_res to automatically remove residues\nthat do not match temp",
+    "PolymerCreationError: \nError: Creation of data structure for receptor failed.\n\nDetails:\n\nBad res B:320 is within radius of box edge (6.4847 <= delete_bad_res_from_box_radius=8.0000 A).\n\nBad res B:341 is within radius of box edge (0.0000 <= delete_bad_res_from_box_radius=8.0000 A).\n\nBad res B:345 is within radius of box edge (0.3257 <= delete_bad_res_from_box_radius=8.0000 A).\nThese residues can be ignored with option --delete_bad_res or --delete_bad_res_from_box_radius.\n\nTraceback (most recent c",
+    "PolymerCreationError: \nError: Creation of data structure for receptor failed.\n\nDetails:\n\nBad res B:36 is within radius of box edge (0.0000 <= delete_bad_res_from_box_radius=8.0000 A).\n\nBad res B:106 is within radius of box edge (4.2191 <= delete_bad_res_from_box_radius=8.0000 A).\nThese residues can be ignored with option --delete_bad_res or --delete_bad_res_from_box_radius.\n\nRecommendations:\n1. (for batch processing) Use -a/--allow_bad_res to automatically remove residues\nthat do not match templ",
+    "PolymerCreationError: \nError: Creation of data structure for receptor failed.\n\nDetails:\n\nBad res B:656 is within radius of box edge (0.4456 <= delete_bad_res_from_box_radius=8.0000 A).\n\nBad res B:698 is within radius of box edge (0.0000 <= delete_bad_res_from_box_radius=8.0000 A).\nThese residues can be ignored with option --delete_bad_res or --delete_bad_res_from_box_radius.\n\nRecommendations:\n1. (for batch processing) Use -a/--allow_bad_res to automatically remove residues\nthat do not match temp",
+    "PolymerCreationError: \nError: Creation of data structure for receptor failed.\n\nDetails:\n\nBad res C:18 is within radius of box edge (0.0000 <= delete_bad_res_from_box_radius=8.0000 A).\nThese residues can be ignored with option --delete_bad_res or --delete_bad_res_from_box_radius.\n\nRecommendations:\n1. (for batch processing) Use -a/--allow_bad_res to automatically remove residues\nthat do not match templates, and --default_altloc to set\na default altloc variant. Use these at your own risk.\n\n2. (proc",
+    "ReceptorError: PDB2PQR outputs disagree: 133912 atoms, 133532 charges",
+    "ReceptorError: PDB2PQR outputs disagree: 136188 atoms, 135808 charges",
+    "ReceptorError: PDB2PQR outputs disagree: 137887 atoms, 137507 charges",
+    "ReceptorError: PDB2PQR outputs disagree: 141708 atoms, 141148 charges",
+    "ReceptorError: PDB2PQR outputs disagree: 141887 atoms, 141367 charges",
+    "ReceptorError: pdb2pqr failed:     coords = [bondatom.coords, nextatom.coords] |                                ^^^^^^^^^^^^^^^ | AttributeError: 'NoneType' object has no attribute 'coords'",
+    "ReceptorError: pdb2pqr failed:     newcoords = hatom.coords |                 ^^^^^^^^^^^^ | AttributeError: 'NoneType' object has no attribute 'coords'",
+    "ReceptorError: pdb2pqr failed:   File \"/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/pdb2pqr/main.py\", line 802, in main_driver |     raise RuntimeError from err | RuntimeError",
+    "RuntimeError: hydrogens disagree with Meeko's template within 8.0 A of the box, at A:174",
+    "RuntimeError: hydrogens disagree with Meeko's template within 8.0 A of the box, at A:188",
+    "RuntimeError: hydrogens disagree with Meeko's template within 8.0 A of the box, at A:188, A:82, B:625",
+    "RuntimeError: hydrogens disagree with Meeko's template within 8.0 A of the box, at A:265",
+    "RuntimeError: hydrogens disagree with Meeko's template within 8.0 A of the box, at A:366",
+    "RuntimeError: hydrogens disagree with Meeko's template within 8.0 A of the box, at A:378",
+    "RuntimeError: hydrogens disagree with Meeko's template within 8.0 A of the box, at A:465",
+    "RuntimeError: hydrogens disagree with Meeko's template within 8.0 A of the box, at A:4666",
+    "RuntimeError: hydrogens disagree with Meeko's template within 8.0 A of the box, at A:581",
+    "RuntimeError: hydrogens disagree with Meeko's template within 8.0 A of the box, at B:265",
+    "RuntimeError: hydrogens disagree with Meeko's template within 8.0 A of the box, at B:96",
+    "TypeError: \n\nPDBQT parsing error: Coordinate \"1 266.70\" is not valid.\n > ATOM  100000  N   LYS u 107     329.345 153.631 266.701  1.00  0.00    -0.344 N \n\nAdditional information:\nWrong number or type of arguments for overloaded function 'Vina_set_receptor'.\n  Possible C/C++ prototypes are:\n    Vina::set_receptor(std::string const &,std::string const &)\n    Vina::set_receptor(std::string const &)\n    Vina::set_receptor()\n",
+    "TypeError: \n\nPDBQT parsing error: Coordinate \"5 198.33\" is not valid.\n > ATOM  100000  N   LYS j 291     169.943 235.945 198.335  1.00  0.00    -0.344 N \n\nAdditional information:\nWrong number or type of arguments for overloaded function 'Vina_set_receptor'.\n  Possible C/C++ prototypes are:\n    Vina::set_receptor(std::string const &,std::string const &)\n    Vina::set_receptor(std::string const &)\n    Vina::set_receptor()\n",
+    "ValueError: each residue key must have exactly 1 resname\nbut got violations={':3': {'LEU', 'ALA', 'LYN', 'PHE', 'SER', 'HIE', 'HID', 'VAL', 'GLN', 'GLU', 'GLY', 'TRP', 'LYS', 'THR', 'ASH', 'ILE', 'TYR', 'ASN', 'ARG', 'MET', 'GLH', 'ASP', 'PRO'}, ':4': {'LEU', 'ALA', 'PHE', 'SER', 'HIE', 'HID', 'VAL', 'GLU', 'GLN', 'GLY', 'TRP', 'LYS', 'THR', 'CYS', 'ILE', 'TYR', 'ASN', 'ARG', 'MET', 'ASP', 'PRO'}, ':5': {'LEU', 'ALA', 'PHE', 'SER', 'HIE', 'HID', 'VAL', 'GLY', 'GLN', 'GLU', 'TRP', 'LYS', 'THR', '",
+    "ValueError: each residue key must have exactly 1 resname\nbut got violations={':3': {'VAL', 'TYR', 'GLY', 'HID', 'PHE', 'ASP', 'ARG', 'LEU', 'THR', 'SER', 'LYS', 'GLN', 'GLU', 'ALA', 'MET', 'PRO'}, ':4': {'CYS', 'HID', 'TRP', 'LYS', 'TYR', 'GLY', 'LYN', 'ARG', 'LEU', 'ASP', 'PRO', 'HIE', 'SER', 'GLU', 'THR', 'MET', 'ALA', 'ILE', 'VAL', 'PHE', 'ASN', 'GLN'}, ':7': {'CYS', 'HID', 'TRP', 'LYS', 'HIP', 'TYR', 'GLY', 'LYN', 'ARG', 'LEU', 'PRO', 'ASP', 'ASH', 'GLH', 'HIE', 'SER', 'GLU', 'THR', 'MET', '",
+    "timed out after 18000 s"
+  ],
+  "exhaustiveness": 32,
+  "flex_radius": 4.0,
+  "flex_residues_per_copy": {
+    "max": 8,
+    "mean": 6.9952153110047846,
+    "zero": 2
+  },
+  "holm": {
+    "J1": 0.001,
+    "J2": 0.0
+  },
+  "max_flex": 8,
+  "n_bootstrap": 2000,
+  "n_copies_scored": 209,
+  "n_records": 272,
+  "residues_dropped": {
+    "by_copy": {
+      "1GC6:A:1229": [
+        "A:296"
+      ],
+      "2P0H:A:101": [
+        "A:321"
+      ],
+      "2P1Q:B:801": [
+        "A:60"
+      ],
+      "2XAM:A:500": [
+        "B:183"
+      ],
+      "2XAN:A:500": [
+        "B:279"
+      ],
+      "4A6H:A:1584": [
+        "A:465",
+        "B:465"
+      ],
+      "4A6K:A:1585": [
+        "B:465"
+      ],
+      "5HP3:A:801": [
+        "D:466"
+      ],
+      "5J67:A:1311": [
+        "C:1139"
+      ],
+      "6C9M:C:902": [
+        "A:721"
+      ],
+      "6FJK:A:501": [
+        "B:6",
+        "B:9"
+      ],
+      "6GFG:A:501": [
+        "B:74"
+      ],
+      "6REY:c:1901": [
+        "C:210",
+        "C:30",
+        "E:147",
+        "F:138",
+        "F:92",
+        "G:109",
+        "G:218",
+        "I:28",
+        "M:213",
+        "P:199",
+        "Q:30",
+        "S:147",
+        "T:138",
+        "T:92",
+        "U:218",
+        "W:28",
+        "c:1068",
+        "c:886",
+        "c:961",
+        "d:711",
+        "d:886",
+        "d:961"
+      ],
+      "6ZWM:A:2602": [
+        "A:258",
+        "A:358",
+        "A:362",
+        "A:380",
+        "B:358",
+        "B:362",
+        "B:485",
+        "D:121"
+      ],
+      "6ZWO:B:2602": [
+        "D:121"
+      ],
+      "7F1W:A:501": [
+        "B:10"
+      ],
+      "7F1X:A:501": [
+        "B:10",
+        "D:10"
+      ],
+      "7JTB:B:501": [
+        "A:386"
+      ],
+      "7MOR:A:501": [
+        "D:10"
+      ],
+      "7PE7:A:2601": [
+        "A:202",
+        "A:261",
+        "A:415",
+        "B:202",
+        "B:261",
+        "B:415",
+        "C:121",
+        "D:121"
+      ]
+    },
+    "copies": 32,
+    "drop_radius": 8.0,
+    "residues": 96
+  },
+  "rigid_arm_check": {
+    "meeko_receptor_success": 0.09569377990430622,
+    "n_copies": 209,
+    "study_f_success": 0.11
+  },
+  "seed": 20261003
+}

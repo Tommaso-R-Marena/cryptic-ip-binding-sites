@@ -109,6 +109,32 @@ TOP_FRACTIONS: Tuple[float, ...] = (0.01, 0.05, 0.10)
 # --------------------------------------------------------------------- metrics
 
 
+def _prefit_calibrator(estimator, *, method: str, n_samples: int):
+    """A calibrator fitted on an already-fitted ``estimator``, without refitting it.
+
+    scikit-learn deprecated ``CalibratedClassifierCV(cv="prefit")`` in 1.6 and
+    **removed** it in 1.8, where passing it raises rather than warning, so the
+    calibration step died outright on a current install.
+    ``sklearn.frozen.FrozenEstimator`` is the documented replacement and exists from
+    1.6, covering the pinned 1.7.2 and every later version.
+
+    Freezing alone is not enough. ``cv="prefit"`` fitted **one** calibrator on all the
+    calibration data; a frozen estimator with the default ``cv`` instead splits that
+    data five ways, which both changes the semantics and fails outright when the
+    calibration set is smaller than five rows - as it is on the synthetic integration
+    fixture, where it holds four. Passing a single fold whose train and test indices
+    are both every row restores the old behaviour exactly: one calibrator, fitted on
+    everything, over a base estimator that is never refitted.
+    """
+    try:
+        from sklearn.frozen import FrozenEstimator
+    except ImportError:  # scikit-learn < 1.6, where "prefit" is still the only way
+        return CalibratedClassifierCV(estimator, method=method, cv="prefit")
+    every_row = np.arange(n_samples)
+    return CalibratedClassifierCV(
+        FrozenEstimator(estimator), method=method, cv=[(every_row, every_row)])
+
+
 def expected_calibration_error(
     y_true: np.ndarray, y_prob: np.ndarray, *, n_bins: int = 10
 ) -> float:
@@ -1040,7 +1066,7 @@ class CrypticSiteMLClassifier:
         # Isotonic regression needs a few hundred points to beat Platt scaling;
         # below that it overfits the calibration set.
         method = "isotonic" if int(np.sum(y[calib_idx] == 1)) >= 50 else "sigmoid"
-        calibrated = CalibratedClassifierCV(base, method=method, cv="prefit")
+        calibrated = _prefit_calibrator(base, method=method, n_samples=len(calib_idx))
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             calibrated.fit(X.iloc[calib_idx], y[calib_idx])

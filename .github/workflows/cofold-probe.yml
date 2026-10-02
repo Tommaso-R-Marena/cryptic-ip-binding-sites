@@ -1,0 +1,66 @@
+name: Cofold probe
+
+# A FEASIBILITY MEASUREMENT, not a study. Boltz-2 is a GPU model and this
+# repository's runners are CPU-only, so before study M can be designed we need to
+# know what a single IP6 co-fold actually costs here. This times one prediction at
+# three protein lengths and reports whether the weights download, whether IHP (IP6)
+# is accepted as a CCD ligand, and whether the affinity head runs.
+#
+# Nothing here scores a candidate or compares an arm, so it needs no plan.
+
+on:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - 'scripts/cofold_probe.py'
+      - '.github/workflows/cofold-probe.yml'
+  workflow_dispatch:
+    inputs:
+      lengths:
+        description: 'protein lengths to time, space separated'
+        default: '100 300 600'
+      timeout_s:
+        description: 'per-prediction timeout in seconds'
+        default: '5400'
+
+concurrency:
+  group: cofold-probe-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install Boltz-2
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install boltz
+          python -c "import boltz, torch; print('boltz ok, torch', torch.__version__, 'cuda', torch.cuda.is_available())"
+      - name: Machine
+        run: |
+          nproc; free -g | head -2; df -h / | tail -1
+      - name: Time one IP6 co-fold at each length
+        run: |
+          python scripts/cofold_probe.py --lengths ${{ inputs.lengths || '100 300 600' }} \
+            --timeout ${{ inputs.timeout_s || '5400' }} --out probe.json
+      - name: Report
+        if: always()
+        run: |
+          test -f probe.json && python scripts/extract_log_block.py emit COFOLD_PROBE_JSON probe.json || true
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: cofold-probe
+          path: probe.json
+          retention-days: 90

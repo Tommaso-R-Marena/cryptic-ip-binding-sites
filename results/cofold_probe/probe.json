@@ -1,0 +1,18 @@
+{
+  "probe": "boltz-2 cpu feasibility",
+  "results": [
+    {
+      "length": 100,
+      "ccd": "IHP",
+      "affinity_requested": true,
+      "command": "boltz predict probe_work/100/probe_100.yaml --accelerator cpu --out_dir probe_work/100/out --diffusion_samples 1 --recycling_steps 0 --output_format pdb",
+      "ok": false,
+      "timed_out_after_s": 5400,
+      "seconds": 5400.2,
+      "outputs": [
+        "probe_100_model_0.pdb"
+      ]
+    }
+  ],
+  "note": "runtime measurement only; no candidate is scored and no arm is compared"
+}
