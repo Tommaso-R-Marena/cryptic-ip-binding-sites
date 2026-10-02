@@ -381,8 +381,15 @@ AUC 0.744, so the scores are worth more as a site filter than as a pose ranker.
 explicit electrostatic term. Scoring a −9 polyanion with a function that ignores charge is weak
 evidence whatever the search budget.
 
-**Study J** (flexible receptor) is the last structural explanation before the scoring function
-stands alone as the suspect. It is running; no J1/J2/J3 estimate exists yet.
+**Study J** (flexible receptor) was the last structural explanation before the scoring
+function stands alone as the suspect, and it came back the other way: letting the pocket's
+side chains move makes redocking **worse**. Top-pose success falls to 0.026 from
+0.096 rigid, a paired difference of -0.078 [-0.140, -0.031] per homology
+group (Holm p 0.001); the best-of-list ceiling falls to 0.179 from
+0.367. Both on 209 copies in 29 strict groups. The extra torsional freedom
+enlarges the search space faster than the scoring function can exploit it, which leaves the
+scoring function itself as the remaining suspect. Full figures and censoring in
+`results/flexible/PROVENANCE.md`.
 
 ---
 

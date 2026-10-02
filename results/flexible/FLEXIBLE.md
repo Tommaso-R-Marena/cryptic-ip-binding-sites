@@ -3,33 +3,33 @@
 Pre-registered in `docs/FLEXIBLE_PLAN.md`, amended in `docs/FLEXIBLE_PLAN_AMENDMENT_1.md`, `_2.md` and `_3.md`. Seed 20261003, 2000 resamples of strict homology groups, exhaustiveness 32.
 Flexible side chains: within 4.0 A of the ligand, at most 8.
 
-Movable side chains per copy: mean 6.99, max 8, and 2 copies had none.
+Movable side chains per copy: mean 7.00, max 8, and 2 copies had none.
 
 ## J1 - top-pose success at 2 A (primary)
 
 Decision: **worse**.
-flex 0.026 against rigid 0.095; paired difference -0.078 [-0.140, -0.031] over 207 copies in 29 groups.
+flex 0.026 against rigid 0.096; paired difference -0.078 [-0.140, -0.031] over 209 copies in 29 groups.
 
 ## J2 - best-of-list ceiling (secondary)
 
 Decision: **worse**.
-flex 0.177 against rigid 0.364; paired difference -0.169 [-0.243, -0.098] over 207 copies in 29 groups.
+flex 0.179 against rigid 0.367; paired difference -0.170 [-0.243, -0.099] over 209 copies in 29 groups.
 
 ## The receptor pipeline, audited
 
-The rigid arm scores 0.095 under this study's receptor, against study F's 0.110 under the project-prepared one, over 207 copies. A material gap is a finding about the pipeline, not about side-chain freedom, and is not folded into J1.
+The rigid arm scores 0.096 under this study's receptor, against study F's 0.110 under the project-prepared one, over 209 copies. A material gap is a finding about the pipeline, not about side-chain freedom, and is not folded into J1.
 
 ## J3 - by burial class (exploratory, not Holm-corrected)
 
 | burial class | decision | difference | copies | groups |
 | --- | --- | --- | --- | --- |
-| cryptic | not evaluable | -0.155 [-0.500, +0.179] | 10 | 4 |
+| cryptic | not evaluable | -0.156 [-0.500, +0.177] | 11 | 4 |
 | semi_cryptic | worse | -0.137 [-0.226, -0.053] | 44 | 11 |
-| surface | worse | -0.022 [-0.044, -0.005] | 153 | 22 |
+| surface | worse | -0.022 [-0.044, -0.005] | 154 | 22 |
 
 ## Receptor residues deleted to satisfy Meeko
 
-93 residue(s) across 30 copies, each more than 8.0 A beyond the docking box, where Vina's own interaction cutoff puts them out of reach of any pose. Both arms of a copy see the same deletions or the copy fails. Per docs/FLEXIBLE_PLAN_AMENDMENT_2.md.
+96 residue(s) across 32 copies, each more than 8.0 A beyond the docking box, where Vina's own interaction cutoff puts them out of reach of any pose. Both arms of a copy see the same deletions or the copy fails. Per docs/FLEXIBLE_PLAN_AMENDMENT_2.md.
 
 ## Copies not docked, by cause
 
