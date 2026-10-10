@@ -1,0 +1,106 @@
+# Molecular dynamics on the shortlist. NOT RUNNABLE YET: gated on docs/MD_PLAN.md.
+#
+# docs/GPU_REQUIREMENTS.md calls this the biggest standing weakness in the whole
+# project, and it is the one an informed reader pushes on first: every candidate
+# is a single apo AlphaFold conformer, with no induced fit, no alternative
+# rotamers, and no evidence the pocket exists as anything but a static
+# prediction.
+#
+# The code exists - cryptic_ip/validation/md_validation.py (OpenMM) and
+# scripts/run_md_pilot_validation.py - so this is a scheduling problem, not a
+# development one. What does not exist is the plan, and the plan has the harder
+# questions in it: how long, how many replicates, what counts as the pocket
+# staying open, and what the result would have to look like to count against
+# the candidate list rather than for it.
+#
+# The resources below are a pilot, not the production run. GPU_REQUIREMENTS.md
+# estimates a ~50,000-atom system at 100-250 ns/day on a current datacentre GPU
+# and says to confirm that with a short probe rather than assume it - so the
+# first thing this manifest should do is measure ns/day, exactly as the CPU
+# co-folding probe measured cost and killed a study that would have wasted far
+# more. 20 systems x 3 replicates x 100 ns is the large ask behind it.
+
+study: P
+title: Pocket stability and cryptic opening under molecular dynamics
+description: >
+  Replicate MD per shortlisted system, apo and with IP6 placed, reporting
+  pocket occupancy and opening rather than a single-conformer snapshot.
+
+plan:
+  - docs/MD_PLAN.md
+
+stages:
+  - name: throughput_probe
+    description: measured ns/day on one real system, before any production time is requested
+    shards: 2
+    throttle: 2
+    output: throughput-{shard}.json
+    resources:
+      partition: gpu
+      cpus: 4
+      mem_gb: 32
+      walltime: "02:00:00"
+      gpus: 1
+    command:
+      - python
+      - scripts/run_md_pilot_validation.py
+      - throughput
+      - --system-index
+      - "{shard}"
+      - --out
+      - "{stage_dir}/throughput-{shard}.json"
+
+  # One replicate per shard: 20 systems x 2 states (apo, with IP6) x 3
+  # replicates. Checkpointed, because a 100 ns replicate does not fit in one
+  # walltime and a requeued task has to resume rather than restart.
+  - name: replicate
+    description: one replicate of one system in one state
+    depends_on: [throughput_probe]
+    shards: 120
+    throttle: 8
+    output: replicate-{shard}/final.json
+    resources:
+      partition: gpu
+      cpus: 4
+      mem_gb: 48
+      walltime: "24:00:00"
+      gpus: 1
+    command:
+      - python
+      - scripts/run_md_pilot_validation.py
+      - replicate
+      - --shard
+      - "{shard}"
+      - --shards
+      - "{shards}"
+      - --checkpoint-dir
+      - "{stage_dir}/replicate-{shard}"
+      - --out
+      - "{stage_dir}/replicate-{shard}/final.json"
+
+  - name: report
+    description: pocket occupancy and opening across replicates, resampling whole systems
+    depends_on: [replicate]
+    after: any
+    output: md.json
+    resources:
+      partition: shared
+      cpus: 8
+      mem_gb: 32
+      walltime: "04:00:00"
+    command:
+      - python
+      - scripts/rockfish.py
+      - collect
+      - --manifest
+      - hpc/studies/md.yml
+      - --stage
+      - replicate
+      - --work-dir
+      - "{work_dir}"
+      - --records
+      - "{stage_dir}/records.json"
+      - --census-out
+      - "{stage_dir}/census.json"
+      - --provenance
+      - "{stage_dir}/PROVENANCE.md"

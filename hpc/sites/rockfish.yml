@@ -1,0 +1,90 @@
+# Rockfish (Johns Hopkins ARCH), as this repository currently believes it to be.
+#
+# EVERY value below is a claim about a machine this repository cannot reach, and
+# none of them has been checked against the live cluster yet - `verified.date` is
+# null and will stay null until someone runs:
+#
+#     python scripts/rockfish.py preflight --site hpc/sites/rockfish.yml
+#
+# on a login node. That command compares each claim with what the scheduler
+# reports and writes the mismatches. Until then, treat the numbers as a
+# starting point to correct, not as documentation. Two of them in particular
+# decide whether a study is runnable at all:
+#
+#   * `partitions.gpu.gpu_vram_gb` - docs/GPU_REQUIREMENTS.md shows the
+#     candidate length distribution (median 436, max 2352 residues, 5 of 75 at
+#     >= 1000) makes VRAM, not throughput, the binding constraint for
+#     co-folding. 40 GB means the long tail must be truncated to a domain
+#     around the pocket, and truncation is a modelling decision that has to be
+#     pre-registered rather than improvised when a job runs out of memory.
+#   * `max_mem_gb_per_node` - GiB, not GB, because that is what sbatch's `G`
+#     suffix means and what sinfo reports once its megabytes are divided by
+#     1024. A node advertised as 192 GB reports 192000 MB, which is 187 GiB;
+#     asking for 192G on it is a job that is never scheduled.
+#   * `max_array_size` - SLURM's MaxArraySize. Study J's docking was silently
+#     dropped on GitHub for exceeding a 256-job matrix cap; the chunker here
+#     splits around this number, so a wrong value is a submission that fails or
+#     a study that runs short.
+
+name: rockfish
+scheduler: slurm
+
+# Fill in from `sacctmgr show assoc user=$USER format=account` on a login node.
+# Left null deliberately: a guessed account is a job that is rejected at submit
+# time, which is a better failure than one charged to the wrong allocation.
+account: null
+
+# Lustre scratch. Not the home filesystem: home has a small quota, and a
+# docking shard writing receptor and pose files there will fill it.
+scratch_root: $HOME/scratch4-cryptic-ip
+
+module_loads:
+  - anaconda3
+
+env_activate:
+  - 'source "$(conda info --base)/etc/profile.d/conda.sh"'
+  - conda activate cryptic-ip
+
+# MaxArraySize minus one is the largest index an array may use.
+max_array_size: 1001
+# How many tasks of one study may run at once. Deliberately conservative: a
+# shared allocation is not ours alone, and study J's 272 shards at 20 wide was
+# already a day of wall clock.
+max_array_throttle: 40
+
+partitions:
+  cpu:
+    name: defq
+    max_walltime: "72:00:00"
+    max_cpus_per_node: 48
+    max_mem_gb_per_node: 187
+    note: regular compute; CPU studies (docking, MSAs, bootstraps) belong here
+
+  shared:
+    name: shared
+    max_walltime: "72:00:00"
+    max_cpus_per_node: 48
+    max_mem_gb_per_node: 187
+    note: for tasks smaller than a node, which is most array tasks
+
+  bigmem:
+    name: bigmem
+    max_walltime: "72:00:00"
+    max_cpus_per_node: 48
+    max_mem_gb_per_node: 1500
+    note: the receptors that broke Meeko's PDBQT writer at >= 100,000 atoms
+
+  gpu:
+    name: a100
+    max_walltime: "72:00:00"
+    max_cpus_per_node: 48
+    max_mem_gb_per_node: 187
+    gpus_per_node: 4
+    gpu_model: A100
+    gpu_vram_gb: 40
+    gres_name: gpu
+    note: co-folding and MD; confirm VRAM before planning the long-receptor tail
+
+verified:
+  date: null
+  by: null

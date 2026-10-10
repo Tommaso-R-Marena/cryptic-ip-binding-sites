@@ -1,0 +1,144 @@
+# Study J, flexible-receptor redocking, as a cluster job.
+#
+# This is a port of .github/workflows/flexible.yml, not a new study: the same
+# scripts/flexible.py, the same arguments, the same 272 shards, the same
+# one-copy-per-shard layout that docs/FLEXIBLE_PLAN_AMENDMENT_3.md fixed. It
+# exists because study J already ran to completion on free runners and so is
+# the only study here whose cluster behaviour can be checked against a known
+# answer: 209 of 272 copies scored, 29 strict homology groups, J1 -0.078
+# [-0.140, -0.031] per group. A port that reproduces those numbers is a working
+# harness; one that does not is a broken harness, and we would know which.
+#
+# It also re-runs cheaply at a different per-copy budget. 17 of 272 copies hit
+# the 300-minute cap, concentrated in the large receptors, and the cap is the
+# one exclusion route that compute can actually remove.
+
+study: J
+title: Flexible-receptor redocking
+description: >
+  Both arms - rigid and flexible side chains - docked through one Meeko-prepared
+  receptor per copy, then J1, J2 and J3 with group bootstraps.
+
+# Submission is refused unless every one of these exists.
+plan:
+  - docs/FLEXIBLE_PLAN.md
+  - docs/FLEXIBLE_PLAN_AMENDMENT_1.md
+  - docs/FLEXIBLE_PLAN_AMENDMENT_2.md
+  - docs/FLEXIBLE_PLAN_AMENDMENT_3.md
+
+stages:
+  - name: inputs
+    description: the census, the CCD cache and the structures are present before 272 tasks queue
+    resources:
+      partition: shared
+      cpus: 1
+      mem_gb: 4
+      walltime: "00:30:00"
+    command:
+      - python
+      - scripts/rockfish.py
+      - check-inputs
+      - --work-dir
+      - "{work_dir}"
+      - --require
+      - census/census.csv
+      - --require-dir
+      - census/ccd
+      - --require-dir
+      - structures
+      - --out
+      - "{stage_dir}/inputs.json"
+    output: inputs.json
+
+  - name: residues
+    description: which side chains each copy makes flexible
+    depends_on: [inputs]
+    resources:
+      partition: shared
+      cpus: 2
+      mem_gb: 8
+      walltime: "02:00:00"
+    command:
+      - python
+      - scripts/flexible.py
+      - residues
+      - --census
+      - "{work_dir}/census/census.csv"
+      - --structures
+      - "{work_dir}/structures"
+      - --out
+      - "{stage_dir}/residues.json"
+    output: residues.json
+
+  # One copy per shard at the 300-minute per-copy cap of amendment 3. The
+  # walltime is the shard budget (19800 s) plus setup, which is what
+  # timeout-minutes: 355 was on GitHub; --shard-budget must stay below it or
+  # the scheduler kills the task before it can record its own censoring.
+  - name: dock
+    description: both arms for one copy
+    depends_on: [inputs]
+    shards: 272
+    throttle: 40
+    resources:
+      partition: shared
+      cpus: 2
+      mem_gb: 8
+      walltime: "05:55:00"
+    env:
+      OMP_NUM_THREADS: "1"
+    command:
+      - python
+      - scripts/flexible.py
+      - dock
+      - --census
+      - "{work_dir}/census/census.csv"
+      - --structures-dir
+      - "{work_dir}/structures"
+      - --ccd-dir
+      - "{work_dir}/census/ccd"
+      - --work-dir
+      - "{stage_dir}/work/{shard}"
+      - --shard
+      - "{shard}"
+      - --shards
+      - "{shards}"
+      - --per-copy-timeout
+      - "18000"
+      - --shard-budget
+      - "19800"
+      - --out
+      - "{stage_dir}/flexible-{shard}.json"
+    output: flexible-{shard}.json
+
+  # after: any, for the same reason the GitHub job used always() rather than
+  # !cancelled() - the report matters most when shards failed, and a report
+  # that only runs on a clean sweep is a report you never see.
+  - name: report
+    description: J1, J2 and J3 from whatever the shards produced
+    depends_on: [dock]
+    after: any
+    resources:
+      partition: shared
+      cpus: 4
+      mem_gb: 16
+      walltime: "02:00:00"
+    command:
+      - python
+      - scripts/rockfish.py
+      - collect
+      - --work-dir
+      - "{work_dir}"
+      - --study
+      - "{study}"
+      - --manifest
+      - hpc/studies/flexible.yml
+      - --stage
+      - dock
+      - --records
+      - "{stage_dir}/records.json"
+      - --census-out
+      - "{stage_dir}/census.json"
+      - --then
+      - "python scripts/flexible.py report --records {stage_dir}/records.json
+         --out {stage_dir}/flexible.json --markdown {stage_dir}/FLEXIBLE.md"
+    output: flexible.json
