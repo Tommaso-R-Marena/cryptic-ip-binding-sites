@@ -340,6 +340,88 @@ ordering gives **−0.13** at 2% — with all three pools holding an identical
 basic fraction of 0.270 and entropies within 0.1 bits, so the separation cannot
 be composition.
 
+### `architecture.py` — the lining's sequence-space architecture
+
+Pre-registered as study Q7 in `docs/ARCHITECTURE_PLAN.md`; the committed
+measurements are `results/architecture/ARCHITECTURE.md`. Where `sequence.py`
+asks what the *letters* at a site are, this asks what the *positions* are — a
+pocket being the statement that residues far apart along the chain are close
+together in space.
+
+**It rests on a small theorem.** The complete H₀ invariant of a finite set of
+integer positions, under the gap filtration, is its sorted multiset of gaps:
+each position is born at scale 0 and dies at the gap that merges it into its
+neighbour, so the barcode *is* the gap multiset. Checked against explicit
+single-linkage on 300 random position sets, zero disagreements. Two things
+follow. Persistent homology on a lining buys nothing beyond the gaps — so no
+barcode is ever computed. And the gap multiset is therefore **exactly the
+topological half** of a lining's structure, with everything else living in the
+*order* of the gaps: over the 70 orderings of {3,4,3,4,3,4,3,4}, helical
+coherence runs from 0.572 to 0.902 at identical n, span, occupancy and gap
+entropy.
+
+So a lining is **topology ⊕ register**, and each half gets the null that holds
+the other fixed — the register null being the quotient by the topological
+invariant, not a choice among many. The parallel with `sequence.py` is exact:
+letters ⊕ order there, gaps ⊕ order here.
+
+| half | statistic | null | holds fixed |
+|---|---|---|---|
+| topology | fraction of gaps on one face (3–4 helical, 2 extended) | positions resampled uniformly in the same span | n, span |
+| register | phase coherence over a band | the gap multiset permuted | n, span, the whole gap multiset |
+
+**Which half detects a face was measured, not assumed, and the answer is
+counterintuitive.** A helical face whose gaps are drawn at random from {3,4}
+has *no register at all*: permuting those gaps gives another helical face, so
+the ordering carries nothing and register correctly returns p = 1.00, while
+topology finds it at p = 0.0027. Reading face-ness off a coherence statistic
+would miss every irregularly spaced face, which is most of them. Topology is
+primary; register is "order beyond what the gaps already force".
+
+Four artefacts, each measured before the design was fixed:
+
+* **An analytic threshold on a scanned coherence is useless.** Rayleigh's 95th
+  percentile at n = 12 is 0.500 and period-independent; the true α is 0.019 at
+  period 3.5 and 0.102 at period 2, and for the *band maximum* a scan actually
+  computes, 0.500 admits **26%** of random linings over the helical band and
+  **92%** over a full 2–12 scan.
+* **A borrowed statistic that dies on the lattice.** The axial (doubled-angle)
+  resultant — the textbook tool for data with two modes 180° apart, which is
+  what a β-strand's faces are — is **identically 1** at period 2 for *any*
+  integer position set (max deviation 0.0e+00 over 2000 sets). Not used, and
+  the reason is recorded.
+* **Probe density is derived, not chosen.** The coherence peak half-width is
+  `0.58·ω²/span`, that constant flat to 0.03 across a sixteenfold span range. A
+  fixed 13-probe helical scan loses up to **0.287** in resultant on a perfect
+  face — 0.871 read back as 0.584.
+* **The permutation null has a floor of ~1/k.** Exactly 0.0667 at 15 orderings,
+  0.0079 at 252, so significance at 0.05 is unreachable below 20 — while a
+  sampled z off a 15-ordering null returned **+2.60**. The verdict is the
+  p-value; the z is an effect size only, and short linings are `unresolved`
+  rather than "no register".
+
+**Multiplicity is measured too.** Each of the four tests is calibrated or
+conservative (α = 0.020, 0.027, 0.057, 0.033 at nominal 0.05 over 300 random
+linings) but the best of the four gives **0.123**. Holm over the tests that ran
+restores 0.030, and every verdict reads the corrected p.
+
+The type is a region of (run count, face-like) space — `phase_locked`,
+`mosaic`, `segmental`, `distributed`, `unresolved` — and the graded
+yes/sort-of/no scale is the corrected p of the stronger half. On the ideal
+barrels this recovers the architecture from positions alone: the linkered
+barrel's lining reads `mosaic`/`helix_face` with a dominant period of 3.6,
+which is the helix geometry recovered without being told.
+
+**And it has a falsifiable prediction with a measured power limit.** The
+signature survives spatial subsampling down to ~60% of the face and collapses
+below ~40%, i.e. below about 19 positions — while annotated IP linings here are
+10–20 residues, so the method sits at the edge of its power on bare linings.
+At a fixed 14 residues on the same structure, shape decides everything: a ring
+across all six helices is detected 7% of the time, a column along two helices
+100%. So the signature should be found in elongated element-aligned pockets and
+absent in ring and interface pockets *independently of lining size* — and if it
+instead tracks size, the framework is wrong.
+
 ## 3. Running it
 
 ```bash
@@ -352,6 +434,9 @@ python scripts/detect.py shard --structures DIR --shard 0 --shards 272 --out par
 python scripts/sequence_signature.py validate                  # study Q6 method validation
 python scripts/sequence_signature.py describe --inputs in.jsonl --out sites.json
 python scripts/sequence_signature.py report --sites sites.json --out sequence.json
+
+python scripts/architecture_probe.py list                      # the eight probes
+python scripts/architecture_probe.py run --out architecture.json
 ```
 
 On the cluster, study Q in `hpc/studies/detector.yml`. It is **not** plan-gated,
