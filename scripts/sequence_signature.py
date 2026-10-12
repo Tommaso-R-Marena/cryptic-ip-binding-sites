@@ -216,7 +216,11 @@ def validate_markdown(report: Mapping[str, object]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def provenance_markdown(payload: Mapping[str, object], commit: str) -> str:
+def provenance_markdown(
+    payload: Mapping[str, object],
+    commit: str,
+    confirmation: Optional[Mapping[str, object]] = None,
+) -> str:
     """`results/sequence/PROVENANCE.md`, generated from the artefact.
 
     A provenance file whose numbers were typed in by hand proves nothing, so
@@ -312,6 +316,38 @@ def provenance_markdown(payload: Mapping[str, object], commit: str) -> str:
         "is the cleanest possible case. A real helical face is noisier, so the firing "
         "rate here is an upper bound on sensitivity, not an estimate of it.",
     ]
+    if confirmation is not None:
+        lines += [
+            "",
+            "## Independent confirmation in CI",
+            "",
+            f"`.github/workflows/sequence.yml` re-runs the validation on every push "
+            f"with {confirmation['n_shuffles']} shuffles per window rather than "
+            f"{payload['n_shuffles']}, on a GitHub runner rather than this container. "
+            "Its artefact was extracted from the run log by "
+            "`scripts/extract_log_block.py` - a gzip block whose CRC verifies the "
+            "copy - and is committed beside this file as `validation_ci.json`. "
+            "Nothing was transcribed.",
+            "",
+            "| pool | mean z (this run) | mean z (CI) | firing (this run) | firing (CI) |",
+            "|---|---|---|---|---|",
+        ]
+        by_name = {p["pool"]: p for p in confirmation["pools"]}  # type: ignore[union-attr]
+        for pool in payload["pools"]:  # type: ignore[index]
+            other = by_name.get(pool["pool"])
+            if other is None:
+                continue
+            lines.append(
+                f"| {pool['pool']} | {pool['mean_z']:+.2f} | {other['mean_z']:+.2f} | "
+                f"{pool['fraction_firing'] * 100:.0f}% | "
+                f"{other['fraction_firing'] * 100:.0f}% |"
+            )
+        failed = [k for k, v in confirmation["checks"].items() if not v]  # type: ignore[union-attr]
+        lines += [
+            "",
+            f"All {len(confirmation['checks'])} checks pass in CI as well"  # type: ignore[arg-type]
+            + (": " + ", ".join(failed) if failed else "") + ".",
+        ]
     return "\n".join(lines) + "\n"
 
 
@@ -348,6 +384,11 @@ def describe_one(record: Mapping[str, object], *, n_shuffles: int) -> Dict[str, 
     out: Dict[str, object] = {
         "id": record["id"], "group": record["group"], "arm": record["arm"],
     }
+    # Carried through rather than derived here: the plan requires the Q6b split
+    # to be recorded in the inputs so it cannot be adjusted after a difference
+    # is seen.
+    if record.get("pocket_type"):
+        out["pocket_type"] = str(record["pocket_type"])
     pairs: List[Tuple[str, int]] = [
         (str(chain), int(number)) for chain, number in record["residues"]  # type: ignore[union-attr]
     ]
@@ -509,6 +550,120 @@ def length_confounded(sites: Sequence[Mapping[str, object]], window: str) -> Opt
     return abs(float(np.mean(lengths["site"]) - np.mean(lengths["control"]))) > 2.0
 
 
+def group_means_by_type(
+    sites: Sequence[Mapping[str, object]], window: str, statistic: str,
+    pocket_type: str, *, inside: bool,
+) -> Dict[str, float]:
+    """Group means among *sites* of one pocket type, or of all the others.
+
+    Q6b is a question about sites only: controls do not enter it. ``inside``
+    selects the stratum; its complement is the rest of the sites, which is the
+    one-against-rest shape the plan fixes.
+    """
+    collected: Dict[str, List[float]] = {}
+    for site in sites:
+        if site.get("arm") != "site":
+            continue
+        matches = str(site.get("pocket_type", "")) == pocket_type
+        if matches is not inside:
+            continue
+        value = value_for(site, window, statistic)
+        if value is None:
+            continue
+        collected.setdefault(str(site["group"]), []).append(value)
+    return {group: float(np.mean(values)) for group, values in collected.items()}
+
+
+def pocket_types(sites: Sequence[Mapping[str, object]]) -> List[str]:
+    """The pocket types present among measurable sites, in a fixed order."""
+    return sorted({
+        str(site["pocket_type"]) for site in sites
+        if site.get("arm") == "site" and site.get("measurable")
+        and site.get("pocket_type")
+    })
+
+
+def run_strata(
+    sites: Sequence[Mapping[str, object]], n_bootstrap: int,
+) -> Dict[str, object]:
+    """Q6b: does a descriptor differ between *kinds* of pocket?
+
+    One-against-rest per pocket type, the same six features, with Holm across
+    features times types - eighteen tests for three types, because that is how
+    many questions were asked. The power block comes first here too, and a
+    stratum below the five-group floor reports its count and no difference.
+    """
+    types = pocket_types(sites)
+    if not types:
+        return {
+            "runnable": False,
+            "reason": "no site carries a pocket_type; Q6b needs the split recorded "
+                      "in the inputs file, not computed here",
+            "types": [],
+            "power": [],
+            "tests": [],
+        }
+    # With exactly two types, one-against-rest tests the same partition twice:
+    # the second row is the first with its sign flipped, carrying no extra
+    # information while doubling the Holm family. So only the first is run, and
+    # the report says that is what happened. At three or more types the rows are
+    # genuinely different partitions and all are run.
+    tested = types[:1] if len(types) == 2 else types
+    power, comparisons, p_values = [], [], {}
+    for pocket_type in tested:
+        for test in sg.PRIMARY_TESTS:
+            inside = group_means_by_type(
+                sites, test.window, test.statistic, pocket_type, inside=True)
+            rest = group_means_by_type(
+                sites, test.window, test.statistic, pocket_type, inside=False)
+            name = f"{pocket_type}/{test.window}:{test.statistic}"
+            power.append({
+                "pocket_type": pocket_type,
+                "test": test.number,
+                "feature": name,
+                "n_groups_in": len(inside),
+                "n_groups_rest": len(rest),
+                "clears_evidence_floor": min(len(inside), len(rest)) >= 5,
+                "minimum_detectable": sq.minimum_detectable_difference(
+                    list(inside.values()), list(rest.values())),
+            })
+            if not inside or not rest:
+                comparisons.append({
+                    "pocket_type": pocket_type, "test": test.number, "feature": name,
+                    "runnable": False, "reason": "one side has no measurable group",
+                })
+                continue
+            comparison = sq.compare_feature(
+                name, inside, rest, n_bootstrap=n_bootstrap, seed=SEED)
+            entry = comparison.as_dict()
+            entry.update({
+                "pocket_type": pocket_type, "test": test.number, "runnable": True,
+            })
+            comparisons.append(entry)
+            p_values[name] = comparison.p_value
+    corrected = sq.holm(p_values) if p_values else {}
+    for entry in comparisons:
+        if entry.get("runnable"):
+            entry["p_holm"] = corrected.get(str(entry["feature"]))
+            entry["is_signature"] = bool(
+                entry["p_holm"] is not None
+                and entry["p_holm"] < 0.05
+                and not (entry["interval"][0] <= 0.0 <= entry["interval"][1])
+                and entry["exceeds_power"]
+                and entry["is_evidence"]
+            )
+    return {
+        "runnable": True,
+        "types": types,
+        "types_tested": tested,
+        "mirrored": len(types) == 2,
+        "holm_family_size": len(p_values),
+        "power": power,
+        "tests": comparisons,
+        "n_signatures": sum(1 for e in comparisons if e.get("is_signature")),
+    }
+
+
 def run_report(sites: Sequence[Mapping[str, object]], n_bootstrap: int) -> Dict[str, object]:
     """The power block, then the primary tests, then the exploratory table."""
     power = power_block(sites)
@@ -554,6 +709,7 @@ def run_report(sites: Sequence[Mapping[str, object]], n_bootstrap: int) -> Dict[
         "primary": comparisons,
         "n_signatures": sum(1 for e in comparisons if e.get("is_signature")),
         "holm_family_size": len(p_values),
+        "strata": run_strata(sites, n_bootstrap),
     }
 
 
@@ -631,7 +787,84 @@ def report_markdown(report: Mapping[str, object]) -> str:
         "effect printed above, five groups on both sides, and arms that are not",
         "length-confounded. All five, per the plan.",
     ]
+    lines += strata_markdown(report["strata"])  # type: ignore[index]
     return "\n".join(lines) + "\n"
+
+
+def strata_markdown(strata: Mapping[str, object]) -> List[str]:
+    """Q6b's section: by pocket type, power first, Holm over features x types."""
+    lines = ["", "## Q6b: by pocket type", ""]
+    if not strata.get("runnable"):
+        lines.append(f"Not run: {strata['reason']}.")
+        return lines
+    lines += [
+        f"{len(strata['types'])} pocket types: "  # type: ignore[arg-type]
+        f"{', '.join(f'`{t}`' for t in strata['types'])}. "  # type: ignore[union-attr]
+        "One against rest per type, same six features, Holm across "
+        f"{strata['holm_family_size']} tests (features x types).",
+        "",
+    ]
+    if strata.get("mirrored"):
+        lines += [
+            f"With two types, one against rest is the same partition twice - "
+            f"`{strata['types'][1]}` against the rest is "  # type: ignore[index]
+            f"`{strata['types'][0]}` with the sign flipped - so only "  # type: ignore[index]
+            f"`{strata['types_tested'][0]}` is tested and the Holm family is six "  # type: ignore[index]
+            "rather than twelve.",
+            "",
+        ]
+    lines += [
+        "### Power, before any difference",
+        "",
+        "| type | # | groups in | groups rest | floor | MDE |",
+        "|---|---|---|---|---|---|",
+    ]
+    for row in strata["power"]:  # type: ignore[union-attr]
+        mde = row["minimum_detectable"]
+        lines.append(
+            f"| `{row['pocket_type']}` | {row['test']} | {row['n_groups_in']} | "
+            f"{row['n_groups_rest']} | "
+            f"{'yes' if row['clears_evidence_floor'] else 'NO'} | "
+            f"{'inf' if not np.isfinite(mde) else f'{mde:.3f}'} |"
+        )
+    below = [r for r in strata["power"] if not r["clears_evidence_floor"]]  # type: ignore[union-attr]
+    if below:
+        lines += [
+            "",
+            f"{len(below)} of {len(strata['power'])} strata sit below the "  # type: ignore[arg-type]
+            "five-group floor and give no evidence either way. With 29 strict "
+            "groups the plan says in advance that this is the expected outcome "
+            "for most strata: a stratified null here means the design could not "
+            "see, and the MDE beside it is what separates that from an absence.",
+        ]
+    lines += [
+        "",
+        "### Differences",
+        "",
+        "| type | # | feature | difference | 95% interval | p | Holm | signature |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for entry in strata["tests"]:  # type: ignore[union-attr]
+        if not entry.get("runnable"):
+            lines.append(
+                f"| `{entry['pocket_type']}` | {entry['test']} | "
+                f"`{entry['feature']}` | — | — | — | — | "
+                f"not runnable: {entry['reason']} |"
+            )
+            continue
+        low, high = entry["interval"]
+        lines.append(
+            f"| `{entry['pocket_type']}` | {entry['test']} | `{entry['feature']}` | "
+            f"{entry['difference']:+.3f} | [{low:+.3f}, {high:+.3f}] | "
+            f"{entry['p_value']:.4f} | {entry['p_holm']:.4f} | "
+            f"{'**yes**' if entry['is_signature'] else 'no'} |"
+        )
+    lines += [
+        "",
+        f"Type-specific signatures established: **{strata['n_signatures']}** of "
+        f"{strata['holm_family_size']}.",
+    ]
+    return lines
 
 
 # ------------------------------------------------------------------- cli
@@ -656,6 +889,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "provenance", help="regenerate PROVENANCE.md from a validation artefact")
     provenance.add_argument("--validation", type=Path, required=True)
     provenance.add_argument("--commit", default="unknown")
+    provenance.add_argument(
+        "--confirmation", type=Path, default=None,
+        help="a second validation artefact (e.g. CI's) to report alongside")
     provenance.add_argument("--out", type=Path, required=True)
 
     report = sub.add_parser("report", help="the pre-registered analysis")
@@ -677,7 +913,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.command == "provenance":
         payload = json.loads(args.validation.read_text())
-        args.out.write_text(provenance_markdown(payload, args.commit))
+        confirmation = (
+            json.loads(args.confirmation.read_text()) if args.confirmation else None
+        )
+        args.out.write_text(provenance_markdown(payload, args.commit, confirmation))
         print(f"wrote {args.out}")
         return 0
 

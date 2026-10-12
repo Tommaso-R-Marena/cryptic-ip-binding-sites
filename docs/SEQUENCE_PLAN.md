@@ -176,9 +176,37 @@ difference itself is read**, as `FLEXIBLE.md` does. The analysis script emits
 the MDE block first and the comparison block second, in that order, so the
 ordering is in the artefact and not merely asserted.
 
-For Q6b, the MDE is computed per pocket-type stratum. A stratum below the
-5-group floor is reported as "no evidence" with its group count and no
-difference at all.
+### Q6b, fixed now
+
+The comparison shape, written down today before any descriptor exists so it
+cannot be chosen to suit a result. For each pocket type present among the
+sites, that type's sites are compared with the sites of **all other types** —
+one-against-rest, not pairwise, because pairwise over k types multiplies the
+family by k(k−1)/2 and this dataset cannot afford it. The features are the same
+six. The MDE is computed per stratum and printed before the differences, as
+above.
+
+**Holm for Q6b runs across features × types**, so a study with three pocket
+types and six features corrects over eighteen tests. That is a harsh
+correction and it is the honest one: "which of these features differs for
+which kind of pocket" is eighteen questions, not six.
+
+With exactly **two** types the correction is six, not twelve: one-against-rest
+tests the same partition twice there — the second type against the rest is the
+first with its sign flipped — so only the first type is run and the report says
+so. From three types up the rows are genuinely different partitions and all are
+run.
+
+A stratum below the 5-group floor is reported as "no evidence" with its group
+count and no difference at all. **With 29 strict groups this is the expected
+outcome for most strata**, and saying so in advance is the point: a stratified
+null here means the design could not see, not that there is nothing there, and
+the MDE beside it is what distinguishes the two.
+
+Pocket types are assigned from existing descriptors before the split, and the
+assignment is recorded per pocket in the inputs file rather than computed
+inside the analysis, so the split cannot be adjusted after a difference is
+seen.
 
 ## Decision rules
 

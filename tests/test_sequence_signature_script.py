@@ -448,11 +448,37 @@ def test_the_committed_provenance_is_what_the_generator_produces():
     """
     import re
 
-    payload = json.loads((ROOT / "results" / "sequence" / "validation.json").read_text())
-    committed = (ROOT / "results" / "sequence" / "PROVENANCE.md").read_text()
+    results = ROOT / "results" / "sequence"
+    payload = json.loads((results / "validation.json").read_text())
+    ci = results / "validation_ci.json"
+    confirmation = json.loads(ci.read_text()) if ci.exists() else None
+    committed = (results / "PROVENANCE.md").read_text()
     commit = re.search(r"at commit `([^`]+)`", committed)
     assert commit, "the provenance file must record the commit it came from"
-    assert script.provenance_markdown(payload, commit.group(1)) == committed
+    assert script.provenance_markdown(
+        payload, commit.group(1), confirmation) == committed
+
+
+def test_the_ci_confirmation_agrees_with_the_committed_run():
+    """CI re-runs the validation with more shuffles on a different machine.
+
+    Its artefact is extracted from the run log by `extract_log_block.py`, whose
+    gzip CRC verifies the copy, so this compares two independent runs rather
+    than a file with itself.
+    """
+    results = ROOT / "results" / "sequence"
+    ci = results / "validation_ci.json"
+    if not ci.exists():
+        pytest.skip("no CI artefact committed yet")
+    mine = json.loads((results / "validation.json").read_text())
+    theirs = json.loads(ci.read_text())
+    assert theirs["all_checks_pass"] is True
+    assert theirs["n_shuffles"] > mine["n_shuffles"]
+    by_name = {p["pool"]: p for p in theirs["pools"]}
+    for pool in mine["pools"]:
+        other = by_name[pool["pool"]]
+        assert other["mean_z"] == pytest.approx(pool["mean_z"], abs=0.5)
+        assert other["basic_fraction"] == pytest.approx(pool["basic_fraction"])
 
 
 def test_the_provenance_subcommand_writes_the_same_file(tmp_path):
@@ -476,3 +502,128 @@ def test_the_provenance_states_what_it_may_not_be_used_for():
     assert "may not be used for" in text
     assert "ESTABLISHED_SIGNATURES" in text
     assert "has not run" in text
+
+
+# ------------------------------------------------------- Q6b, by pocket type
+
+def typed(arm, group, pocket_type, **kwargs):
+    record = site_record(arm, group, **kwargs)
+    record["pocket_type"] = pocket_type
+    return record
+
+
+def test_q6b_does_not_run_without_a_recorded_pocket_type():
+    """The split must come from the inputs, not be computed in the analysis."""
+    strata = script.run_strata(balanced(6), n_bootstrap=100)
+    assert strata["runnable"] is False
+    assert "pocket_type" in strata["reason"]
+
+
+def test_q6b_lists_the_types_it_found():
+    sites = (
+        [typed("site", f"G{i}", "cryptic", z=3.0) for i in range(5)]
+        + [typed("site", f"H{i}", "open", z=0.0) for i in range(5)]
+        + [typed("site", f"I{i}", "groove", z=0.0) for i in range(5)]
+    )
+    strata = script.run_strata(sites, n_bootstrap=100)
+    assert strata["types"] == ["cryptic", "groove", "open"]
+
+
+def test_q6b_compares_a_type_against_the_rest_of_the_sites_only():
+    """Controls do not enter Q6b: it is a question about sites."""
+    sites = (
+        [typed("site", f"G{i}", "cryptic", z=4.0) for i in range(5)]
+        + [typed("site", f"H{i}", "open", z=0.0) for i in range(5)]
+        + [typed("site", f"J{i}", "groove", z=0.0) for i in range(5)]
+        + [site_record("control", f"C{i}", z=99.0) for i in range(5)]
+    )
+    inside = script.group_means_by_type(
+        sites, "local", "entropy_rate_k2", "cryptic", inside=True)
+    rest = script.group_means_by_type(
+        sites, "local", "entropy_rate_k2", "cryptic", inside=False)
+    assert set(inside) == {f"G{i}" for i in range(5)}
+    assert set(rest) == {f"H{i}" for i in range(5)} | {f"J{i}" for i in range(5)}
+    assert 99.0 not in rest.values()
+
+
+def test_two_types_are_tested_once_because_the_second_is_a_mirror():
+    """One against rest on two types is the same partition with a flipped sign."""
+    sites = (
+        [typed("site", f"G{i}", "cryptic", z=3.0) for i in range(6)]
+        + [typed("site", f"H{i}", "open", z=0.0) for i in range(6)]
+    )
+    strata = script.run_strata(sites, n_bootstrap=200)
+    assert strata["mirrored"] is True
+    assert strata["types_tested"] == ["cryptic"]
+    assert strata["holm_family_size"] == len(script.sg.PRIMARY_TESTS)
+
+
+def test_three_types_are_all_tested():
+    sites = (
+        [typed("site", f"G{i}", "cryptic", z=3.0) for i in range(6)]
+        + [typed("site", f"H{i}", "open", z=0.0) for i in range(6)]
+        + [typed("site", f"J{i}", "groove", z=1.0) for i in range(6)]
+    )
+    strata = script.run_strata(sites, n_bootstrap=200)
+    assert strata["mirrored"] is False
+    assert strata["types_tested"] == ["cryptic", "groove", "open"]
+    assert strata["holm_family_size"] == 3 * len(script.sg.PRIMARY_TESTS)
+
+
+def test_a_stratum_below_the_floor_gives_no_evidence():
+    sites = (
+        [typed("site", f"G{i}", "cryptic", z=9.0) for i in range(3)]
+        + [typed("site", f"H{i}", "open", z=0.0) for i in range(8)]
+        + [typed("site", f"J{i}", "groove", z=0.0) for i in range(8)]
+    )
+    strata = script.run_strata(sites, n_bootstrap=200)
+    cryptic = [r for r in strata["power"] if r["pocket_type"] == "cryptic"]
+    assert cryptic and all(not r["clears_evidence_floor"] for r in cryptic)
+    for entry in strata["tests"]:
+        if entry.get("runnable") and entry["pocket_type"] == "cryptic":
+            assert entry["is_signature"] is False
+
+
+def test_q6b_power_is_reported_for_every_stratum_and_feature():
+    sites = (
+        [typed("site", f"G{i}", "cryptic", z=3.0) for i in range(6)]
+        + [typed("site", f"H{i}", "open", z=0.0) for i in range(6)]
+        + [typed("site", f"J{i}", "groove", z=1.0) for i in range(6)]
+    )
+    strata = script.run_strata(sites, n_bootstrap=100)
+    assert len(strata["power"]) == 3 * len(script.sg.PRIMARY_TESTS)
+    for row in strata["power"]:
+        assert row["minimum_detectable"] >= 0.0
+
+
+def test_the_q6b_markdown_puts_power_before_the_differences():
+    sites = (
+        [typed("site", f"G{i}", "cryptic", z=3.0) for i in range(6)]
+        + [typed("site", f"H{i}", "open", z=0.0) for i in range(6)]
+    )
+    text = "\n".join(script.strata_markdown(script.run_strata(sites, n_bootstrap=100)))
+    assert text.index("### Power, before any difference") < text.index("### Differences")
+
+
+def test_the_q6b_markdown_explains_an_unrunnable_study():
+    text = "\n".join(script.strata_markdown(
+        script.run_strata(balanced(6), n_bootstrap=50)))
+    assert "Not run" in text
+
+
+def test_the_pocket_type_survives_into_the_site_record():
+    record = a_record()
+    record["pocket_type"] = "cryptic"
+    out = script.describe_one(record, n_shuffles=20)
+    assert out["pocket_type"] == "cryptic"
+
+
+def test_a_report_carries_its_q6b_section():
+    sites = (
+        [typed("site", f"G{i}", "cryptic", z=3.0) for i in range(6)]
+        + [typed("site", f"H{i}", "open", z=0.0) for i in range(6)]
+        + [site_record("control", f"C{i}", z=0.0) for i in range(6)]
+    )
+    report = script.run_report(sites, n_bootstrap=100)
+    assert report["strata"]["runnable"] is True
+    assert "Q6b: by pocket type" in script.report_markdown(report)

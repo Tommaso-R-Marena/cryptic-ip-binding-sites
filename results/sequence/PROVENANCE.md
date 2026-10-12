@@ -1,6 +1,6 @@
 # Study Q6 method validation: provenance
 
-**Run.** `scripts/sequence_signature.py validate --windows 40 --length 24 --shuffles 400`, seed 20261012, on the session container (single core), at commit `8f817d1`.
+**Run.** `scripts/sequence_signature.py validate --windows 40 --length 24 --shuffles 400`, seed 20261012, on the session container (single core), at commit `c543b1e`.
 
 **Plan.** `docs/SEQUENCE_PLAN.md`, which pre-registers study Q6 and states that this validation is a property of the method and not a study result.
 
@@ -49,3 +49,15 @@ All 8 checks pass: **True**. A failed check exits non-zero and fails the workflo
 * It is not a benchmark of the detector: no structure is involved.
 * It does not license adding a sequence term to the score. `signature.ESTABLISHED_SIGNATURES` stays empty until study Q6 reports, and `sequence_contribution` returns an abstention until then.
 * The planted signal is a charge periodicity at exactly 3.6 residues, which is the cleanest possible case. A real helical face is noisier, so the firing rate here is an upper bound on sensitivity, not an estimate of it.
+
+## Independent confirmation in CI
+
+`.github/workflows/sequence.yml` re-runs the validation on every push with 1000 shuffles per window rather than 400, on a GitHub runner rather than this container. Its artefact was extracted from the run log by `scripts/extract_log_block.py` - a gzip block whose CRC verifies the copy - and is committed beside this file as `validation_ci.json`. Nothing was transcribed.
+
+| pool | mean z (this run) | mean z (CI) | firing (this run) | firing (CI) |
+|---|---|---|---|---|
+| planted helical face | +4.05 | +4.04 | 100% | 100% |
+| same letters, shuffled | -0.24 | -0.23 | 0% | 0% |
+| basic-rich, no ordering | -0.13 | -0.12 | 2% | 2% |
+
+All 8 checks pass in CI as well.
