@@ -95,95 +95,106 @@ def recede(ax, *, grid_axis: str = "y") -> None:
 # ------------------------------------------------------------------- F1
 
 def figure_power(report: Dict[str, object], path: Path) -> Path:
-    """Detection rate against the fraction of a face a lining captures."""
+    """Detection against how much of a face is seen, and which half carries it.
+
+    Two panels, because one number hid the mechanism. The left panel is the
+    headline rate - the better of the two halves, Holm-corrected - for the two
+    sampling schemes, against the false-positive rate that makes it meaningful.
+    The right panel splits the spatial curve into its halves, which is where an
+    earlier topology-only reading went wrong: register holds up far below the
+    point at which topology collapses.
+    """
     power = report["power"]
     n_face = int(power["n_face_residues"])  # type: ignore[index]
-    fig, ax = plt.subplots(figsize=(5.4, 3.6))
-    recede(ax)
-
-    modes = [("spatial", "spatial slab\n(what a ligand selects)", SERIES[0], "o", "-"),
-             ("random", "random subset", SERIES[1], "s", "--")]
-    rows_by_mode = {
-        key: sorted((r for r in power["dilution"] if r["mode"] == key),  # type: ignore[union-attr]
-                    key=lambda r: r["fraction_of_face"])
-        for key, *_ in modes
-    }
-
-    def other(table, key, at_x):
-        """The other series' value at the same x, for finding the widest gap."""
-        name = "random" if key == "spatial" else "spatial"
-        for row in table[name]:
-            if row["n_positions"] == at_x:
-                return row["detected_rate"]
-        return 0.0
-
-    for key, label, colour, marker, dash in modes:
-        rows = rows_by_mode[key]
-        x = [r["n_positions"] for r in rows]
-        y = [r["detected_rate"] for r in rows]
-        ax.plot(x, y, color=colour, marker=marker, linestyle=dash, label=label,
-                markeredgecolor=SURFACE, markeredgewidth=1.2, zorder=3,
-                clip_on=False)
-        # Direct-label where the curves are furthest apart, never at the shared
-        # endpoint: both series finish at 100% and labels there collide.
-        gaps = [abs(y[i] - other(rows_by_mode, key, x[i])) for i in range(len(x))]
-        spot = int(np.argmax(gaps))
-        ax.annotate(label.split("\n")[0], xy=(x[spot], y[spot]),
-                    xytext=(9, -13),
-                    textcoords="offset points", color=colour, fontsize=8,
-                    fontweight="bold", va="center", ha="left")
-
+    decoy = power["false_positive"]  # type: ignore[index]
     low, high = REAL_LINING_RANGE
-    ax.axvspan(low, high, color=INK_MUTED, alpha=0.10, zorder=1, lw=0)
-    ax.annotate("annotated IP linings in this project", xy=((low + high) / 2, 1.13),
-                ha="center", va="bottom", fontsize=7.5, color=INK_SECONDARY)
+    fig, (left, right) = plt.subplots(1, 2, figsize=(9.0, 3.7), sharey=True)
 
-    ax.set_xlabel(f"lining positions observed  (of {n_face} on the face)")
-    ax.set_ylabel("detected at p ≤ 0.05")
-    ax.set_title("The signature needs most of the face")
-    ax.set_ylim(-0.03, 1.26)
-    ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
-    ax.set_yticklabels(["0", "25%", "50%", "75%", "100%"])
-    ax.legend(loc="lower right", bbox_to_anchor=(1.0, 0.02))
+    recede(left)
+    for key, label, colour, marker, dash in (
+            ("spatial", "spatial slab", SERIES[0], "o", "-"),
+            ("random", "random subset", SERIES[1], "s", "--")):
+        rows = sorted((r for r in power["dilution"] if r["mode"] == key),  # type: ignore[union-attr]
+                      key=lambda r: r["n_positions"])
+        left.plot([r["n_positions"] for r in rows], [r["detected_either"] for r in rows],
+                  color=colour, marker=marker, linestyle=dash, label=label,
+                  markeredgecolor=SURFACE, markeredgewidth=1.2, zorder=3, clip_on=False)
+    left.axvspan(low, high, color=INK_MUTED, alpha=0.10, zorder=1, lw=0)
+    left.annotate("annotated IP linings", xy=((low + high) / 2, 1.15),
+                  ha="center", va="bottom", fontsize=7.5, color=INK_SECONDARY)
+    left.axhline(decoy["detected_either"], color=INK, linestyle=":", linewidth=1.2, zorder=4)
+    left.annotate(f"false positives ({decoy['detected_either']:.2f})",
+                  xy=(low, decoy["detected_either"]), xytext=(2, 7),
+                  textcoords="offset points", ha="left", va="bottom",
+                  fontsize=7.5, color=INK_SECONDARY)
+    left.set_xlabel(f"lining positions observed  (of {n_face} on the face)")
+    left.set_ylabel("detected at p ≤ 0.05")
+    left.set_title("Either half of the decomposition")
+    left.set_ylim(-0.03, 1.30)
+    left.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+    left.set_yticklabels(["0", "25%", "50%", "75%", "100%"])
+    left.legend(loc="lower right", bbox_to_anchor=(1.0, 0.02))
+
+    recede(right)
+    rows = sorted((r for r in power["dilution"] if r["mode"] == "spatial"),  # type: ignore[union-attr]
+                  key=lambda r: r["n_positions"])
+    x = [r["n_positions"] for r in rows]
+    for field, label, colour, marker, dash, dy in (
+            ("detected_register", "register", SERIES[2], "D", "-", 11),
+            ("detected_topology", "topology", SERIES[1], "^", "--", -13)):
+        y = [r[field] for r in rows]
+        right.plot(x, y, color=colour, marker=marker, linestyle=dash, label=label,
+                   markeredgecolor=SURFACE, markeredgewidth=1.2, zorder=3, clip_on=False)
+        spot = int(np.argmin(y))
+        right.annotate(label, xy=(x[spot], y[spot]), xytext=(10, dy),
+                       textcoords="offset points", color=colour, fontsize=8,
+                       fontweight="bold", va="center", ha="left")
+    right.axvspan(low, high, color=INK_MUTED, alpha=0.10, zorder=1, lw=0)
+    right.set_xlabel("lining positions observed")
+    right.set_title("Split by half, spatial sampling")
+
+    fig.suptitle("Where the signature is detectable, and which half finds it",
+                 fontsize=11, fontweight="bold", y=1.03)
     fig.tight_layout()
     return save(fig, path)
 
 
-# ------------------------------------------------------------------- F2
-
 def figure_shape(report: Dict[str, object], path: Path) -> Path:
-    """The falsifiable prediction: same size, opposite answers."""
-    shapes = report["power"]["shapes"]  # type: ignore[index]
-    rows = sorted(shapes, key=lambda r: r["detected_rate"])  # type: ignore[call-overload]
-    size = int(rows[0]["lining_size"])
+    """Same lining size, different shape - and the two halves swap over."""
+    shapes = sorted(report["power"]["shapes"],  # type: ignore[index,call-overload]
+                    key=lambda r: r["detected_either"])
+    size = int(shapes[0]["lining_size"])
 
-    fig, ax = plt.subplots(figsize=(5.4, 2.5))
+    fig, ax = plt.subplots(figsize=(6.4, 3.0))
     recede(ax, grid_axis="x")
-    positions = np.arange(len(rows))
-    colours = [SERIES[1], SERIES[0]]
-    bars = ax.barh(positions, [r["detected_rate"] for r in rows], height=0.52,
-                   color=colours[: len(rows)], zorder=3)
-    for bar, row in zip(bars, rows):
-        bar.set_linewidth(2.0)
-        bar.set_edgecolor(SURFACE)
-        # The value sits outside the bar: a 7% bar is far too short to hold text.
-        ax.annotate(f"{row['detected_rate'] * 100:.0f}%",
-                    xy=(row["detected_rate"], bar.get_y() + bar.get_height() / 2),
-                    xytext=(7, 0), textcoords="offset points",
-                    va="center", ha="left", fontsize=11, fontweight="bold", color=INK)
+    height = 0.34
+    positions = np.arange(len(shapes))
+    for (field, label, colour), offset in zip(
+            (("detected_topology", "topology", SERIES[1]),
+             ("detected_register", "register", SERIES[2])),
+            (height / 2, -height / 2)):
+        ax.barh(positions + offset, [r[field] for r in shapes], height=height,
+                color=colour, label=label, zorder=3,
+                edgecolor=SURFACE, linewidth=2.0)
+        for position, row in zip(positions, shapes):
+            ax.annotate(f"{row[field]:.2f}", xy=(row[field], position + offset),
+                        xytext=(6, 0), textcoords="offset points", va="center",
+                        ha="left", fontsize=8.5, fontweight="bold", color=INK)
 
     ax.set_yticks(positions)
     ax.set_yticklabels(
-        [f"{str(r['shape']).split(':')[0]}\n"
-         f"{r['elements_spanned']:.0f} elements · {r['helix_gap_fraction']:.2f} on-face"
-         for r in rows], fontsize=8, color=INK)
+        [f"{str(r['shape']).split(':')[0]}\n{r['elements_spanned']:.0f} elements · "
+         f"either half {r['detected_either']:.2f}" for r in shapes],
+        fontsize=8, color=INK)
     for tick in ax.get_yticklabels():
         tick.set_linespacing(1.5)
     ax.set_xlim(0, 1.16)
     ax.set_xticks([0, 0.25, 0.5, 0.75, 1.0])
     ax.set_xticklabels(["0", "25%", "50%", "75%", "100%"])
-    ax.set_xlabel("detected at p ≤ 0.05")
-    ax.set_title(f"Shape decides, not size — both linings are {size} residues")
+    ax.set_xlabel("detected at p ≤ 0.05", labelpad=8)
+    ax.set_title(f"The halves swap over with shape — both linings are {size} residues")
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.24), ncol=2,
+              columnspacing=1.6, handletextpad=0.5)
     fig.tight_layout()
     return save(fig, path)
 

@@ -64,13 +64,13 @@ def test_the_committed_figures_exist_in_both_formats():
         assert (FIGURES / f"{stem}.pdf").exists()
 
 
-def test_the_power_cliff_falls_inside_the_real_lining_range():
-    """The band is worth marking because the cliff is *inside* it, not below it.
+def test_detection_degrades_gracefully_across_the_real_lining_range():
+    """The band is marked because the method's limit sits in it, not below it.
 
-    At the bottom of the range detection is near zero and at the top it is
-    complete, so a 20-residue lining is fine and a 14-residue one is not. That
-    distinction is the point of the figure and is easy to overstate in either
-    direction.
+    Reading the better of the two halves, detection is complete at the top of
+    the range and still well above the false-positive rate at the bottom. An
+    earlier version of this test asserted a collapse, which was true only of
+    the topology half read alone.
     """
     low, high = script.REAL_LINING_RANGE
     assert low < high
@@ -78,8 +78,14 @@ def test_the_power_cliff_falls_inside_the_real_lining_range():
     inside = [r for r in payload["power"]["dilution"]
               if low <= r["n_positions"] <= high and r["mode"] == "spatial"]
     assert len(inside) >= 2
-    assert min(r["detected_rate"] for r in inside) < 0.25
-    assert max(r["detected_rate"] for r in inside) > 0.75
+    decoy = payload["power"]["false_positive"]["detected_either"]
+    assert max(r["detected_either"] for r in inside) > 0.9
+    assert min(r["detected_either"] for r in inside) > decoy + 0.2
+
+
+def test_the_figure_reads_the_composite_rate_not_one_half():
+    text = (ROOT / "scripts" / "architecture_figures.py").read_text()
+    assert "detected_either" in text
 
 
 def test_the_shape_figure_has_exactly_two_shapes_of_one_size():
@@ -87,6 +93,15 @@ def test_the_shape_figure_has_exactly_two_shapes_of_one_size():
     shapes = payload["power"]["shapes"]
     assert len(shapes) == 2
     assert len({r["lining_size"] for r in shapes}) == 1
+
+
+def test_the_shape_figure_shows_both_halves_because_they_swap():
+    payload = json.loads(ARCHITECTURE.read_text())
+    shapes = {str(r["shape"]): r for r in payload["power"]["shapes"]}
+    ring = next(v for k, v in shapes.items() if "ring" in k)
+    column = next(v for k, v in shapes.items() if "column" in k)
+    assert ring["detected_register"] > ring["detected_topology"]
+    assert column["detected_topology"] >= column["detected_register"] - 1e-9
 
 
 def test_the_homology_figure_has_its_controls_and_a_square_matrix():

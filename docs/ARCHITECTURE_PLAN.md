@@ -139,24 +139,34 @@ recorded as such rather than defended.
 
 ## Power, and the design consequence
 
-This is the measurement that changes the study. On the barrel's 42-residue
-face, detectability against the fraction of the face a lining captures:
+On the barrel's 42-residue face, detection against the fraction of the face a
+lining captures. **Each half of the decomposition is reported separately and the
+headline is the better of the two**, because the halves detect different pocket
+shapes and one half alone is not the detection rate of the method:
 
-| sampling | 100% | 80% | 60% | 45% | 33% |
-|---|---|---|---|---|---|
-| random subset, detected at p ≤ 0.05 | 1.00 | 0.97 | 0.87 | 0.37 | 0.03 |
-| spatial slab, detected at p ≤ 0.05 | 1.00 | 1.00 | 1.00 | 1.00 | 0.10 |
+| sampling | half | 100% | 80% | 60% | 45% | 33% (n=14) |
+|---|---|---|---|---|---|---|
+| spatial slab | topology | 1.00 | 1.00 | 1.00 | 1.00 | 0.10 |
+| spatial slab | register | 1.00 | 1.00 | 1.00 | 1.00 | 0.73 |
+| spatial slab | **either** | 1.00 | 1.00 | 1.00 | 1.00 | **0.77** |
+| random subset | **either** | 1.00 | 1.00 | 1.00 | 0.97 | **0.40** |
 
-A spatial slab — which is what a bound ligand actually selects — is far kinder
-than a random subset, but **both collapse below about 40% of the face**, which
-here is fewer than about 19 positions.
+against a false-positive rate of **0.05** on random linings of 14 positions, so
+none of it is bought with false positives.
 
-Annotated IP-site linings in this project are 10–20 residues, so **the cliff
-falls inside that range rather than below it**: at 14 positions the spatial
-detection rate is 0.10 and at 19 it is 1.00. A 20-residue lining is usable and
-a 14-residue one is not, which makes lining size a *gating covariate* for this
-study rather than a nuisance. The primary analysis must therefore not use bare
-linings alone. Pre-registered consequence: the
+**This corrects an earlier version of this plan**, which reported the topology
+half alone and so put the 14-position spatial rate at 0.10 rather than 0.77 — an
+eightfold understatement that made the method look far weaker than it is. The
+error was reading a sub-component where the composite was the right statistic;
+it is recorded here rather than quietly fixed, and the probe now reports all
+three rates so the same mistake cannot recur.
+
+The corrected reading: detection is essentially complete down to about 19
+positions and degrades gracefully rather than collapsing below that. Annotated
+IP-site linings here are 10–20 residues, so **most of that range is usable**,
+and lining size remains a reported covariate rather than a gate. The
+element-extended lining stays the pre-registered primary unit, now as a power
+*improvement* rather than a necessity. Pre-registered consequence: the
 primary unit for Q7 is the **element-extended lining** — each lining residue
 together with the contiguous run it belongs to in the local window — with the
 bare lining reported as a secondary analysis whose expected result is null for
@@ -168,22 +178,28 @@ measured above at that fraction.
 
 At a fixed lining size of 14 residues on the same structure:
 
-| shape | elements spanned | helix-gap fraction | median p | detected |
-|---|---|---|---|---|
-| ring, across all elements | 6.0 | 0.338 | 0.201 | **0.07** |
-| column, along 2 elements | 2.0 | 0.615 | 0.015 | **1.00** |
+| shape | elements | helix-gap fraction | topology | register | **either** |
+|---|---|---|---|---|---|
+| ring, across all elements | 6.0 | 0.338 | 0.07 | 0.73 | **0.73** |
+| column, along 2 elements | 2.0 | 0.615 | 1.00 | 1.00 | **1.00** |
 
-Same structure, same number of lining residues, opposite answers. So:
+Same structure, same lining size, a real difference — and a difference in
+**degree**, not the presence-versus-absence an earlier topology-only reading
+implied. The mechanism is visible in the halves, and it is the more interesting
+result: a column is a long run on one element and carries a **topology** signal;
+a ring is short runs separated by linkers in a repeating arrangement and carries
+a **register** signal. The halves swap over with shape.
 
-> **Prediction Q7-P1.** The sequence-space signature is present in elongated,
-> element-aligned pockets and absent in ring-shaped and interface pockets,
-> **independently of lining size**.
+> **Prediction Q7-P1 (revised, and weaker than its first form).** At equal
+> lining size the signature is **stronger** in elongated element-aligned pockets
+> than in ring-shaped ones, and **the half that carries it differs between
+> them** — topology for columns, register for rings.
 
-This is the study's main hypothesis and it is falsifiable in the strong
-direction: if the signature appears uniformly across pocket shapes, or tracks
-lining size rather than shape, the framework is wrong. Shape is assigned from
-existing structural descriptors before the split and recorded per pocket in the
-inputs, never derived inside the analysis.
+Falsifiable in two directions: if detection is uniform across shapes, or if the
+same half carries both, the framework is wrong. The second clause is the
+sharper test and it was not available before the halves were reported
+separately. Shape is assigned from existing structural descriptors before the
+split and recorded per pocket in the inputs, never derived inside the analysis.
 
 ## Q7-H: architecture homology, and the controls it must beat
 

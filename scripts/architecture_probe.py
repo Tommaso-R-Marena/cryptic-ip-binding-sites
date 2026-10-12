@@ -278,6 +278,34 @@ def probe_panel(rng: np.random.Generator, n_draws: int = 1500) -> Dict[str, obje
 
 # ------------------------------------- probe 8: power, dilution and shape
 
+def _detection(arch) -> Dict[str, float]:
+    """Both halves' Holm-corrected p, and the better of the two.
+
+    All three are reported, and the headline is ``either``. An earlier version
+    of this probe reported the topology half alone, on the reasoning that
+    topology is what detects a face - which is true of a *single element* and
+    wrong as a detection rate. Ring-shaped linings carry their signal in
+    register, not topology, so the topology-only rate understated them by a
+    factor of seven, and understated a 14-residue slab by a factor of eight.
+    """
+    topology = arch.topology_p if arch.topology_p is not None else 1.0
+    register = arch.register_p if arch.register_p is not None else 1.0
+    return {"topology": float(topology), "register": float(register),
+            "either": float(min(topology, register))}
+
+
+def _rates(records: List[Dict[str, float]]) -> Dict[str, float]:
+    out: Dict[str, float] = {}
+    for half in ("topology", "register", "either"):
+        values = np.asarray([r[half] for r in records], dtype=float)
+        out[f"detected_{half}"] = float(np.mean(values <= 0.05))
+    values = np.asarray([r["either"] for r in records], dtype=float)
+    out["median_p"] = float(np.median(values))
+    out["clear_rate"] = float(np.mean(values <= 0.01))
+    out["detected_rate"] = out["detected_either"]
+    return out
+
+
 def probe_power(rng: np.random.Generator, n_draws: int = 600) -> Dict[str, object]:
     """How completely, and in what shape, must a lining be seen to be detectable?
 
@@ -285,6 +313,10 @@ def probe_power(rng: np.random.Generator, n_draws: int = 600) -> Dict[str, objec
     annotated lining is the residues within contact range of a bound ligand -
     a spatial slab of the face, not a random subset of it - so both are
     measured, and then two pocket shapes of identical size are compared.
+
+    Every rate is reported for each half of the decomposition and for the
+    better of the two, because the two halves detect different pocket shapes
+    and a single half is not the detection rate of the method.
     """
     inward, heights = barrel_inward()
     low, high = min(heights.values()), max(heights.values())
@@ -294,7 +326,7 @@ def probe_power(rng: np.random.Generator, n_draws: int = 600) -> Dict[str, objec
             count = int(round(fraction * len(inward)))
             if count < 6:
                 continue
-            p_values = []
+            records = []
             for rep in range(30):
                 if mode == "random":
                     pick = rng.choice(inward, size=count, replace=False)
@@ -302,20 +334,17 @@ def probe_power(rng: np.random.Generator, n_draws: int = 600) -> Dict[str, objec
                     centre = float(rng.uniform(low, high))
                     pick = sorted(inward, key=lambda r: abs(heights[r] - centre))[:count]
                 arch = ar.describe_architecture(with_linkers(pick), n_draws=n_draws, seed=SEED + rep)
-                p_values.append(arch.topology_p if arch.topology_p is not None else 1.0)
-            p_values = np.asarray(p_values)
+                records.append(_detection(arch))
             dilution.append({
                 "mode": mode, "fraction_of_face": fraction, "n_positions": count,
-                "median_p": float(np.median(p_values)),
-                "clear_rate": float(np.mean(p_values <= 0.01)),
-                "detected_rate": float(np.mean(p_values <= 0.05)),
+                **_rates(records),
             })
 
     # Shape, at one fixed lining size.
     size = 14
     shapes = []
     for label, elements in (("ring across all elements", None), ("column along 2 elements", 2)):
-        p_values, spanned, fractions = [], [], []
+        records, spanned, fractions = [], [], []
         for rep in range(30):
             if elements is None:
                 centre = float(rng.uniform(low, high))
@@ -328,21 +357,31 @@ def probe_power(rng: np.random.Generator, n_draws: int = 600) -> Dict[str, objec
                 pick = pool[:size]
             positions = with_linkers(pick)
             arch = ar.describe_architecture(positions, n_draws=n_draws, seed=SEED + rep)
-            p_values.append(arch.topology_p if arch.topology_p is not None else 1.0)
+            records.append(_detection(arch))
             spanned.append(len({int(r) // PER for r in pick}))
             fractions.append(ar.face_gap_fraction(positions, ar.HELIX_FACE_GAPS))
-        if not p_values:
+        if not records:
             continue
-        p_values = np.asarray(p_values)
         shapes.append({
             "shape": label, "lining_size": size,
             "elements_spanned": float(np.mean(spanned)),
             "helix_gap_fraction": float(np.mean(fractions)),
-            "median_p": float(np.median(p_values)),
-            "clear_rate": float(np.mean(p_values <= 0.01)),
-            "detected_rate": float(np.mean(p_values <= 0.05)),
+            **_rates(records),
         })
-    return {"n_face_residues": len(inward), "dilution": dilution, "shapes": shapes}
+    # Random linings of the same size, so no detection rate is ever read
+    # without the false-positive rate that makes it meaningful.
+    decoys = []
+    for rep in range(40):
+        span = int(rng.integers(4 * size, 14 * size))
+        pick = sorted(rng.choice(np.arange(span), size=size, replace=False).tolist())
+        decoys.append(_detection(ar.describe_architecture(
+            pick, n_draws=n_draws, seed=SEED + 500 + rep)))
+    return {
+        "n_face_residues": len(inward),
+        "dilution": dilution,
+        "shapes": shapes,
+        "false_positive": {"lining_size": size, **_rates(decoys)},
+    }
 
 
 # ------------------------------------------------------------------ driver
@@ -499,45 +538,68 @@ def markdown(report: Dict[str, object]) -> str:
         "",
         "## 8. Power: how much of a lining must be seen",
         "",
-        f"The barrel has {power['n_face_residues']} face residues. Subsampling them:",
+        f"The barrel has {power['n_face_residues']} face residues. Subsampling them, with "
+        "each half of the decomposition reported separately and the headline being the "
+        "better of the two:",
         "",
-        "| sampling | fraction of face | n | median p | clear | detected |",
+        "| sampling | fraction of face | n | topology | register | **either** |",
         "|---|---|---|---|---|---|",
     ]
     for row in power["dilution"]:
         lines.append(
             f"| {row['mode']} | {row['fraction_of_face']:.2f} | {row['n_positions']} | "
-            f"{row['median_p']:.4f} | {row['clear_rate']:.2f} | {row['detected_rate']:.2f} |"
+            f"{row['detected_topology']:.2f} | {row['detected_register']:.2f} | "
+            f"**{row['detected_either']:.2f}** |"
         )
+    decoy = power["false_positive"]
     lines += [
         "",
-        "A spatial slab - which is what a bound ligand actually selects - is far kinder "
-        "than a random subset at the same count, but both collapse once a lining captures "
-        "less than about 40% of the face it sits on.",
+        f"Against a false-positive rate of **{decoy['detected_either']:.2f}** on random "
+        f"linings of {decoy['lining_size']} positions, so none of this is bought with "
+        "false positives.",
         "",
-        "And at one fixed lining size, pocket **shape** decides detectability:",
+        "**The two halves detect different things, and reading either one alone "
+        "understates the method.** An earlier version of this probe reported the topology "
+        "half only - on the reasoning that topology is what detects a face, which is true "
+        "of a single element and wrong as a detection rate - and so understated a "
+        "14-position slab eightfold.",
         "",
-        "| shape | lining size | elements spanned | helix-gap fraction | median p | clear | detected |",
+        "And at one fixed lining size, pocket **shape** still matters, though less than "
+        "the topology half alone suggested:",
+        "",
+        "| shape | lining size | elements spanned | helix-gap fraction | topology | register | **either** |",
         "|---|---|---|---|---|---|---|",
     ]
     for row in power["shapes"]:
         lines.append(
             f"| {row['shape']} | {row['lining_size']} | {row['elements_spanned']:.1f} | "
-            f"{row['helix_gap_fraction']:.3f} | {row['median_p']:.4f} | "
-            f"{row['clear_rate']:.2f} | {row['detected_rate']:.2f} |"
+            f"{row['helix_gap_fraction']:.3f} | {row['detected_topology']:.2f} | "
+            f"{row['detected_register']:.2f} | **{row['detected_either']:.2f}** |"
         )
+    ring = next((r for r in power["shapes"] if "ring" in str(r["shape"])), None)
+    column = next((r for r in power["shapes"] if "column" in str(r["shape"])), None)
+    if ring and column:
+        lines += [
+            "",
+            f"Same structure, same lining size, and a real difference - "
+            f"{column['detected_either']:.2f} against {ring['detected_either']:.2f} - but "
+            "a difference in degree rather than the presence-versus-absence the "
+            "topology-only measurement implied. The mechanism is visible in the two "
+            "halves: a column lining is a long run on one element, which is a **topology** "
+            f"signal ({column['detected_topology']:.2f} against "
+            f"{ring['detected_topology']:.2f}); a ring lining is short runs separated by "
+            "linkers in a repeating arrangement, which is a **register** signal "
+            f"({ring['detected_register']:.2f} against "
+            f"{ring['detected_topology']:.2f} for its own topology).",
+            "",
+            "So the falsifiable prediction stands in a weakened and more precise form: the "
+            "signature should be **stronger** in elongated element-aligned pockets than in "
+            "ring-shaped ones at equal lining size, and the half that carries it should "
+            "differ between them. It is no longer a claim that ring pockets carry no "
+            "signature.",
+            "",
+        ]
     lines += [
-        "",
-        "Same structure, same number of lining residues, opposite answers. A pocket that "
-        "runs **along** a secondary-structure element is detectable; one that cuts "
-        "**across** many elements is not, because each element then contributes only two "
-        "or three face residues and two or three gaps carry no signal.",
-        "",
-        "That is a structural prediction and it is falsifiable: it says the sequence-space "
-        "signature should be found in elongated, element-aligned pockets and should be "
-        "absent in ring-shaped and interface pockets, independent of how many lining "
-        "residues each has.",
-        "",
         "## What this cannot be used for",
         "",
         "* It is not evidence about real binding sites. Every lining here is synthetic or "

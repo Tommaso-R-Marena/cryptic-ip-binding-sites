@@ -412,15 +412,21 @@ barrels this recovers the architecture from positions alone: the linkered
 barrel's lining reads `mosaic`/`helix_face` with a dominant period of 3.6,
 which is the helix geometry recovered without being told.
 
-**And it has a falsifiable prediction with a measured power limit.** The
-signature survives spatial subsampling down to ~60% of the face and collapses
-below ~40%, i.e. below about 19 positions — while annotated IP linings here are
-10–20 residues, so the method sits at the edge of its power on bare linings.
-At a fixed 14 residues on the same structure, shape decides everything: a ring
-across all six helices is detected 7% of the time, a column along two helices
-100%. So the signature should be found in elongated element-aligned pockets and
-absent in ring and interface pockets *independently of lining size* — and if it
-instead tracks size, the framework is wrong.
+**And it has a falsifiable prediction with a measured power curve.** Reading
+the better of the two halves, detection is complete down to about 19 lining
+positions and 0.77 at 14, against a 0.05 false-positive rate on random linings
+of the same size. At a fixed 14 residues, shape still matters — a column along
+two helices is detected 100% of the time against 73% for a ring across all six
+— but the sharper result is *which half* finds each: a column is a long run on
+one element and is a **topology** signal (1.00 against 0.07 for the ring); a
+ring is short runs in a repeating arrangement and is a **register** signal (0.73
+against its own 0.07 topology). The halves swap over with shape, and that is a
+harder prediction to satisfy by accident than a difference in rate.
+
+*(This supersedes an earlier reading of the same probe which reported the
+topology half alone and so put the ring at 7% and a 14-residue slab at 10%. The
+probe now reports both halves and their better, and `results/architecture/
+ARCHITECTURE.md` records the correction.)*
 
 ### `homology.py` — are two pockets lined the same way?
 

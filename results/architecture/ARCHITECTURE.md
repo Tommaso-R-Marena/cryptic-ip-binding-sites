@@ -83,33 +83,35 @@ The row that matters most is the jittered helical face. Its gaps are drawn at ra
 
 ## 8. Power: how much of a lining must be seen
 
-The barrel has 42 face residues. Subsampling them:
+The barrel has 42 face residues. Subsampling them, with each half of the decomposition reported separately and the headline being the better of the two:
 
-| sampling | fraction of face | n | median p | clear | detected |
+| sampling | fraction of face | n | topology | register | **either** |
 |---|---|---|---|---|---|
-| random | 1.00 | 42 | 0.0067 | 1.00 | 1.00 |
-| random | 0.80 | 34 | 0.0067 | 0.83 | 0.97 |
-| random | 0.60 | 25 | 0.0200 | 0.47 | 0.87 |
-| random | 0.45 | 19 | 0.0649 | 0.13 | 0.37 |
-| random | 0.33 | 14 | 0.4493 | 0.00 | 0.03 |
-| spatial | 1.00 | 42 | 0.0067 | 1.00 | 1.00 |
-| spatial | 0.80 | 34 | 0.0067 | 1.00 | 1.00 |
-| spatial | 0.60 | 25 | 0.0067 | 0.93 | 1.00 |
-| spatial | 0.45 | 19 | 0.0175 | 0.37 | 1.00 |
-| spatial | 0.33 | 14 | 0.1722 | 0.00 | 0.10 |
+| random | 1.00 | 42 | 1.00 | 1.00 | **1.00** |
+| random | 0.80 | 34 | 0.97 | 1.00 | **1.00** |
+| random | 0.60 | 25 | 0.87 | 1.00 | **1.00** |
+| random | 0.45 | 19 | 0.37 | 0.97 | **0.97** |
+| random | 0.33 | 14 | 0.03 | 0.37 | **0.40** |
+| spatial | 1.00 | 42 | 1.00 | 1.00 | **1.00** |
+| spatial | 0.80 | 34 | 1.00 | 1.00 | **1.00** |
+| spatial | 0.60 | 25 | 1.00 | 1.00 | **1.00** |
+| spatial | 0.45 | 19 | 1.00 | 1.00 | **1.00** |
+| spatial | 0.33 | 14 | 0.10 | 0.73 | **0.77** |
 
-A spatial slab - which is what a bound ligand actually selects - is far kinder than a random subset at the same count, but both collapse once a lining captures less than about 40% of the face it sits on.
+Against a false-positive rate of **0.05** on random linings of 14 positions, so none of this is bought with false positives.
 
-And at one fixed lining size, pocket **shape** decides detectability:
+**The two halves detect different things, and reading either one alone understates the method.** An earlier version of this probe reported the topology half only - on the reasoning that topology is what detects a face, which is true of a single element and wrong as a detection rate - and so understated a 14-position slab eightfold.
 
-| shape | lining size | elements spanned | helix-gap fraction | median p | clear | detected |
+And at one fixed lining size, pocket **shape** still matters, though less than the topology half alone suggested:
+
+| shape | lining size | elements spanned | helix-gap fraction | topology | register | **either** |
 |---|---|---|---|---|---|---|
-| ring across all elements | 14 | 6.0 | 0.338 | 0.2013 | 0.00 | 0.07 |
-| column along 2 elements | 14 | 2.0 | 0.615 | 0.0150 | 0.40 | 1.00 |
+| ring across all elements | 14 | 6.0 | 0.338 | 0.07 | 0.73 | **0.73** |
+| column along 2 elements | 14 | 2.0 | 0.615 | 1.00 | 1.00 | **1.00** |
 
-Same structure, same number of lining residues, opposite answers. A pocket that runs **along** a secondary-structure element is detectable; one that cuts **across** many elements is not, because each element then contributes only two or three face residues and two or three gaps carry no signal.
+Same structure, same lining size, and a real difference - 1.00 against 0.73 - but a difference in degree rather than the presence-versus-absence the topology-only measurement implied. The mechanism is visible in the two halves: a column lining is a long run on one element, which is a **topology** signal (1.00 against 0.07); a ring lining is short runs separated by linkers in a repeating arrangement, which is a **register** signal (0.73 against 0.07 for its own topology).
 
-That is a structural prediction and it is falsifiable: it says the sequence-space signature should be found in elongated, element-aligned pockets and should be absent in ring-shaped and interface pockets, independent of how many lining residues each has.
+So the falsifiable prediction stands in a weakened and more precise form: the signature should be **stronger** in elongated element-aligned pockets than in ring-shaped ones at equal lining size, and the half that carries it should differ between them. It is no longer a claim that ring pockets carry no signature.
 
 ## What this cannot be used for
 

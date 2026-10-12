@@ -99,18 +99,36 @@ def test_the_panel_probe_covers_both_a_face_and_a_random_lining():
     assert by_name["contiguous stretch of 14"]["architecture_class"] == "unresolved"
 
 
+def test_the_power_probe_reports_both_halves_and_their_better():
+    """Reading one half as the detection rate is the mistake this pins shut."""
+    out = script.probe_power(rng(), n_draws=200)
+    for row in out["dilution"] + out["shapes"] + [out["false_positive"]]:
+        for key in ("detected_topology", "detected_register", "detected_either"):
+            assert key in row, key
+        # 'either' is the better of the two, so it can never be below one.
+        assert row["detected_either"] >= row["detected_topology"] - 1e-9
+        assert row["detected_either"] >= row["detected_register"] - 1e-9
+
+
 def test_the_power_probe_shows_dilution_and_a_shape_contrast():
     out = script.probe_power(rng(), n_draws=200)
     full = [r for r in out["dilution"] if r["fraction_of_face"] == 1.0]
     thin = [r for r in out["dilution"] if r["fraction_of_face"] == 0.33]
     assert full and thin
-    assert min(r["detected_rate"] for r in full) > max(r["detected_rate"] for r in thin)
+    assert min(r["detected_either"] for r in full) > max(r["detected_either"] for r in thin)
     shapes = {r["shape"]: r for r in out["shapes"]}
     assert len(shapes) == 2
     ring = next(v for k, v in shapes.items() if "ring" in k)
     column = next(v for k, v in shapes.items() if "column" in k)
     assert column["lining_size"] == ring["lining_size"]
-    assert column["detected_rate"] > ring["detected_rate"]
+    assert column["detected_either"] >= ring["detected_either"]
+
+
+def test_a_detection_rate_never_ships_without_its_false_positive_rate():
+    out = script.probe_power(rng(), n_draws=200)
+    decoy = out["false_positive"]
+    assert decoy["lining_size"] == out["shapes"][0]["lining_size"]
+    assert decoy["detected_either"] < 0.25, "decoys should rarely be called structured"
 
 
 # ---------------------------------------------------------- the markdown
@@ -140,6 +158,16 @@ def test_every_probe_is_listed():
 
 # ------------------------------------------------------- the committed run
 
+def test_the_committed_artefact_records_the_half_swap():
+    """Columns are a topology signal, rings a register one. The sharper claim."""
+    payload = json.loads(ARTEFACT.read_text())
+    shapes = {str(r["shape"]): r for r in payload["power"]["shapes"]}
+    ring = next(v for k, v in shapes.items() if "ring" in k)
+    column = next(v for k, v in shapes.items() if "column" in k)
+    assert column["detected_topology"] > ring["detected_topology"]
+    assert ring["detected_register"] > ring["detected_topology"]
+
+
 def test_the_committed_artefact_holds_every_probe():
     payload = json.loads(ARTEFACT.read_text())
     assert set(script.PROBES) <= set(payload)
@@ -156,7 +184,7 @@ def test_the_committed_artefact_agrees_with_the_plan_s_headline_numbers():
     shapes = {r["shape"]: r for r in payload["power"]["shapes"]}
     ring = next(v for k, v in shapes.items() if "ring" in k)
     column = next(v for k, v in shapes.items() if "column" in k)
-    assert column["detected_rate"] > ring["detected_rate"]
+    assert column["detected_either"] >= ring["detected_either"]
     assert "Q7-P1" in plan
 
 

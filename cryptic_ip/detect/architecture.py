@@ -274,6 +274,42 @@ AXIAL_UNUSABLE = (
 )
 
 
+#: **Why the resultant and not something else.** Model a secondary-structure
+#: face as a von Mises preference on phase: a residue at position p lines the
+#: pocket with density proportional to ``exp(kappa cos(2 pi p / w - phi))``,
+#: where ``phi`` is the element's face phase and is unknown. Marginalising that
+#: nuisance over a uniform prior gives
+#:
+#:     (1 / 2 pi) * integral exp(kappa * sum_p cos(theta_p - phi)) dphi
+#:         = I0(kappa * n * Rbar)
+#:
+#: which is monotone in the resultant. So **the resultant is the Neyman-Pearson
+#: optimal statistic for a face of known period and unknown phase** - it is not
+#: a reasonable choice among many, it is the choice. Verified numerically
+#: against the integral to nine decimal places.
+#:
+#: The same derivation has a consequence that cost an experiment. For k
+#: elements with *independent* face phases the optimum is a sum of per-element
+#: terms, ``sum_e log I0(kappa n_e Rbar_e)``, while a resultant pooled over all
+#: positions implicitly requires every element's face to be in phase. Measured
+#: on six elements of six residues at random independent phases: pooled Rbar
+#: 0.327 against a per-element mean of 0.886.
+#:
+#: That predicts a per-element statistic should beat the pooled one on
+#: multi-element linings, and **it does not**: on ring-shaped barrel linings it
+#: detected 0 of 12 where the pooled statistic detected 10. The reason is a
+#: second-order effect the derivation ignores - a band *scan* over a run of two
+#: or three residues can fit almost any spacing, so the per-element statistic
+#: saturates and its permutation null saturates with it. The derivation is
+#: sound and the estimator built from it is not, at the run lengths a real
+#: lining gives. Recorded here because it is the kind of negative that is
+#: otherwise repeated.
+VON_MISES_OPTIMALITY = (
+    "marginalising an unknown face phase over a uniform prior gives "
+    "I0(kappa n Rbar), so the resultant is the Neyman-Pearson statistic"
+)
+
+
 def phase_resultant(positions: Sequence[int], period: float) -> float:
     """Circular concentration of the lining's phases at one period, on [0, 1].
 
