@@ -26,7 +26,7 @@ FIGURES = ROOT / "results" / "architecture" / "figures"
 
 
 def test_every_figure_is_declared():
-    assert set(script.FIGURES) == {"power", "shape", "homology"}
+    assert set(script.FIGURES) == {"power", "shape", "homology", "transfer"}
 
 
 def test_only_validated_palette_slots_are_used():
@@ -40,8 +40,9 @@ def test_no_figure_uses_a_fourth_series():
 
 
 def test_the_figures_build_from_the_committed_artefacts(tmp_path):
-    produced = script.build(ARCHITECTURE, HOMOLOGY, tmp_path)
-    assert len(produced) == 3
+    produced = script.build(ARCHITECTURE, HOMOLOGY, tmp_path,
+                            ROOT / "results" / "architecture" / "real" / "real.json")
+    assert len(produced) == len(script.FIGURES)
     for path in produced:
         assert path.exists() and path.stat().st_size > 0
         assert path.with_suffix(".pdf").exists()
@@ -59,7 +60,7 @@ def test_a_missing_key_fails_loudly(tmp_path):
 
 
 def test_the_committed_figures_exist_in_both_formats():
-    for stem in ("F1_power", "F2_shape", "F3_homology"):
+    for stem in ("F1_power", "F2_shape", "F3_homology", "F4_transfer"):
         assert (FIGURES / f"{stem}.png").exists()
         assert (FIGURES / f"{stem}.pdf").exists()
 

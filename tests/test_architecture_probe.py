@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
@@ -152,7 +153,7 @@ def test_the_markdown_states_what_it_is_not_evidence_for():
 def test_every_probe_is_listed():
     assert set(script.PROBES) == {
         "identities", "axial", "scan_inflation", "peak_width",
-        "orderings_floor", "calibration", "panel", "power",
+        "orderings_floor", "calibration", "panel", "power", "transfer",
     }
 
 
@@ -202,3 +203,47 @@ def test_the_cli_lists_the_probes(capsys):
     printed = capsys.readouterr().out
     for name in script.PROBES:
         assert name in printed
+
+
+# ------------------------------------------------- transfer to irregularity
+
+def test_the_transfer_probe_covers_jitter_and_bulges():
+    out = script.probe_transfer(rng(), n_draws=150, reps=4)
+    labels = [r["condition"] for r in out["rows"]]
+    assert "ideal" in labels
+    assert any("jitter" in label for label in labels)
+    assert any("bulge" in label for label in labels)
+    for row in out["rows"]:
+        for key in ("detected_topology", "detected_register", "detected_either"):
+            assert 0.0 <= row[key] <= 1.0
+
+
+def test_jitter_leaves_the_covalent_geometry_exactly_ideal():
+    """Only torsions move, so an irregular fixture is still a valid structure."""
+    for jitter in (0.0, script.gf.REALISTIC_JITTER, 20.0):
+        report = script.gf.bond_length_report(
+            script.gf.helix_barrel(4, 16, 9.0, jitter=jitter, seed=1))
+        assert report["CA_CB_mean"] == pytest.approx(1.530, abs=1e-3)
+        assert report["CA_CB_max_deviation"] < 1e-9
+
+
+def test_a_bulge_leaves_the_covalent_geometry_exactly_ideal():
+    report = script.gf.bond_length_report(
+        script.gf.helix_barrel(4, 16, 9.0, bulges={0: [8]}, seed=1))
+    assert report["CA_CB_max_deviation"] < 1e-9
+
+
+def test_the_committed_transfer_result_is_a_fall_not_a_rise():
+    """The headline negative, pinned so it cannot be quietly reversed."""
+    payload = json.loads(ARTEFACT.read_text())
+    transfer = payload["transfer"]
+    assert transfer["ideal_rate"] > transfer["realistic_rate"]
+    assert transfer["worst_rate"] <= transfer["realistic_rate"]
+    worst = min(transfer["rows"], key=lambda r: r["detected_either"])
+    assert "bulge" in worst["condition"] or "jitter" in worst["condition"]
+
+
+def test_the_report_says_the_transfer_result_is_a_hard_negative():
+    text = script.markdown(json.loads(ARTEFACT.read_text()))
+    assert "hard negative" in text
+    assert "upper bound" in text

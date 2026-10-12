@@ -113,6 +113,25 @@ Same structure, same lining size, and a real difference - 1.00 against 0.73 - bu
 
 So the falsifiable prediction stands in a weakened and more precise form: the signature should be **stronger** in elongated element-aligned pockets than in ring-shaped ones at equal lining size, and the half that carries it should differ between them. It is no longer a claim that ring pockets carry no signature.
 
+
+## 9. Does any of this transfer? The sharpest test, and it is a hard negative
+
+Every number above comes from barrels built out of exact 3.6-residue helices, a periodicity no real protein has. `build_backbone` now perturbs each residue's phi and psi and can insert bulges that shift the register of everything after them. Both leave bond lengths and angles **exactly** ideal - only torsions move - so the structures stay valid and only the realism changes.
+
+| condition | face residues | topology | register | **either** |
+|---|---|---|---|---|
+| ideal | 42 | 0.17 | 0.70 | **0.73** |
+| jitter 4 deg | 45 | 0.07 | 0.50 | **0.53** |
+| jitter 8 deg (realistic) | 46 | 0.07 | 0.27 | **0.33** |
+| jitter 12 deg | 45 | 0.10 | 0.20 | **0.23** |
+| jitter 20 deg | 46 | 0.27 | 0.00 | **0.27** |
+| one bulge per helix | 51 | 0.03 | 0.30 | **0.30** |
+| bulges + jitter 8 deg | 47 | 0.17 | 0.03 | **0.20** |
+
+**Detection falls from 0.73 on the idealised barrel to 0.33 at a realistic 8 degrees of phi/psi scatter, and to 0.20 with bulges + jitter 8 deg.** The documentation has said throughout that the barrel numbers are an upper bound on what an irregular protein would give. This measures the gap rather than asserting it, and the gap is large: roughly a halving at realistic jitter and a three- to fourfold fall once bulges interrupt the face.
+
+That is the single most important limit on this method and it is not a fixable one - a bulge genuinely destroys the periodicity the statistic looks for, because the periodicity is no longer there to find. It bounds what study Q7 can expect from real structures, and it is why the real-lining analysis in `results/architecture/real/REAL.md` must be read beside it.
+
 ## What this cannot be used for
 
 * It is not evidence about real binding sites. Every lining here is synthetic or derived from an idealised barrel, and no annotated sequence has been read.

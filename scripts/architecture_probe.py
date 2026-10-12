@@ -384,6 +384,73 @@ def probe_power(rng: np.random.Generator, n_draws: int = 600) -> Dict[str, objec
     }
 
 
+# ------------------------------------------- probe 9: does any of it transfer
+
+def probe_transfer(rng: np.random.Generator, n_draws: int = 600,
+                   reps: int = 30, size: int = 14) -> Dict[str, object]:
+    """Does the ideal-geometry result survive realistic irregularity?
+
+    The sharpest threat to everything measured on these fixtures: a barrel
+    built from exact 3.6-residue helices has a periodicity no real protein has.
+    `build_backbone` can now perturb each residue's phi and psi, and insert
+    bulges that shift the register of everything after them. Both leave bond
+    lengths and angles **exactly** ideal - only torsions move - so the
+    structures stay valid and only the realism changes.
+
+    Every row uses the same realistic lining: a spatial slab of ``size``
+    positions, which is what a bound ligand selects.
+    """
+    conditions = [
+        ("ideal", {"jitter": 0.0, "bulges": None}),
+        ("jitter 4 deg", {"jitter": 4.0, "bulges": None}),
+        ("jitter 8 deg (realistic)", {"jitter": gf.REALISTIC_JITTER, "bulges": None}),
+        ("jitter 12 deg", {"jitter": 12.0, "bulges": None}),
+        ("jitter 20 deg", {"jitter": 20.0, "bulges": None}),
+        ("one bulge per helix", {"jitter": 0.0, "bulges": {h: [9] for h in range(NHEL)}}),
+        ("bulges + jitter 8 deg",
+         {"jitter": gf.REALISTIC_JITTER, "bulges": {h: [9] for h in range(NHEL)}}),
+    ]
+    rows = []
+    for label, settings in conditions:
+        records, face_sizes = [], []
+        for rep in range(reps):
+            fixture = gf.helix_barrel(NHEL, PER, 9.0, seed=rep, **settings)
+            inward: List[int] = []
+            heights: Dict[int, float] = {}
+            for residue in np.unique(fixture.residue_index):
+                sel = fixture.residue_index == residue
+                atoms = {str(n): c for n, c in
+                         zip(fixture.atom_names[sel], fixture.coords[sel])}
+                if "CA" in atoms and "CB" in atoms:
+                    if np.hypot(*atoms["CB"][:2]) < np.hypot(*atoms["CA"][:2]):
+                        inward.append(int(residue))
+                        heights[int(residue)] = float(atoms["CB"][2])
+            if len(inward) < size:
+                continue
+            face_sizes.append(len(inward))
+            centre = float(rng.uniform(min(heights.values()), max(heights.values())))
+            pick = sorted(inward, key=lambda r: abs(heights[r] - centre))[:size]
+            records.append(_detection(ar.describe_architecture(
+                with_linkers(pick), n_draws=n_draws, seed=SEED + rep)))
+        if not records:
+            continue
+        rows.append({
+            "condition": label, "lining_size": size, "reps": len(records),
+            "mean_face_size": float(np.mean(face_sizes)),
+            **_rates(records),
+        })
+    ideal = next((r for r in rows if r["condition"] == "ideal"), None)
+    realistic = next((r for r in rows if "realistic" in r["condition"]), None)
+    worst = min(rows, key=lambda r: r["detected_either"]) if rows else None
+    return {
+        "rows": rows,
+        "ideal_rate": None if ideal is None else ideal["detected_either"],
+        "realistic_rate": None if realistic is None else realistic["detected_either"],
+        "worst_rate": None if worst is None else worst["detected_either"],
+        "worst_condition": None if worst is None else worst["condition"],
+    }
+
+
 # ------------------------------------------------------------------ driver
 
 PROBES = {
@@ -395,6 +462,7 @@ PROBES = {
     "calibration": "false-positive rates, per test and for the family",
     "panel": "recovery of architectures known from the 3-D construction",
     "power": "how completely and in what shape a lining must be seen",
+    "transfer": "whether any of it survives realistic phi/psi jitter and bulges",
 }
 
 
@@ -412,6 +480,7 @@ def run_all(*, quick: bool = False) -> Dict[str, object]:
         "calibration": probe_calibration(rng, n_linings=120 if quick else 300, n_draws=draws),
         "panel": probe_panel(rng, n_draws=600 if quick else 1500),
         "power": probe_power(rng, n_draws=draws),
+        "transfer": probe_transfer(rng, n_draws=draws, reps=12 if quick else 30),
     }
 
 
@@ -597,6 +666,45 @@ def markdown(report: Dict[str, object]) -> str:
             "ring-shaped ones at equal lining size, and the half that carries it should "
             "differ between them. It is no longer a claim that ring pockets carry no "
             "signature.",
+            "",
+        ]
+    transfer = report["transfer"]
+    lines += [
+        "",
+        "## 9. Does any of this transfer? The sharpest test, and it is a hard negative",
+        "",
+        "Every number above comes from barrels built out of exact 3.6-residue helices, "
+        "a periodicity no real protein has. `build_backbone` now perturbs each residue's "
+        "phi and psi and can insert bulges that shift the register of everything after "
+        "them. Both leave bond lengths and angles **exactly** ideal - only torsions move "
+        "- so the structures stay valid and only the realism changes.",
+        "",
+        "| condition | face residues | topology | register | **either** |",
+        "|---|---|---|---|---|",
+    ]
+    for row in transfer["rows"]:  # type: ignore[union-attr]
+        lines.append(
+            f"| {row['condition']} | {row['mean_face_size']:.0f} | "
+            f"{row['detected_topology']:.2f} | {row['detected_register']:.2f} | "
+            f"**{row['detected_either']:.2f}** |"
+        )
+    if transfer["ideal_rate"] is not None and transfer["realistic_rate"] is not None:
+        lines += [
+            "",
+            f"**Detection falls from {transfer['ideal_rate']:.2f} on the idealised barrel "
+            f"to {transfer['realistic_rate']:.2f} at a realistic 8 degrees of phi/psi "
+            f"scatter, and to {transfer['worst_rate']:.2f} with "
+            f"{transfer['worst_condition']}.** The documentation has said throughout that "
+            "the barrel numbers are an upper bound on what an irregular protein would "
+            "give. This measures the gap rather than asserting it, and the gap is large: "
+            "roughly a halving at realistic jitter and a three- to fourfold fall once "
+            "bulges interrupt the face.",
+            "",
+            "That is the single most important limit on this method and it is not a "
+            "fixable one - a bulge genuinely destroys the periodicity the statistic "
+            "looks for, because the periodicity is no longer there to find. It bounds "
+            "what study Q7 can expect from real structures, and it is why the real-lining "
+            "analysis in `results/architecture/real/REAL.md` must be read beside it.",
             "",
         ]
     lines += [

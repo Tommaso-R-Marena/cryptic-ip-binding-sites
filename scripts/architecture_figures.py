@@ -281,6 +281,90 @@ def figure_homology(report: Dict[str, object], path: Path) -> Path:
     return save(fig, path)
 
 
+def figure_transfer(report: Dict[str, object], real: Optional[Dict[str, object]],
+                    path: Path) -> Path:
+    """What realistic irregularity costs, and where the real linings land.
+
+    The left panel is the hard negative: detection against phi/psi scatter, with
+    the two bulge conditions marked. The right panel puts the real-lining rate
+    on the same axis as the fixtures and its own matched decoys.
+
+    The real rate and the realistic-jitter rate coincide. That is worth seeing
+    and is **not** a tested prediction: the jitter model was never fitted to
+    the real data, but neither rate has a tight interval at these sample sizes,
+    so the agreement is a consistency observation and the panel is titled as
+    one.
+    """
+    transfer = report["transfer"]
+    rows = list(transfer["rows"])  # type: ignore[arg-type]
+    jittered = [r for r in rows if "bulge" not in str(r["condition"])]
+    bulged = [r for r in rows if "bulge" in str(r["condition"])]
+
+    fig, (left, right) = plt.subplots(
+        1, 2, figsize=(9.0, 3.6), gridspec_kw={"width_ratios": [1.25, 0.85]})
+
+    recede(left)
+    degrees = []
+    for row in jittered:
+        label = str(row["condition"])
+        degrees.append(0.0 if label == "ideal" else float(label.split()[1]))
+    order = np.argsort(degrees)
+    x = [degrees[i] for i in order]
+    y = [jittered[i]["detected_either"] for i in order]
+    left.plot(x, y, color=SERIES[0], marker="o", linestyle="-",
+              markeredgecolor=SURFACE, markeredgewidth=1.2, zorder=3, clip_on=False)
+    for row, colour, marker in zip(bulged, (SERIES[1], SERIES[2]), ("X", "P")):
+        left.scatter([8.0 if "jitter" in str(row["condition"]) else 0.0],
+                     [row["detected_either"]], color=colour, marker=marker, s=90,
+                     zorder=4, edgecolor=SURFACE, linewidth=1.4,
+                     label=str(row["condition"]))
+    left.axvspan(6.0, 10.0, color=INK_MUTED, alpha=0.10, zorder=1, lw=0)
+    left.annotate("scatter real\nstructures show", xy=(8.0, 0.92), ha="center",
+                  va="bottom", fontsize=7.5, color=INK_SECONDARY, linespacing=1.3)
+    left.set_xlabel("phi/psi jitter (degrees)")
+    left.set_ylabel("detected at p ≤ 0.05")
+    left.set_title("Irregularity costs most of the signal")
+    left.set_ylim(-0.03, 1.18)
+    left.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+    left.set_yticklabels(["0", "25%", "50%", "75%", "100%"])
+    left.legend(loc="upper right", bbox_to_anchor=(1.0, 1.0))
+
+    recede(right, grid_axis="x")
+    bars, labels, colours = [], [], []
+    ideal = transfer["ideal_rate"]
+    realistic = transfer["realistic_rate"]
+
+    def add(value: float, label: str, colour: str) -> None:
+        bars.append(float(value))
+        labels.append(label)
+        colours.append(colour)
+
+    if ideal is not None:
+        add(ideal, "barrel, ideal", INK_MUTED)
+    if realistic is not None:
+        add(realistic, "barrel, 8° jitter", SERIES[0])
+    if real:
+        rates = real["rates"]  # type: ignore[index]
+        add(rates["real_either"], f"real linings (n={real['n_measurable']})", SERIES[2])
+        add(rates["decoy_either"], "matched decoys", INK_MUTED)
+    positions = np.arange(len(bars))[::-1]
+    right.barh(positions, bars, height=0.55, color=colours, zorder=3,
+               edgecolor=SURFACE, linewidth=2.0)
+    for position, value in zip(positions, bars):
+        right.annotate(f"{value:.2f}", xy=(value, position), xytext=(6, 0),
+                       textcoords="offset points", va="center", ha="left",
+                       fontsize=9, fontweight="bold", color=INK)
+    right.set_yticks(positions)
+    right.set_yticklabels(labels, fontsize=8, color=INK)
+    right.set_xlim(0, 1.16)
+    right.set_xticks([0, 0.5, 1.0])
+    right.set_xticklabels(["0", "50%", "100%"])
+    right.set_xlabel("detected at p ≤ 0.05")
+    right.set_title("Real linings, beside fixtures and decoys")
+    fig.tight_layout()
+    return save(fig, path)
+
+
 # ----------------------------------------------------------------- output
 
 def save(fig, path: Path) -> Path:
@@ -295,17 +379,22 @@ FIGURES = {
     "power": "detection rate against the fraction of a face observed",
     "shape": "ring versus column at identical lining size",
     "homology": "fold retrieval beside its controls, and the distance matrix",
+    "transfer": "what realistic irregularity costs, and where real linings land",
 }
 
 
-def build(architecture: Path, homology: Path, out_dir: Path) -> List[Path]:
+def build(architecture: Path, homology: Path, out_dir: Path,
+          real: Optional[Path] = None) -> List[Path]:
     style()
     architecture_report = json.loads(architecture.read_text())
     homology_report = json.loads(homology.read_text())
+    real_report = (json.loads(real.read_text())
+                   if real is not None and real.exists() else None)
     return [
         figure_power(architecture_report, out_dir / "F1_power"),
         figure_shape(architecture_report, out_dir / "F2_shape"),
         figure_homology(homology_report, out_dir / "F3_homology"),
+        figure_transfer(architecture_report, real_report, out_dir / "F4_transfer"),
     ]
 
 
@@ -317,8 +406,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         default=Path("results/architecture/homology.json"))
     parser.add_argument("--out-dir", type=Path,
                         default=Path("results/architecture/figures"))
+    parser.add_argument("--real", type=Path,
+                        default=Path("results/architecture/real/real.json"))
     args = parser.parse_args(argv)
-    for path in build(args.architecture, args.homology, args.out_dir):
+    for path in build(args.architecture, args.homology, args.out_dir, args.real):
         print(f"wrote {path} and {path.with_suffix('.pdf')}")
     return 0
 

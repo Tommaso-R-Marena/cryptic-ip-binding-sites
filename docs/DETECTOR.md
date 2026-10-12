@@ -428,6 +428,31 @@ topology half alone and so put the ring at 7% and a 14-residue slab at 10%. The
 probe now reports both halves and their better, and `results/architecture/
 ARCHITECTURE.md` records the correction.)*
 
+**And none of it transfers intact.** Those numbers come from barrels of exact
+3.6-residue helices. With each residue's φ and ψ perturbed — leaving bond
+lengths ideal to 1e-15, so only realism changes — detection falls from **0.73
+to 0.33** at the 8° scatter real structures show, and to **0.20** once bulges
+interrupt the faces. That is the single largest limit on the method and it is
+not fixable: a bulge removes the periodicity rather than hiding it. Every
+fixture number here should be read as an upper bound about twice the realistic
+value.
+
+**On real linings.** `scripts/build_lining_inputs.py` turns the project's
+committed tables into study inputs, and `results/architecture/real/REAL.md`
+runs Q7 on the 75 real candidate-pocket linings in
+`results/specificity/candidates.csv`. They are structured at **0.33** against
+**0.04** for decoys matched to each one's size and span — the same 0.33 the
+jittered fixtures give, which is a consistency observation and not a tested
+prediction. 23 of 75 classify as `mosaic` against 6 of 375 decoys, and 17 are
+called helical faces. The one pre-registered split, pockets another polyanion
+explains against the rest, is null on all four features after Holm.
+
+That comparison has a control it does not have, stated where it is read: a
+random position set is not a protein, so *any* real pocket lining would beat
+that null. It shows the instrument registers real linings; it shows nothing
+specific to inositol-phosphate sites. The control that would is other pockets
+from the same proteins, and no committed table carries them.
+
 ### `homology.py` — are two pockets lined the same way?
 
 A metric on lining architecture, pre-registered as Q7-H. It respects the

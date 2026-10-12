@@ -259,6 +259,34 @@ not.
   counts are reported separately.
 * No boundary moves after a result. Any change is a dated amendment.
 
+## Transfer to irregular geometry — measured, and a hard negative
+
+Every fixture number in this plan comes from barrels built out of exact
+3.6-residue helices, a periodicity no real protein has. `build_backbone` can
+now perturb each residue's φ and ψ and insert bulges that shift the register of
+everything after them; both leave bond lengths and angles **exactly** ideal, to
+1e-15, so only the realism changes. On a 14-position spatial slab:
+
+| condition | topology | register | **either** |
+|---|---|---|---|
+| ideal | 0.17 | 0.70 | **0.73** |
+| jitter 4° | 0.07 | 0.50 | **0.53** |
+| **jitter 8° (what real structures show)** | 0.07 | 0.27 | **0.33** |
+| jitter 12° | 0.10 | 0.20 | **0.23** |
+| one bulge per helix | 0.03 | 0.30 | **0.30** |
+| bulges + jitter 8° | 0.17 | 0.03 | **0.20** |
+
+**Detection falls from 0.73 to 0.33 at realistic scatter and to 0.20 with
+bulges.** The plan has said throughout that the barrel numbers are an upper
+bound; this measures the gap instead of asserting it, and the gap is a halving
+at realistic jitter and a three- to fourfold fall once a bulge interrupts a
+face. It is not a fixable limitation: a bulge destroys the periodicity the
+statistic looks for, because the periodicity is no longer there.
+
+Every power statement elsewhere in this plan is therefore an **upper bound that
+is roughly twice the realistic value**, and study Q7's expectations are revised
+down accordingly.
+
 ## What this study cannot conclude
 
 * Nothing causal. "Leads to pocket formation" is not testable from a

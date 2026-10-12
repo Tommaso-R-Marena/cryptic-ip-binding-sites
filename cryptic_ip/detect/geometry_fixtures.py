@@ -115,18 +115,50 @@ class Residue:
         return name in self.names
 
 
+#: Standard deviation of phi/psi in real secondary structure, in degrees.
+#: Helices in deposited structures scatter by roughly this much about their
+#: ideal torsions, so it is the scale at which a fixture stops being idealised
+#: and starts resembling a protein.
+REALISTIC_JITTER = 8.0
+
+#: Torsions of a single-residue bulge: a residue that interrupts a helix and
+#: shifts everything after it out of register. Taken from the alpha-L region,
+#: which is where a classic helix bulge sits.
+BULGE = (57.0, 40.0)
+
+
 def build_backbone(
     n_residues: int,
     *,
     phi_psi: Sequence[Tuple[float, float]] = (HELIX,),
+    jitter: float = 0.0,
+    bulges: Sequence[int] = (),
+    rng: Optional[np.random.Generator] = None,
 ) -> List[Residue]:
     """A backbone of ``n_residues`` with ideal bond lengths and angles.
 
     ``phi_psi`` is cycled, so a single pair gives a uniform helix or strand and
     a list gives a mixed fold.
+
+    ``jitter`` adds a Gaussian perturbation, in degrees, to each residue's phi
+    and psi. This is the knob that turns an idealised fixture into something
+    protein-like: it leaves every bond length and bond angle **exactly** ideal,
+    because only torsions move, while the helix axis wanders and the face
+    periodicity stops being exactly 3.6. `REALISTIC_JITTER` is the scale real
+    structures show.
+
+    ``bulges`` lists residue indices given `BULGE` torsions instead, which
+    interrupts the helix and shifts the register of everything after it - the
+    structural irregularity most likely to break a periodicity argument.
     """
     if n_residues < 3:
         raise FixtureError(f"need at least 3 residues, got {n_residues}")
+    if jitter < 0.0:
+        raise FixtureError(f"jitter must not be negative, got {jitter}")
+    bulge_at = {int(b) for b in bulges}
+    if any(b < 1 or b >= n_residues for b in bulge_at):
+        raise FixtureError(f"bulges must lie in 1..{n_residues - 1}, got {sorted(bulge_at)}")
+    generator = rng if rng is not None else np.random.default_rng(0)
     residues: List[Residue] = []
     # Seed the first residue in a fixed frame.
     n0 = np.array([0.0, 0.0, 0.0])
@@ -136,7 +168,13 @@ def build_backbone(
     residues.append(Residue(0, "GLY", ["N", "CA", "C"], [n0, ca0, c0]))
 
     for index in range(1, n_residues):
-        phi, psi = phi_psi[(index - 1) % len(phi_psi)]
+        if index in bulge_at:
+            phi, psi = BULGE
+        else:
+            phi, psi = phi_psi[(index - 1) % len(phi_psi)]
+        if jitter > 0.0:
+            phi += float(generator.normal(0.0, jitter))
+            psi += float(generator.normal(0.0, jitter))
         previous = residues[-1]
         n_prev, ca_prev, c_prev = previous.atom("N"), previous.atom("CA"), previous.atom("C")
         # The next N is placed by psi of the previous residue.
@@ -308,6 +346,9 @@ def helix_barrel(
     sequence: str = "ALA",
     lining: Optional[Dict[int, str]] = None,
     plddt: float = 90.0,
+    jitter: float = 0.0,
+    bulges: Optional[Dict[int, Sequence[int]]] = None,
+    seed: int = 0,
 ) -> Fixture:
     """A ring of ideal helices around a central channel.
 
@@ -319,10 +360,13 @@ def helix_barrel(
     if n_helices < 3:
         raise FixtureError(f"a barrel needs at least 3 helices, got {n_helices}")
     lining = dict(lining or {})
+    bulges = dict(bulges or {})
+    generator = np.random.default_rng(seed)
     all_residues: List[Residue] = []
     offset = 0
     for helix in range(n_helices):
-        built = build_backbone(residues_per_helix, phi_psi=(HELIX,))
+        built = build_backbone(residues_per_helix, phi_psi=(HELIX,), jitter=jitter,
+                               bulges=bulges.get(helix, ()), rng=generator)
         add_carbonyl(built)
         for position, residue in enumerate(built):
             name = lining.get(helix) if position == residues_per_helix // 2 else None

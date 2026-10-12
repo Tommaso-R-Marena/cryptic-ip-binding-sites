@@ -550,5 +550,97 @@
     ],
     "span": 60
   },
-  "seed": 20261012
+  "seed": 20261012,
+  "transfer": {
+    "ideal_rate": 0.7333333333333333,
+    "realistic_rate": 0.3333333333333333,
+    "rows": [
+      {
+        "clear_rate": 0.4,
+        "condition": "ideal",
+        "detected_either": 0.7333333333333333,
+        "detected_rate": 0.7333333333333333,
+        "detected_register": 0.7,
+        "detected_topology": 0.16666666666666666,
+        "lining_size": 14,
+        "mean_face_size": 42.0,
+        "median_p": 0.013311148086522463,
+        "reps": 30
+      },
+      {
+        "clear_rate": 0.16666666666666666,
+        "condition": "jitter 4 deg",
+        "detected_either": 0.5333333333333333,
+        "detected_rate": 0.5333333333333333,
+        "detected_register": 0.5,
+        "detected_topology": 0.06666666666666667,
+        "lining_size": 14,
+        "mean_face_size": 45.13333333333333,
+        "median_p": 0.04326123128119801,
+        "reps": 30
+      },
+      {
+        "clear_rate": 0.13333333333333333,
+        "condition": "jitter 8 deg (realistic)",
+        "detected_either": 0.3333333333333333,
+        "detected_rate": 0.3333333333333333,
+        "detected_register": 0.26666666666666666,
+        "detected_topology": 0.06666666666666667,
+        "lining_size": 14,
+        "mean_face_size": 45.56666666666667,
+        "median_p": 0.07321131447587355,
+        "reps": 30
+      },
+      {
+        "clear_rate": 0.03333333333333333,
+        "condition": "jitter 12 deg",
+        "detected_either": 0.23333333333333334,
+        "detected_rate": 0.23333333333333334,
+        "detected_register": 0.2,
+        "detected_topology": 0.1,
+        "lining_size": 14,
+        "mean_face_size": 45.46666666666667,
+        "median_p": 0.10648918469217969,
+        "reps": 30
+      },
+      {
+        "clear_rate": 0.0,
+        "condition": "jitter 20 deg",
+        "detected_either": 0.26666666666666666,
+        "detected_rate": 0.26666666666666666,
+        "detected_register": 0.0,
+        "detected_topology": 0.26666666666666666,
+        "lining_size": 14,
+        "mean_face_size": 46.166666666666664,
+        "median_p": 0.1264559068219634,
+        "reps": 30
+      },
+      {
+        "clear_rate": 0.06666666666666667,
+        "condition": "one bulge per helix",
+        "detected_either": 0.3,
+        "detected_rate": 0.3,
+        "detected_register": 0.3,
+        "detected_topology": 0.03333333333333333,
+        "lining_size": 14,
+        "mean_face_size": 51.0,
+        "median_p": 0.14309484193011646,
+        "reps": 30
+      },
+      {
+        "clear_rate": 0.03333333333333333,
+        "condition": "bulges + jitter 8 deg",
+        "detected_either": 0.2,
+        "detected_rate": 0.2,
+        "detected_register": 0.03333333333333333,
+        "detected_topology": 0.16666666666666666,
+        "lining_size": 14,
+        "mean_face_size": 47.0,
+        "median_p": 0.1697171381031614,
+        "reps": 30
+      }
+    ],
+    "worst_condition": "bulges + jitter 8 deg",
+    "worst_rate": 0.2
+  }
 }
