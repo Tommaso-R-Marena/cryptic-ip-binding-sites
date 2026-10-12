@@ -24,7 +24,7 @@ from studies A-P and what it rules out.
 | ΔAUC −0.015 for IP-specific re-weighting; 30 of 75 candidates explained by another polyanion | an absolute "is this a polyanion pocket" has the answer yes everywhere | a comparative margin against a competitor panel, with `polyanion_generic` as a real outcome |
 | every candidate is a single apo conformer | a cryptic site is closed in the apo state, so burial measures the wrong variable | persistence and crypticity across an elastic-network conformer ensemble |
 
-## 2. The six modules
+## 2. The modules
 
 ### `cavity.py` — detection in process, and true burial
 
@@ -261,6 +261,85 @@ the previously reported 0.499 is a statement about power, not about biology.
 `python scripts/detect.py power` prints this, and Q4's decision rule requires
 it to be published before any AUC.
 
+### `sequence.py` and `signature.py` — information in the sequence, and a refusal
+
+Pre-registered separately as study Q6 in `docs/SEQUENCE_PLAN.md`. The question:
+is there a signature in the sequence at an annotated site — in its entropy, its
+compressibility, its periodicity, the spacing of its coordinating residues —
+that says a pocket of a particular kind forms there?
+
+Three traps, each measured before the design was fixed, because all three
+manufacture a signature that is not there.
+
+| trap | the measurement | what the code does |
+|---|---|---|
+| **Kolmogorov complexity is uncomputable** | — | nothing is named after it; `lempel_ziv_phrases` is the exact LZ76 parse and `compressed_bits` is a compressor's output minus its measured empty-input header. Both bound K from above up to a constant |
+| **plug-in Shannon entropy is biased, and the bias depends on N** | mean bias over 4000 random windows per row, seed 20261012, against a uniform source whose true entropy is 4.322 bits: −1.408 bits at N=10, −0.799 at N=20, −0.302 at N=50, −0.144 at N=100. A lining is 10–20 residues | Grassberger by default (−0.821, −0.316, −0.029, −0.002), window length controlled explicitly, and the plug-in value reported beside it as `entropy_bias_visible` |
+| **composition is the confounder** | these sites are Arg/Lys-rich, which this project established long ago | the headline statistic is `composition_z`: the measure's z against 2000 shuffles of the same window. Same length, same letters, order destroyed — so the z is bias-free by construction and answers only whether the *ordering* carries information |
+
+Four faults were found in the machinery by measuring it, and each one is now a
+test:
+
+* **The LZ76 parser was the wrong one.** The widely circulated Kaspar–Schuster
+  snippet drops the longest-match bookkeeping, so it advances one symbol per
+  phrase. It agreed with every short textbook case — `aaaaaaaa` to 2,
+  `abababab` to 3, `abcdefgh` to 8 — while scoring a random 500-residue window
+  at **485 phrases against the correct 213**. The textbook cases cannot see
+  that fault, so the parse is returned and tested against its own definition.
+* **Periodicity exceeded 1 at the Nyquist period.** Projecting onto two
+  quadratures and normalising by `variance · n/2` returned 2.0 for a pure
+  alternating signal, because the sine vanishes at period 2 and only one
+  quadrature contributes. Replaced by a least-squares explained variance, which
+  normalises by the basis it actually fitted.
+* **A single exact probe has a blind spot.** A strictly period-4 charge train is
+  *exactly* orthogonal to a 3.6-residue probe over 36 points, scoring 0.000 for
+  a sequence that plainly has a periodic basic face. So `HELIX_BAND` is a band,
+  3.0 to 4.2 — the lower edge is 3.0 and not 3.2 because a 3₁₀ helix is exactly
+  3.0 residues per turn and the first version scored a perfect period-3 pattern
+  at 0.099.
+* **Band power is confounded by harmonics.** A period-7 pattern has content at
+  3.5 and scored 0.33 in the helical band. The fundamental still wins the scan
+  (7.1, not 3.5), so `dominant_period` is reported too and `helix_face`
+  requires the dominant period to be *in* the band, not merely power there.
+
+`lz_normalised` carries its own warning: `n / log_a(n)` is asymptotic, and on
+random windows the ratio is 0.88 at N=20, 0.84 at N=36, 0.83 at N=100 and 0.88
+at N=500 — below 1 and **not monotone in N**. Like the entropy bias, that makes
+the raw value unsafe to compare across window lengths, and the composition null
+is the answer to both.
+
+`signature.py` decides *which* string, which is where the remaining mistakes
+live:
+
+* A pocket's lining gives two very different windows — the lining residues with
+  the gaps closed, and the contiguous stretch they span — and **only the second
+  can carry a period**. Closing the gaps destroys exactly the positional
+  information a periodicity measures. Every function in `sequence.py` accepts
+  either, because both are strings, so `statistic_for_window` refuses a
+  positional statistic on the lining window.
+* Lining residue numbers in this repo are **chain-blind** by their own
+  docstring, so they arrive as `(chain, number)` pairs. A pocket with less than
+  80% of its lining on one chain is an interface pocket, has no single sequence
+  window, and is excluded with that reason rather than measured.
+* Exclusions are reported by cause, and the non-standard-residue fraction is
+  tested before the window-length floor, because dropped residues are what
+  *made* a window short.
+
+And the refusal: `ESTABLISHED_SIGNATURES` is empty, so `sequence_contribution`
+returns `None` — an abstention, which `monotone.py` treats as "unmeasured"
+rather than as a zero that would push a candidate down. The descriptors are
+computed, recorded and available, and **they move no score until study Q6
+reports**. A name may be added only alongside a results file that cleared all
+five of the plan's decision rules. The project has a held-out AUC of 0.499 on
+record from the last time an untested feature was trusted.
+
+The method validation is committed at `results/sequence/VALIDATION.md`: a
+planted helical-face signature fires at mean z **+4.05** in 100% of windows,
+the same letters shuffled give **−0.24** at 0%, and a basic-rich pool with no
+ordering gives **−0.13** at 2% — with all three pools holding an identical
+basic fraction of 0.270 and entropies within 0.1 bits, so the separation cannot
+be composition.
+
 ## 3. Running it
 
 ```bash
@@ -269,6 +348,10 @@ python scripts/detect.py power                     # what this dataset could det
 python scripts/detect.py describe model.pdb        # one structure, full detector
 python scripts/detect.py describe model.pdb --no-ensemble   # skip most of the cost
 python scripts/detect.py shard --structures DIR --shard 0 --shards 272 --out part.json
+
+python scripts/sequence_signature.py validate                  # study Q6 method validation
+python scripts/sequence_signature.py describe --inputs in.jsonl --out sites.json
+python scripts/sequence_signature.py report --sites sites.json --out sequence.json
 ```
 
 On the cluster, study Q in `hpc/studies/detector.yml`. It is **not** plan-gated,
