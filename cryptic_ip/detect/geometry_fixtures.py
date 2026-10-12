@@ -342,6 +342,58 @@ def helix_barrel(
     return assemble(all_residues, plddt=plddt)
 
 
+def strand_sheet(
+    n_strands: int = 5,
+    residues_per_strand: int = 12,
+    strand_spacing: float = 4.8,
+    *,
+    sequence: str = "ALA",
+    lining: Optional[Dict[int, str]] = None,
+    antiparallel: bool = True,
+    plddt: float = 90.0,
+) -> Fixture:
+    """A beta sheet: strands laid side by side, one face pointing the same way.
+
+    The second fold family in this module, and it exists so that a method which
+    claims to read architecture can be asked to tell two folds apart. A sheet's
+    structure is different from a barrel's in exactly the way that matters
+    here: an extended strand alternates faces every residue, so the residues on
+    one face of the sheet are two apart along the chain rather than three or
+    four.
+
+    ``strand_spacing`` is 4.8 angstrom, the inter-strand distance of a real
+    sheet. ``antiparallel`` flips alternate strands, which is what most sheets
+    do and which changes the sign of the chain direction without changing the
+    face periodicity.
+    """
+    if n_strands < 2:
+        raise FixtureError(f"a sheet needs at least 2 strands, got {n_strands}")
+    lining = dict(lining or {})
+    all_residues: List[Residue] = []
+    offset = 0
+    for strand in range(n_strands):
+        built = build_backbone(residues_per_strand, phi_psi=(STRAND,))
+        add_carbonyl(built)
+        for position, residue in enumerate(built):
+            name = lining.get(strand) if position == residues_per_strand // 2 else None
+            add_side_chain(residue, name or sequence)
+        coords = np.asarray([c for r in built for c in r.coords])
+        centre = coords.mean(axis=0)
+        axis = _principal_axis(coords - centre)
+        rotation = _align(axis, np.array([0.0, 0.0, 1.0]))
+        if antiparallel and strand % 2 == 1:
+            # Flip about x, which reverses the chain direction along z while
+            # leaving the sheet plane and the face periodicity alone.
+            rotation = np.diag([1.0, -1.0, -1.0]) @ rotation
+        shift = np.array([strand * strand_spacing, 0.0, 0.0])
+        for residue in built:
+            residue.index += offset
+            residue.coords = [rotation @ (c - centre) + shift for c in residue.coords]
+        offset += residues_per_strand
+        all_residues.extend(built)
+    return assemble(all_residues, plddt=plddt)
+
+
 def _principal_axis(centred: np.ndarray) -> np.ndarray:
     """The direction of greatest variance, which for a helix is its axis."""
     _, _, vectors = np.linalg.svd(centred, full_matrices=False)

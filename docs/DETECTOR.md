@@ -422,6 +422,51 @@ across all six helices is detected 7% of the time, a column along two helices
 absent in ring and interface pockets *independently of lining size* — and if it
 instead tracks size, the framework is wrong.
 
+### `homology.py` — are two pockets lined the same way?
+
+A metric on lining architecture, pre-registered as Q7-H. It respects the
+decomposition rather than ignoring it: **Wasserstein distance between H₀
+persistence diagrams** for the topological half — the canonical TDA metric,
+applicable here only because the barcode *is* the gap multiset — and the
+**correlation distance between coherence spectra** for the register half, which
+is exactly invariant to sliding a lining along the chain because a constant
+offset multiplies the resultant by a unit phase the modulus discards. Both
+halves are metrics; identity, symmetry and the triangle inequality are tested,
+not assumed.
+
+The Wasserstein solve is an assignment problem rather than a sorted match,
+because sorted matching is optimal only at equal cardinality: measured on
+random pairs, routing points to the diagonal beat it in nearly half of
+equal-cardinality cases, by up to ten residues.
+
+On two fold families with ideal covalent geometry — helix barrels (face
+residues 3–4 apart) and β sheets (2 apart), matched on lining size, residues
+per element, linker and with overlapping spans — **register separates them
+perfectly**: P@1 1.00, cluster purity 1.00, permutation p 0.0005, while a
+size-only control sits at 0.50 (p = 0.49) and a span-only control at 0.53
+(p = 0.40).
+
+Three things are worth taking from that, and two of them are limits:
+
+* **The halves have opposite utility on the two tasks.** Topology detects a
+  face within one lining and register cannot; register separates folds and
+  topology does so less well. That is a reason to keep both and never collapse
+  them into one number.
+* **The combined metric is worse than its better half** (purity 0.67 against
+  1.00), because its stated 4-residues-per-unit scale leaves topology
+  dominating about ten to one. The constant has deliberately not been retuned
+  against the result that exposed it.
+* **The graded relationship is not a finding.** Distance tracks element count
+  at Spearman +0.95 — and so does the span-only control, so span explains it.
+
+And the standing caveat: this is *architecture* homology. It does not show two
+proteins are evolutionarily related, it does not replace Foldseek or MMseqs2,
+and it must never be used for the project's statistical grouping.
+
+Figures for all of this are built by `scripts/architecture_figures.py` from the
+committed artefacts — never recomputed — into
+`results/architecture/figures/`.
+
 ## 3. Running it
 
 ```bash
@@ -437,6 +482,8 @@ python scripts/sequence_signature.py report --sites sites.json --out sequence.js
 
 python scripts/architecture_probe.py list                      # the eight probes
 python scripts/architecture_probe.py run --out architecture.json
+python scripts/homology_probe.py run --out homology.json        # fold retrieval + controls
+python scripts/architecture_figures.py                          # F1-F3, PDF and PNG
 ```
 
 On the cluster, study Q in `hpc/studies/detector.yml`. It is **not** plan-gated,

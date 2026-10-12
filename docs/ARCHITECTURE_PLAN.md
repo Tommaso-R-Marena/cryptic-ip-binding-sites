@@ -151,9 +151,12 @@ A spatial slab — which is what a bound ligand actually selects — is far kind
 than a random subset, but **both collapse below about 40% of the face**, which
 here is fewer than about 19 positions.
 
-Annotated IP-site linings in this project are 10–20 residues. **The method
-therefore sits at or below the edge of its power on bare linings**, and the
-primary analysis must not use them alone. Pre-registered consequence: the
+Annotated IP-site linings in this project are 10–20 residues, so **the cliff
+falls inside that range rather than below it**: at 14 positions the spatial
+detection rate is 0.10 and at 19 it is 1.00. A 20-residue lining is usable and
+a 14-residue one is not, which makes lining size a *gating covariate* for this
+study rather than a nuisance. The primary analysis must therefore not use bare
+linings alone. Pre-registered consequence: the
 primary unit for Q7 is the **element-extended lining** — each lining residue
 together with the contiguous run it belongs to in the local window — with the
 bare lining reported as a secondary analysis whose expected result is null for
@@ -181,6 +184,49 @@ direction: if the signature appears uniformly across pocket shapes, or tracks
 lining size rather than shape, the framework is wrong. Shape is assigned from
 existing structural descriptors before the split and recorded per pocket in the
 inputs, never derived inside the analysis.
+
+## Q7-H: architecture homology, and the controls it must beat
+
+A second question the same invariants can be asked: are two pockets lined in
+the *same way*? `cryptic_ip/detect/homology.py` answers it with a metric that
+respects the decomposition — Wasserstein distance between H₀ persistence
+diagrams for the topological half (the canonical TDA metric, applicable only
+because the barcode *is* the gap multiset), and the correlation distance
+between coherence spectra for the register half, which is exactly invariant to
+sliding a lining along the chain. Both halves are metrics, so any non-negative
+combination is one.
+
+**This is architecture homology and it is a weaker claim than sequence or
+structural homology.** It must never be used for the project's statistical
+grouping: the independence `homology_group_strict` supplies comes from sequence
+and structure comparison, and a metric on lining spacing supplies none of it.
+
+Every retrieval runs beside two deliberately stupid controls — a distance that
+knows only lining size, and one that knows only span. On two fold families
+matched on lining size (18 positions each), residues per element, linker length
+and with overlapping spans (`results/architecture/HOMOLOGY.md`):
+
+| metric | P@1 | cluster purity | permutation p |
+|---|---|---|---|
+| size-only *(control)* | 0.50 | 0.53 | 0.49 |
+| span-only *(control)* | 0.53 | 0.50 | 0.40 |
+| topology | 0.97 | 0.67 | 0.0005 |
+| **register** | **1.00** | **1.00** | **0.0005** |
+| architecture (combined) | 0.97 | 0.67 | 0.0005 |
+
+Two pre-registered readings. **The halves have opposite utility on the two
+tasks** — topology detects a face within one lining and register cannot, while
+register separates folds and topology does so less well — which is why both are
+always reported and never collapsed. And **the combined metric is worse than
+its better half**, because its stated scale of 4 residues per unit of register
+distance leaves topology dominating about ten to one; that constant is a
+documented convention and is deliberately **not** retuned against this result.
+
+The graded claim fails its control and is recorded as a negative: distance
+tracks how many elements a fold has at Spearman +0.95, but the span-only
+control reaches +0.95 too, so **the graded ordering is explained by span and is
+not a finding**. Family separation survives every control; the ordering does
+not.
 
 ## Decision rules
 
