@@ -68,6 +68,14 @@ DEFAULT_MIN_ENCLOSURE = 5
 #: hold an inositol phosphate plus its shell of water.
 DEFAULT_SCAN_REACH = 12.0
 
+#: How many grid cells of clearance a channel needs before solvent counts as
+#: able to pass through it. At the default 0.8 A spacing, 2 cells is 1.6 A,
+#: which is about a water molecule's radius - so a throat narrower than a water
+#: does not connect a cavity to bulk. Set to 0 to use raw free-space
+#: connectivity, which treats a one-voxel gap as a channel and finds almost
+#: nothing buried.
+DEFAULT_PROBE_STEPS = 2
+
 #: Smallest cavity reported, in cubic angstrom. An IP6 displaces roughly
 #: 350 Å^3, so anything under 50 cannot be a site for one and is noise.
 MIN_CAVITY_VOLUME = 50.0
@@ -87,7 +95,13 @@ class CavityError(ValueError):
 
 @dataclass(frozen=True)
 class Cavity:
-    """One detected cavity."""
+    """One detected cavity.
+
+    ``sealed_fraction`` and ``mouth_area`` are what separate a cavity from a
+    groove. The enclosure count alone cannot: a deep surface channel is
+    enclosed in five of seven directions along most of its length and reads as
+    buried, which is the one distinction this whole project turns on.
+    """
 
     centre: Tuple[float, float, float]
     volume: float
@@ -95,6 +109,24 @@ class Cavity:
     mean_enclosure: float
     max_enclosure: int
     depth: float
+    sealed_fraction: float = 0.0
+    mouth_area: float = 0.0
+    reaches_bulk: bool = True
+
+    @property
+    def sealed_volume(self) -> float:
+        """The part of the cavity solvent cannot reach from outside."""
+        return float(self.volume * self.sealed_fraction)
+
+    @property
+    def is_buried(self) -> bool:
+        """Whether most of the cavity is cut off from bulk solvent.
+
+        The 0.5 boundary is stated rather than fitted, and it is the one place
+        a continuous quantity becomes a label - callers that want the
+        continuum should read ``sealed_fraction``.
+        """
+        return self.sealed_fraction >= 0.5
 
     def as_dict(self) -> Dict[str, object]:
         return {
@@ -104,6 +136,11 @@ class Cavity:
             "mean_enclosure": float(self.mean_enclosure),
             "max_enclosure": int(self.max_enclosure),
             "depth": float(self.depth),
+            "sealed_fraction": float(self.sealed_fraction),
+            "sealed_volume": self.sealed_volume,
+            "mouth_area": float(self.mouth_area),
+            "reaches_bulk": bool(self.reaches_bulk),
+            "is_buried": self.is_buried,
         }
 
 
@@ -121,13 +158,27 @@ class CavityMap:
     def total_volume(self) -> float:
         return float(sum(c.volume for c in self.cavities))
 
+    @property
+    def buried_volume(self) -> float:
+        """Volume in cavities that are mostly cut off from bulk solvent."""
+        return float(sum(c.sealed_volume for c in self.cavities))
+
+    def buried(self) -> List["Cavity"]:
+        return [c for c in self.cavities if c.is_buried]
+
+    def largest_buried(self) -> Optional["Cavity"]:
+        buried = self.buried()
+        return max(buried, key=lambda c: c.sealed_volume) if buried else None
+
     def largest(self) -> Optional[Cavity]:
         return max(self.cavities, key=lambda c: c.volume) if self.cavities else None
 
     def as_dict(self) -> Dict[str, object]:
         return {
             "n_cavities": len(self.cavities),
+            "n_buried": len(self.buried()),
             "total_volume": self.total_volume,
+            "buried_volume": self.buried_volume,
             "spacing": self.spacing,
             "min_enclosure": self.min_enclosure,
             "cavities": [c.as_dict() for c in self.cavities],
@@ -227,6 +278,13 @@ def enclosure_count(
     return counts
 
 
+def _face_neighbour(mask: np.ndarray) -> np.ndarray:
+    """Points face-adjacent to ``mask``, used to find a cavity's mouth."""
+    return ndimage.binary_dilation(
+        mask, structure=ndimage.generate_binary_structure(3, 1),
+    ) & ~mask
+
+
 def _shifted(array: np.ndarray, shift: Sequence[int]) -> np.ndarray:
     """``array`` translated by ``shift``, with False shifted in from outside.
 
@@ -254,6 +312,57 @@ def _shifted(array: np.ndarray, shift: Sequence[int]) -> np.ndarray:
     return out
 
 
+def bulk_reachable(
+    occupied: np.ndarray,
+    *,
+    probe_steps: int = 2,
+) -> np.ndarray:
+    """Which free grid points solvent can reach from outside the structure.
+
+    A flood fill through free space from the grid boundary. ``probe_steps``
+    erodes the free space first, so a channel narrower than that many grid
+    cells does not count as a route for solvent: without it, a one-voxel gap
+    between two atoms would connect a sealed cavity to bulk and nothing would
+    ever read as buried.
+
+    This is what the enclosure count cannot do. A deep surface groove is
+    enclosed in five of seven directions along most of its length, so it scores
+    as buried on enclosure alone while being open to solvent the whole way.
+    """
+    free = ~occupied
+    if probe_steps > 0:
+        # Erode the free space: a point survives only if its neighbourhood is
+        # also free, which is what it means for a probe to pass through.
+        passable = ndimage.binary_erosion(
+            free, structure=ndimage.generate_binary_structure(3, 1),
+            iterations=int(probe_steps), border_value=1,
+        )
+    else:
+        passable = free
+    # Seed from every face of the box. The grid is padded beyond the structure,
+    # so the boundary is bulk solvent by construction.
+    seeds = np.zeros_like(passable)
+    seeds[0, :, :] = seeds[-1, :, :] = True
+    seeds[:, 0, :] = seeds[:, -1, :] = True
+    seeds[:, :, 0] = seeds[:, :, -1] = True
+    seeds &= passable
+    if not seeds.any():
+        # The structure fills its own padding, which should not happen; treat
+        # nothing as reachable rather than silently calling it all buried.
+        return np.zeros_like(free)
+    labels, _ = ndimage.label(passable)
+    outside = set(np.unique(labels[seeds])) - {0}
+    reachable = np.isin(labels, list(outside)) if outside else np.zeros_like(free)
+    # Dilate back by what was eroded, so the reachable region reaches the
+    # surfaces it was eroded away from, but never through a narrow throat.
+    if probe_steps > 0:
+        reachable = ndimage.binary_dilation(
+            reachable, structure=ndimage.generate_binary_structure(3, 1),
+            iterations=int(probe_steps),
+        ) & free
+    return reachable
+
+
 def detect_cavities(
     coords: np.ndarray,
     elements: Sequence[str],
@@ -262,14 +371,16 @@ def detect_cavities(
     min_enclosure: int = DEFAULT_MIN_ENCLOSURE,
     reach: float = DEFAULT_SCAN_REACH,
     min_volume: float = MIN_CAVITY_VOLUME,
+    probe_steps: int = DEFAULT_PROBE_STEPS,
 ) -> CavityMap:
-    """Find the cavities of one conformer."""
+    """Find the cavities of one conformer, with their burial."""
     radii = atom_radii(elements)
     occupied, origin = occupancy_grid(coords, radii, spacing=spacing)
     counts = enclosure_count(occupied, spacing=spacing, reach=reach)
     pocket = counts >= min_enclosure
     if not np.any(pocket):
         return CavityMap((), spacing, tuple(float(v) for v in origin), occupied.shape, min_enclosure)
+    reachable = bulk_reachable(occupied, probe_steps=probe_steps)
 
     labels, n_labels = ndimage.label(pocket)
     voxel = spacing ** 3
@@ -287,6 +398,11 @@ def detect_cavities(
         # (non-pocket, non-protein) point. A groove has a shallow depth even
         # when it is large.
         distance = ndimage.distance_transform_edt(mask) * spacing
+        sealed = mask & ~reachable
+        sealed_fraction = float(np.sum(sealed) / n_points)
+        # The mouth is where the cavity meets solvent that reached it from
+        # outside: the sealed interior's boundary with the reachable part.
+        mouth_voxels = int(np.sum(mask & reachable & _face_neighbour(sealed)))
         cavities.append(Cavity(
             centre=(float(centre[0]), float(centre[1]), float(centre[2])),
             volume=float(volume),
@@ -294,6 +410,9 @@ def detect_cavities(
             mean_enclosure=float(np.mean(enclosures)),
             max_enclosure=int(np.max(enclosures)),
             depth=float(np.max(distance)),
+            sealed_fraction=sealed_fraction,
+            mouth_area=float(mouth_voxels) * spacing * spacing,
+            reaches_bulk=bool(np.any(mask & reachable)),
         ))
     cavities.sort(key=lambda c: -c.volume)
     return CavityMap(

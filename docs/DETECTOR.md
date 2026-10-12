@@ -26,7 +26,7 @@ from studies A-P and what it rules out.
 
 ## 2. The six modules
 
-### `cavity.py` — detection in process
+### `cavity.py` — detection in process, and true burial
 
 LIGSITE's protein-solvent-protein count on a 0.8 Å grid: mark the free points,
 count the directions in which protein is met on both sides, keep points
@@ -45,6 +45,25 @@ Verified against geometries whose answer is known by construction: a closed
 shell gives exactly one cavity at the origin with 7/7 enclosure, cutting a hole
 in it drops the enclosure to 6.21/7, and a flat slab gives none.
 
+**Burial is now solvent connectivity, not a direction count.** The enclosure
+count cannot separate a sealed cavity from a deep groove: a surface channel is
+enclosed in five of seven directions along most of its length and reads as
+buried. So each cavity also reports whether solvent can reach it from outside,
+by a flood fill through free space eroded by about a water radius, and carries
+`sealed_fraction`, `mouth_area` and `reaches_bulk`.
+
+Measured on a block with a slot cut into one face, where the slot's clearance
+is set by the atom lattice:
+
+| clearance | sealed fraction | mouth area | verdict |
+|---|---|---|---|
+| 1.8 Å | 1.00 | 0 Å² | buried — a 1.8 Å throat is impassable to water |
+| 5.8 Å | 0.30 | 82 Å² | open groove |
+| 9.8 Å | 0.22 | 110 Å² | open groove |
+
+The first row is the point: a slot that looks open on paper is sealed if water
+cannot get down it, and the directional count calls all three buried.
+
 ### `ensemble.py` — crypticity, the signal that was missing
 
 Displace along the softest elastic-network modes (both directions, ±1 and ±2 Å),
@@ -60,9 +79,47 @@ with middling persistence and high crypticity is what this project set out to
 find. Verified: an explicit ensemble whose apo has no cavity and which opens to
 484 Å³ gives persistence 0.60, crypticity 1.00, classification `cryptic`.
 
-**The sharpest limit:** atoms move rigidly with their residue, so this cannot
-open a side-chain cryptic site. That is the reason Q1 is question one and is
-allowed to come back negative.
+**The limit this had, and no longer has alone:** elastic-network modes move
+atoms rigidly with their residue, so they cannot open a site occluded by one
+side chain — a large share of the real ones. The ensemble now has a second
+tier.
+
+### `rotamer.py` — the second tier
+
+Pocket-lining side chains are rotated about chi1 and chi2 at fixed offsets and
+screened for clashes. Composed with the backbone modes, this opens sites that
+no amount of low-frequency backbone motion reaches.
+
+Measured on helix barrels whose channel is plugged by tryptophans, comparing the
+maximum crypticity each tier finds:
+
+| barrel radius | backbone only | both tiers | gain |
+|---|---|---|---|
+| 6.5 Å | 0.130 | 0.130 | +0.000 — too tight for the TRP to rotate at all |
+| 7.0 Å | 0.038 | **1.000** | **+0.962** |
+| 7.5 Å | 0.046 | 0.067 | +0.021 |
+| 8.0 Å | 0.028 | 0.056 | +0.028 |
+| 9.0 Å | 0.012 | 0.041 | +0.029 |
+
+At 7.0 Å the rotamer tier found a site the backbone tier missed entirely. At
+6.5 Å no rotation is sterically allowed and the gain is honestly zero.
+
+Two things here are not obvious and both were found by running it:
+
+* **Clash screening is relative to the input, not absolute.** A predicted model
+  routinely carries marginal contacts, and against a fixed 2.9 Å bar *every*
+  rotation of such a side chain is a clash — including the one that opens the
+  pocket. The first version produced an empty ensemble with no explanation.
+* **An unphysical torsion axis is refused.** The project's existing synthetic
+  structures place atoms on a lattice, where a CA–CB "bond" can be 14.7 Å.
+  Rotating about that flings atoms through the protein, every conformer is
+  rejected, and the output looks exactly like a tightly packed pocket rather
+  than like invalid input — which is what it was.
+
+That last point is why `geometry_fixtures.py` exists: it builds backbones by
+internal coordinates with ideal bond lengths and angles (measured CA–CB 1.530 Å,
+zero deviation) so geometry-dependent methods can be benchmarked on geometry
+they can trust.
 
 ### `openability.py` — cost to open, not whether open
 
@@ -227,7 +284,49 @@ measurement, which is why study Q's first stage is a timing probe on real
 structures rather than a production sweep — the same discipline that let a
 90-minute CPU probe kill a co-folding study before it wasted far more.
 
-## 4. What it cannot do
+## 4. Benchmarks
+
+`scripts/detect_benchmark.py run` executes seven suites; the committed result is
+`results/detector/BENCHMARK.md` with its provenance alongside. 48 measurements,
+0 failing. Pre-registered as a method validation in
+`docs/DETECTOR_PLAN_AMENDMENT_1.md`, which also states what it may not be used
+for.
+
+| quantity | measured |
+|---|---|
+| field spectrum rotation discrepancy | 2.0e-03 |
+| field spectrum translation discrepancy | 6.1e-16 |
+| field discrepancy at 0.1 Å coordinate noise | 0.014 |
+| field discrepancy at 0.5 Å coordinate noise | 0.138 |
+| cavity volume change at 0.5 Å noise | 0.215 |
+| basic minus acidic well depth | 3.43 kT/e |
+| cavity detection scaling exponent | 1.02 |
+| **field panel scaling exponent** | **0.032** |
+| conformal coverage at α = 0.1 | 0.903 |
+| minimum detectable AUC at 5 homology groups | 0.87 |
+| monotonicity violations in 2000 perturbations | 0 |
+| deployed scorer separation margin | 0.052 |
+| monotone score separation margin | 0.095 |
+
+The field panel's scaling exponent of 0.032 is the one worth a sentence: **the
+descriptor's cost does not grow with the protein**, measured over barrels from
+360 to 1,260 atoms whose radius grows with their helix count so the structure
+really does get bigger. That is what the 5-Debye-length screening cutoff was
+for, and it means the 2,352-residue tail of the candidate set costs what a
+small protein costs.
+
+**It says nothing about whether the detector finds real binding sites.** The
+fixtures are idealised barrels with chosen sequences and no energy
+minimisation. Q1–Q5 ask the biological questions of real structures and none
+has run.
+
+The benchmark also found two faults in itself, both recorded in
+`results/detector/PROVENANCE.md`: its ground-truth labels were wrong (two
+poly-alanine channels marked positive for being buried, when burial is not
+site-ness — and both scorers duly reported a negative separation margin), and
+its cost suite was timing its own warm-up.
+
+## 5. What it cannot do
 
 * No output is calibrated against a measured affinity. None is a prediction.
 * The opening cost is ordinal at best and is not in kT.

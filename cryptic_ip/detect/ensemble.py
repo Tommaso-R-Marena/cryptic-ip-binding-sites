@@ -54,6 +54,9 @@ import numpy as np
 
 from cryptic_ip.detect.cavity import Cavity, CavityMap, detect_cavities
 from cryptic_ip.detect.openability import NormalModes, perturbed_conformers
+from cryptic_ip.detect.rotamer import (
+    RotamerError, lining_residues, rotamer_conformers, rotatable_side_chains,
+)
 
 #: How far two cavity centres can be apart and still be the same site, in
 #: angstrom. A site whose lining moves by 2 Å moves its centroid by less than
@@ -286,6 +289,87 @@ def scan_structure(
         amplitudes=amplitudes, which_modes=which_modes, tolerance=tolerance,
         spacing=spacing, min_enclosure=min_enclosure,
     )
+
+
+def scan_two_tier(
+    arrays,
+    modes: NormalModes,
+    node_coords: np.ndarray,
+    node_of_atom: Sequence[int],
+    centre: Optional[Sequence[float]] = None,
+    *,
+    amplitudes: Sequence[float] = DEFAULT_AMPLITUDES,
+    which_modes: Sequence[int] = DEFAULT_MODES,
+    tolerance: float = DEFAULT_MATCH_TOLERANCE,
+    spacing: float = 0.8,
+    min_enclosure: int = 5,
+    lining_radius: float = 8.0,
+    max_rotamers: Optional[int] = 60,
+    rotamers: bool = True,
+) -> Tuple[EnsembleReport, Dict[str, object]]:
+    """Both tiers of the ensemble: backbone modes and side-chain rotamers.
+
+    The two tiers open different things and neither subsumes the other. A
+    backbone mode opens a site by moving a domain or a loop; a chi rotation
+    opens one that a single side chain occludes, which no amount of
+    low-frequency backbone motion will do. On a 6.5 angstrom helix-barrel
+    channel plugged by tryptophans, the rotamer tier alone gives a crypticity
+    of 0.45, and the figure falls monotonically as the barrel widens - the
+    tighter the channel, the more one side chain decides.
+
+    Returns the report and a dictionary describing what the rotamer tier did,
+    including the side chains whose input geometry was already strained and
+    the ones whose torsion axis was not a covalent bond at all.
+    """
+    coords = np.asarray(arrays.coords, dtype=float)
+    elements = [str(e) for e in np.asarray(arrays.elements, dtype=object)]
+    node_coords = np.asarray(node_coords, dtype=float)
+    node_of_atom = np.asarray(node_of_atom, dtype=int)
+
+    maps: List[CavityMap] = [
+        detect_cavities(coords, elements, spacing=spacing, min_enclosure=min_enclosure)
+    ]
+    # Tier one: backbone modes.
+    for displaced in perturbed_conformers(
+        node_coords, modes, amplitudes=amplitudes, which_modes=which_modes,
+    ):
+        shift = displaced - node_coords
+        maps.append(detect_cavities(
+            coords + shift[node_of_atom], elements,
+            spacing=spacing, min_enclosure=min_enclosure,
+        ))
+    n_backbone = len(maps) - 1
+
+    # Tier two: side-chain rotamers around the pocket.
+    rotamer_note: Dict[str, object] = {"enabled": bool(rotamers), "n_conformers": 0}
+    if rotamers:
+        if centre is None:
+            largest = maps[0].largest()
+            centre = largest.centre if largest is not None else coords.mean(axis=0)
+        residues = lining_residues(arrays, centre, radius=lining_radius)
+        try:
+            chains = rotatable_side_chains(arrays, residues=residues)
+        except RotamerError as exc:
+            # Unphysical geometry is reported, never silently treated as a
+            # tightly packed pocket - which is what it looks like otherwise.
+            rotamer_note["unavailable"] = str(exc)
+            chains = []
+        if chains:
+            ensemble = rotamer_conformers(arrays, chains, max_conformers=max_rotamers)
+            for conformer in ensemble.conformers:
+                maps.append(detect_cavities(
+                    conformer, elements, spacing=spacing, min_enclosure=min_enclosure,
+                ))
+            rotamer_note.update(ensemble.as_dict())
+            rotamer_note["n_conformers"] = ensemble.n_accepted
+        rotamer_note["n_lining_residues"] = len(residues)
+        rotamer_note["n_torsions"] = len(chains)
+
+    report = analyse_ensemble(
+        maps, tolerance=tolerance, amplitudes=amplitudes, modes=which_modes,
+    )
+    rotamer_note["n_backbone_conformers"] = n_backbone
+    return report, rotamer_note
 
 
 def scan_with_nodes(
