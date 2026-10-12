@@ -1,0 +1,135 @@
+{
+  "O1": {
+    "auc": {
+      "evidence": true,
+      "groups": 99,
+      "negatives": 62,
+      "positives": 62,
+      "roc_auc": {
+        "high": 0.758072550136273,
+        "low": 0.5762583461736004,
+        "p_value": 0.0,
+        "point": 0.6671436004162331
+      }
+    },
+    "n": 124,
+    "n_binders": 62,
+    "n_controls": 62,
+    "verdict": "pass"
+  },
+  "O2": {
+    "decision": "better in candidates",
+    "estimate": {
+      "copies": 75,
+      "evidence": true,
+      "groups": 65,
+      "per_copy": {
+        "high": 1.1509470101497052,
+        "low": 0.8228718529953288,
+        "p_value": 0.0,
+        "point": 0.9860247778510217
+      },
+      "per_group": {
+        "high": 1.18082540425624,
+        "low": 0.8487815342926598,
+        "p_value": 0.0,
+        "point": 1.0136032676548066
+      }
+    },
+    "n_pairs": 75
+  },
+  "O3": {
+    "buried_max_relative_sasa": 0.2363,
+    "cryptic_max_relative_sasa": 0.1044,
+    "eps": 2.5,
+    "members": [
+      {
+        "cryptic": false,
+        "deviation": 1.6928910364737888,
+        "n_anchors": 4.0,
+        "n_basic": 17,
+        "query_anchor_labels": [
+          "A:LYS422",
+          "A:ARG986",
+          "A:ARG981",
+          "A:ARG931"
+        ],
+        "relative_sasa": 0.19277878917170888,
+        "score": -1.6928910364737888,
+        "template": "9R4I:A:501",
+        "template_burial": "surface",
+        "uniprot_id": "Q54BM7"
+      },
+      {
+        "cryptic": false,
+        "deviation": 2.1685031703618347,
+        "n_anchors": 4.0,
+        "n_basic": 5,
+        "query_anchor_labels": [
+          "A:ARG773",
+          "A:ARG807",
+          "A:ARG698",
+          "A:ARG655"
+        ],
+        "relative_sasa": 0.18269530919091514,
+        "score": -2.1685031703618347,
+        "template": "5HP2:A:801",
+        "template_burial": "cryptic",
+        "uniprot_id": "Q03619"
+      },
+      {
+        "cryptic": false,
+        "deviation": 2.203224272876673,
+        "n_anchors": 4.0,
+        "n_basic": 7,
+        "query_anchor_labels": [
+          "A:ARG485",
+          "A:LYS524",
+          "A:LYS4",
+          "A:ARG317"
+        ],
+        "relative_sasa": 0.23614978678775259,
+        "score": -2.203224272876673,
+        "template": "9D5J:A:801",
+        "template_burial": "cryptic",
+        "uniprot_id": "Q55FR9"
+      }
+    ],
+    "n_candidates_cryptic": 0,
+    "n_candidates_passing": 3,
+    "n_candidates_scored": 75,
+    "n_controls_cryptic": 0,
+    "n_controls_passing": 0,
+    "n_controls_scored": 75
+  },
+  "balance": {
+    "annotated": {
+      "control_censored": 45,
+      "control_mean_basic": 4.451612903225806,
+      "n_control": 62,
+      "n_query": 62,
+      "query_censored": 29,
+      "query_mean_basic": 7.193548387096774
+    },
+    "candidates": {
+      "control_censored": 59,
+      "control_mean_basic": 4.946666666666666,
+      "n_control": 75,
+      "n_query": 75,
+      "query_censored": 7,
+      "query_mean_basic": 7.306666666666667
+    }
+  },
+  "eps": 2.5,
+  "errors": [
+    "no AlphaFold model"
+  ],
+  "holm": {
+    "O1": 0.0,
+    "O2": 0.0
+  },
+  "n_bootstrap": 2000,
+  "n_records": 275,
+  "prune_tolerance": 5.0,
+  "seed": 20261007
+}

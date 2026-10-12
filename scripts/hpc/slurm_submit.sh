@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# SUPERSEDED by the harness in cryptic_ip/hpc/ and scripts/rockfish.py; see
+# docs/ROCKFISH.md. This submits one proteome-screen job with hardcoded
+# resources and no sharding, census or resume. Kept because it is what the
+# proteome screen was run with, not because it is the way to run anything now.
 set -euo pipefail
 
 PROTEOME_FILE=${1:-data/proteomes.txt}

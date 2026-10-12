@@ -1,0 +1,646 @@
+{
+  "axial": {
+    "axial_statistic_usable": false,
+    "max_abs_deviation_at_period_2": 0.0,
+    "max_abs_deviation_at_period_4_uniform_parity": 0.0,
+    "note": "the doubled-angle resultant is identically 1 at period 2 for any integer position set, so it cannot be used on sequence positions"
+  },
+  "calibration": {
+    "classes": {
+      "distributed": 263,
+      "mosaic": 3,
+      "segmental": 34
+    },
+    "family_alpha_holm_0.01": 0.0,
+    "family_alpha_holm_0.05": 0.03,
+    "family_alpha_uncorrected_0.05": 0.12333333333333334,
+    "n_linings": 300,
+    "per_test": {
+      "helix_register": {
+        "alpha_at_0.05": 0.056666666666666664,
+        "fraction_runnable": 1.0
+      },
+      "helix_topology": {
+        "alpha_at_0.05": 0.02,
+        "fraction_runnable": 1.0
+      },
+      "strand_register": {
+        "alpha_at_0.05": 0.03333333333333333,
+        "fraction_runnable": 1.0
+      },
+      "strand_topology": {
+        "alpha_at_0.05": 0.02666666666666667,
+        "fraction_runnable": 1.0
+      }
+    },
+    "verdicts": {
+      "none": 291,
+      "weak": 9
+    }
+  },
+  "identities": {
+    "barcode_identity_holds": true,
+    "barcode_mismatches": 0,
+    "barcode_trials": 300
+  },
+  "orderings_floor": {
+    "floor_used": 20,
+    "rows": [
+      {
+        "gaps": [
+          3,
+          1,
+          3,
+          3,
+          1,
+          3
+        ],
+        "min_attainable_p": 0.06666666666666667,
+        "orderings": 15
+      },
+      {
+        "gaps": [
+          1,
+          1,
+          1,
+          8,
+          1,
+          1,
+          1
+        ],
+        "min_attainable_p": 0.2857142857142857,
+        "orderings": 7
+      },
+      {
+        "gaps": [
+          4,
+          3,
+          4,
+          3,
+          4,
+          3,
+          4
+        ],
+        "min_attainable_p": 0.02857142857142857,
+        "orderings": 35
+      },
+      {
+        "gaps": [
+          3,
+          4,
+          3,
+          4,
+          3,
+          4,
+          3,
+          4
+        ],
+        "min_attainable_p": 0.02857142857142857,
+        "orderings": 70
+      },
+      {
+        "gaps": [
+          4,
+          3,
+          4,
+          3,
+          4,
+          3,
+          4,
+          3,
+          4,
+          3
+        ],
+        "min_attainable_p": 0.007936507936507936,
+        "orderings": 252
+      }
+    ]
+  },
+  "panel": {
+    "rows": [
+      {
+        "architecture_class": "phase_locked",
+        "dominant_period": 3.725,
+        "element": "helix_face",
+        "gap_entropy": 0.9709390894079508,
+        "lining": "barrel, no linkers",
+        "n": 42,
+        "occupancy": 0.8031159135588379,
+        "register_p": 0.002664890073284477,
+        "segments": 1,
+        "signature": "clear",
+        "topology_p": 0.002664890073284477
+      },
+      {
+        "architecture_class": "mosaic",
+        "dominant_period": 3.575,
+        "element": "helix_face",
+        "gap_entropy": 0.9040752021129482,
+        "lining": "barrel + 10-residue linkers",
+        "n": 42,
+        "occupancy": 0.7410974747586828,
+        "register_p": 0.002664890073284477,
+        "segments": 6,
+        "signature": "clear",
+        "topology_p": 0.002664890073284477
+      },
+      {
+        "architecture_class": "mosaic",
+        "dominant_period": 3.5672913117546847,
+        "element": "helix_face",
+        "gap_entropy": 0.8924631764591682,
+        "lining": "three helices + linkers",
+        "n": 21,
+        "occupancy": 0.7190472026194372,
+        "register_p": 0.002664890073284477,
+        "segments": 3,
+        "signature": "clear",
+        "topology_p": 0.003997335109926716
+      },
+      {
+        "architecture_class": "phase_locked",
+        "dominant_period": 3.513353115727003,
+        "element": "helix_face",
+        "gap_entropy": 0.9958375843353768,
+        "lining": "helix face, exact 3,4 spacing",
+        "n": 12,
+        "occupancy": 0.6736209953992307,
+        "register_p": 0.006493506493506494,
+        "segments": 1,
+        "signature": "clear",
+        "topology_p": 0.002664890073284477
+      },
+      {
+        "architecture_class": "phase_locked",
+        "dominant_period": 3.6052631578947367,
+        "element": "helix_face",
+        "gap_entropy": 0.9965581685098492,
+        "lining": "helix face, jittered 3/4",
+        "n": 13,
+        "occupancy": 0.6738052990918816,
+        "register_p": 1.0,
+        "segments": 1,
+        "signature": "clear",
+        "topology_p": 0.002664890073284477
+      },
+      {
+        "architecture_class": "phase_locked",
+        "dominant_period": 2.0,
+        "element": "strand_face",
+        "gap_entropy": 1.0000000000000002,
+        "lining": "strand face, every 2nd",
+        "n": 14,
+        "occupancy": 0.8007245009109598,
+        "register_p": null,
+        "segments": 1,
+        "signature": "clear",
+        "topology_p": 0.0013324450366422385
+      },
+      {
+        "architecture_class": "unresolved",
+        "dominant_period": 9.787610619469026,
+        "element": "none",
+        "gap_entropy": 1.0000000000000002,
+        "lining": "contiguous stretch of 14",
+        "n": 14,
+        "occupancy": 1.0,
+        "register_p": null,
+        "segments": 1,
+        "signature": "unresolved",
+        "topology_p": null
+      },
+      {
+        "architecture_class": "segmental",
+        "dominant_period": 10.263665594855304,
+        "element": "none",
+        "gap_entropy": 0.5710897880418595,
+        "lining": "hairpin, two runs of 7",
+        "n": 14,
+        "occupancy": 0.7308549774488542,
+        "register_p": null,
+        "segments": 2,
+        "signature": "none",
+        "topology_p": 1.0
+      },
+      {
+        "architecture_class": "distributed",
+        "dominant_period": 11.05,
+        "element": "none",
+        "gap_entropy": 0.8354951876494812,
+        "lining": "random 14 in 200",
+        "n": 14,
+        "occupancy": 0.49809347893681555,
+        "register_p": 1.0,
+        "segments": 9,
+        "signature": "none",
+        "topology_p": 0.5889407061958695
+      },
+      {
+        "architecture_class": "distributed",
+        "dominant_period": 8.8,
+        "element": "none",
+        "gap_entropy": 0.855125021588101,
+        "lining": "random 20 in 400",
+        "n": 20,
+        "occupancy": 0.5056723369138433,
+        "register_p": 0.4343770819453698,
+        "segments": 17,
+        "signature": "none",
+        "topology_p": 0.6215856095936042
+      }
+    ]
+  },
+  "peak_width": {
+    "fixed_probe_losses": [
+      {
+        "fine": 0.9023345585110144,
+        "lost": 7.681376457524536e-05,
+        "period": 3.47,
+        "span": 30,
+        "thirteen_probes": 0.9022577447464392
+      },
+      {
+        "fine": 0.8981603821706394,
+        "lost": 0.00010435436684697041,
+        "period": 3.62,
+        "span": 30,
+        "thirteen_probes": 0.8980560278037925
+      },
+      {
+        "fine": 0.9050476445882493,
+        "lost": 0.011419015751484074,
+        "period": 3.78,
+        "span": 30,
+        "thirteen_probes": 0.8936286288367652
+      },
+      {
+        "fine": 0.9016804708545156,
+        "lost": 0.0007116029520960465,
+        "period": 3.47,
+        "span": 60,
+        "thirteen_probes": 0.9009688679024196
+      },
+      {
+        "fine": 0.8892100368090688,
+        "lost": 0.011314258664928967,
+        "period": 3.62,
+        "span": 60,
+        "thirteen_probes": 0.8778957781441399
+      },
+      {
+        "fine": 0.8892568467281224,
+        "lost": 0.025118326290137105,
+        "period": 3.78,
+        "span": 60,
+        "thirteen_probes": 0.8641385204379853
+      },
+      {
+        "fine": 0.8795761568839958,
+        "lost": 0.07232657282638688,
+        "period": 3.47,
+        "span": 104,
+        "thirteen_probes": 0.8072495840576089
+      },
+      {
+        "fine": 0.8842088036825891,
+        "lost": 0.03143348356990672,
+        "period": 3.62,
+        "span": 104,
+        "thirteen_probes": 0.8527753201126824
+      },
+      {
+        "fine": 0.8952854142618676,
+        "lost": 0.05509145622070988,
+        "period": 3.78,
+        "span": 104,
+        "thirteen_probes": 0.8401939580411577
+      },
+      {
+        "fine": 0.870606388922909,
+        "lost": 0.2870162382506005,
+        "period": 3.47,
+        "span": 200,
+        "thirteen_probes": 0.5835901506723085
+      },
+      {
+        "fine": 0.8803508716708678,
+        "lost": 0.13229879963976365,
+        "period": 3.62,
+        "span": 200,
+        "thirteen_probes": 0.7480520720311041
+      },
+      {
+        "fine": 0.8881636754031417,
+        "lost": 0.10838795093566911,
+        "period": 3.78,
+        "span": 200,
+        "thirteen_probes": 0.7797757244674726
+      }
+    ],
+    "ratio_mean": 0.5770370370370368,
+    "ratio_spread": 0.037962962962961866,
+    "rows": [
+      {
+        "measured_half_width": 0.36060000000000003,
+        "ratio_to_w2_over_span": 0.5564814814814815,
+        "span": 20
+      },
+      {
+        "measured_half_width": 0.18179999999999996,
+        "ratio_to_w2_over_span": 0.561111111111111,
+        "span": 40
+      },
+      {
+        "measured_half_width": 0.09404999999999997,
+        "ratio_to_w2_over_span": 0.5805555555555554,
+        "span": 80
+      },
+      {
+        "measured_half_width": 0.048149999999999915,
+        "ratio_to_w2_over_span": 0.5944444444444433,
+        "span": 160
+      },
+      {
+        "measured_half_width": 0.02400000000000002,
+        "ratio_to_w2_over_span": 0.5925925925925931,
+        "span": 320
+      }
+    ],
+    "worst_loss": 0.2870162382506005
+  },
+  "power": {
+    "dilution": [
+      {
+        "clear_rate": 1.0,
+        "detected_either": 1.0,
+        "detected_rate": 1.0,
+        "detected_register": 1.0,
+        "detected_topology": 1.0,
+        "fraction_of_face": 1.0,
+        "median_p": 0.0066555740432612314,
+        "mode": "random",
+        "n_positions": 42
+      },
+      {
+        "clear_rate": 1.0,
+        "detected_either": 1.0,
+        "detected_rate": 1.0,
+        "detected_register": 1.0,
+        "detected_topology": 0.9666666666666667,
+        "fraction_of_face": 0.8,
+        "median_p": 0.0066555740432612314,
+        "mode": "random",
+        "n_positions": 34
+      },
+      {
+        "clear_rate": 0.9,
+        "detected_either": 1.0,
+        "detected_rate": 1.0,
+        "detected_register": 1.0,
+        "detected_topology": 0.8666666666666667,
+        "fraction_of_face": 0.6,
+        "median_p": 0.0066555740432612314,
+        "mode": "random",
+        "n_positions": 25
+      },
+      {
+        "clear_rate": 0.6,
+        "detected_either": 0.9666666666666667,
+        "detected_rate": 0.9666666666666667,
+        "detected_register": 0.9666666666666667,
+        "detected_topology": 0.36666666666666664,
+        "fraction_of_face": 0.45,
+        "median_p": 0.0066555740432612314,
+        "mode": "random",
+        "n_positions": 19
+      },
+      {
+        "clear_rate": 0.1,
+        "detected_either": 0.4,
+        "detected_rate": 0.4,
+        "detected_register": 0.36666666666666664,
+        "detected_topology": 0.03333333333333333,
+        "fraction_of_face": 0.33,
+        "median_p": 0.05657237936772047,
+        "mode": "random",
+        "n_positions": 14
+      },
+      {
+        "clear_rate": 1.0,
+        "detected_either": 1.0,
+        "detected_rate": 1.0,
+        "detected_register": 1.0,
+        "detected_topology": 1.0,
+        "fraction_of_face": 1.0,
+        "median_p": 0.0066555740432612314,
+        "mode": "spatial",
+        "n_positions": 42
+      },
+      {
+        "clear_rate": 1.0,
+        "detected_either": 1.0,
+        "detected_rate": 1.0,
+        "detected_register": 1.0,
+        "detected_topology": 1.0,
+        "fraction_of_face": 0.8,
+        "median_p": 0.0066555740432612314,
+        "mode": "spatial",
+        "n_positions": 34
+      },
+      {
+        "clear_rate": 1.0,
+        "detected_either": 1.0,
+        "detected_rate": 1.0,
+        "detected_register": 1.0,
+        "detected_topology": 1.0,
+        "fraction_of_face": 0.6,
+        "median_p": 0.0066555740432612314,
+        "mode": "spatial",
+        "n_positions": 25
+      },
+      {
+        "clear_rate": 1.0,
+        "detected_either": 1.0,
+        "detected_rate": 1.0,
+        "detected_register": 1.0,
+        "detected_topology": 1.0,
+        "fraction_of_face": 0.45,
+        "median_p": 0.0066555740432612314,
+        "mode": "spatial",
+        "n_positions": 19
+      },
+      {
+        "clear_rate": 0.43333333333333335,
+        "detected_either": 0.7666666666666667,
+        "detected_rate": 0.7666666666666667,
+        "detected_register": 0.7333333333333333,
+        "detected_topology": 0.1,
+        "fraction_of_face": 0.33,
+        "median_p": 0.013311148086522463,
+        "mode": "spatial",
+        "n_positions": 14
+      }
+    ],
+    "false_positive": {
+      "clear_rate": 0.025,
+      "detected_either": 0.05,
+      "detected_rate": 0.05,
+      "detected_register": 0.025,
+      "detected_topology": 0.025,
+      "lining_size": 14,
+      "median_p": 0.8286189683860233
+    },
+    "n_face_residues": 42,
+    "shapes": [
+      {
+        "clear_rate": 0.5333333333333333,
+        "detected_either": 0.7333333333333333,
+        "detected_rate": 0.7333333333333333,
+        "detected_register": 0.7333333333333333,
+        "detected_topology": 0.06666666666666667,
+        "elements_spanned": 6.0,
+        "helix_gap_fraction": 0.33846153846153854,
+        "lining_size": 14,
+        "median_p": 0.0066555740432612314,
+        "shape": "ring across all elements"
+      },
+      {
+        "clear_rate": 0.7333333333333333,
+        "detected_either": 1.0,
+        "detected_rate": 1.0,
+        "detected_register": 1.0,
+        "detected_topology": 1.0,
+        "elements_spanned": 2.0,
+        "helix_gap_fraction": 0.6153846153846155,
+        "lining_size": 14,
+        "median_p": 0.0066555740432612314,
+        "shape": "column along 2 elements"
+      }
+    ]
+  },
+  "quick": false,
+  "scan_inflation": {
+    "analytic_threshold": 0.49964422955689103,
+    "n": 12,
+    "rows": [
+      {
+        "mean": 0.23439340296399908,
+        "probes": 1,
+        "statistic": "single period 3.6",
+        "true_alpha_at_analytic_threshold": 0.020666666666666667
+      },
+      {
+        "mean": 0.433326519095328,
+        "probes": 13,
+        "statistic": "helix band",
+        "true_alpha_at_analytic_threshold": 0.23333333333333334
+      },
+      {
+        "mean": 0.3918954085038808,
+        "probes": 6,
+        "statistic": "strand band",
+        "true_alpha_at_analytic_threshold": 0.19166666666666668
+      },
+      {
+        "mean": 0.5365687898977177,
+        "probes": 101,
+        "statistic": "full scan 2-12",
+        "true_alpha_at_analytic_threshold": 0.7143333333333334
+      }
+    ],
+    "span": 60
+  },
+  "seed": 20261012,
+  "transfer": {
+    "ideal_rate": 0.7333333333333333,
+    "realistic_rate": 0.3333333333333333,
+    "rows": [
+      {
+        "clear_rate": 0.4,
+        "condition": "ideal",
+        "detected_either": 0.7333333333333333,
+        "detected_rate": 0.7333333333333333,
+        "detected_register": 0.7,
+        "detected_topology": 0.16666666666666666,
+        "lining_size": 14,
+        "mean_face_size": 42.0,
+        "median_p": 0.013311148086522463,
+        "reps": 30
+      },
+      {
+        "clear_rate": 0.16666666666666666,
+        "condition": "jitter 4 deg",
+        "detected_either": 0.5333333333333333,
+        "detected_rate": 0.5333333333333333,
+        "detected_register": 0.5,
+        "detected_topology": 0.06666666666666667,
+        "lining_size": 14,
+        "mean_face_size": 45.13333333333333,
+        "median_p": 0.04326123128119801,
+        "reps": 30
+      },
+      {
+        "clear_rate": 0.13333333333333333,
+        "condition": "jitter 8 deg (realistic)",
+        "detected_either": 0.3333333333333333,
+        "detected_rate": 0.3333333333333333,
+        "detected_register": 0.26666666666666666,
+        "detected_topology": 0.06666666666666667,
+        "lining_size": 14,
+        "mean_face_size": 45.56666666666667,
+        "median_p": 0.07321131447587355,
+        "reps": 30
+      },
+      {
+        "clear_rate": 0.03333333333333333,
+        "condition": "jitter 12 deg",
+        "detected_either": 0.23333333333333334,
+        "detected_rate": 0.23333333333333334,
+        "detected_register": 0.2,
+        "detected_topology": 0.1,
+        "lining_size": 14,
+        "mean_face_size": 45.46666666666667,
+        "median_p": 0.10648918469217969,
+        "reps": 30
+      },
+      {
+        "clear_rate": 0.0,
+        "condition": "jitter 20 deg",
+        "detected_either": 0.26666666666666666,
+        "detected_rate": 0.26666666666666666,
+        "detected_register": 0.0,
+        "detected_topology": 0.26666666666666666,
+        "lining_size": 14,
+        "mean_face_size": 46.166666666666664,
+        "median_p": 0.1264559068219634,
+        "reps": 30
+      },
+      {
+        "clear_rate": 0.06666666666666667,
+        "condition": "one bulge per helix",
+        "detected_either": 0.3,
+        "detected_rate": 0.3,
+        "detected_register": 0.3,
+        "detected_topology": 0.03333333333333333,
+        "lining_size": 14,
+        "mean_face_size": 51.0,
+        "median_p": 0.14309484193011646,
+        "reps": 30
+      },
+      {
+        "clear_rate": 0.03333333333333333,
+        "condition": "bulges + jitter 8 deg",
+        "detected_either": 0.2,
+        "detected_rate": 0.2,
+        "detected_register": 0.03333333333333333,
+        "detected_topology": 0.16666666666666666,
+        "lining_size": 14,
+        "mean_face_size": 47.0,
+        "median_p": 0.1697171381031614,
+        "reps": 30
+      }
+    ],
+    "worst_condition": "bulges + jitter 8 deg",
+    "worst_rate": 0.2
+  }
+}
