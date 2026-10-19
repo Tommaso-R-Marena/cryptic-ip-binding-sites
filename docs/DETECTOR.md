@@ -479,10 +479,14 @@ size-only control sits at 0.50 (p = 0.49) and a span-only control at 0.53
 
 Three things are worth taking from that, and two of them are limits:
 
-* **The halves have opposite utility on the two tasks.** Topology detects a
-  face within one lining and register cannot; register separates folds and
-  topology does so less well. That is a reason to keep both and never collapse
-  them into one number.
+* **The halves have complementary blind spots, not a ranking.** Within one
+  lining topology finds tight, uniform faces that leave register with nothing
+  to test — a strand face every 2nd residue has exactly one gap ordering, so
+  register is unresolved while topology gives p = 0.001 — while register finds
+  the rings and diluted faces whose gap multiset is unremarkable (73% against
+  7% on the ring). Across linings register separates folds and topology does so
+  less well. That is the reason to keep both and never collapse them into one
+  number.
 * **The combined metric is worse than its better half** (purity 0.67 against
   1.00), because its stated 4-residues-per-unit scale leaves topology
   dominating about ten to one. The constant has deliberately not been retuned
@@ -497,6 +501,36 @@ and it must never be used for the project's statistical grouping.
 Figures for all of this are built by `scripts/architecture_figures.py` from the
 committed artefacts — never recomputed — into
 `results/architecture/figures/`.
+
+### Why none of this is wired into the scorer
+
+The architecture descriptors are **deliberately not** features of
+`monotone.py`'s score, and this is a decision rather than unfinished work.
+
+The reason is the transfer measurement above. A feature earns a place in the
+scorer by carrying signal on the inputs the scorer actually sees, which are
+real structures with real backbone scatter. On idealised geometry the
+architecture detector finds a planted face 73% of the time; at the 8° φ/ψ
+scatter real structures show it finds it 33% of the time, and 20% once bulges
+interrupt the face. Two thirds of its measured sensitivity is an artefact of
+ideal fixtures. Wiring a descriptor in at that sensitivity would add a
+noisy column to a scorer whose abstention logic is calibrated on features
+with measured power, and the honest version of that trade is to leave it out.
+
+The second reason is that the paired within-lining test — the one design here
+whose control is not nearly tautological, in
+`results/architecture/real/BASIC_FACE.md` — returns no finding in the
+hypothesised direction. There is no measured real-data effect to carry into a
+score.
+
+So the architecture modules stay what they are: an instrument that describes a
+lining, with proofs and calibration attached, reported alongside the score and
+never folded into it. Three things would change the decision, in order of how
+much they would change it: a within-protein control (other pockets from the
+same proteins, with residue lists, which no committed table carries); a
+detector whose power survives realistic backbone scatter, which a bulge makes
+unlikely rather than merely hard; and a real-data effect that replicates on a
+held-out table. None of those exists today.
 
 ## 3. Running it
 
@@ -585,3 +619,6 @@ its cost suite was timing its own warm-up.
 * One chemistry dominates the ground truth: 134 InsP6 against 1 InsP5. IP3 is
   in the competitor panel, not the target, for that reason.
 * No wet-lab validation. The output is a set of hypotheses.
+* The lining-architecture descriptors do not contribute to any score. They are
+  reported beside it; see *Why none of this is wired into the scorer* above for
+  the measurement that decided it.

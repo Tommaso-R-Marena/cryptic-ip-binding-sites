@@ -221,7 +221,13 @@ def test_the_cost_grows_as_the_square_of_the_opening():
     centre = coords[30] + np.array([6.0, 0, 0])
     one = OA.describe_pocket(arrays, centre, n_modes=6, opening=1.0).opening_cost_gamma_a2
     two = OA.describe_pocket(arrays, centre, n_modes=6, opening=2.0).opening_cost_gamma_a2
-    assert two == pytest.approx(4.0 * one, rel=1e-9)
+    # The quadratic law is exact in the model; the tolerance is not about the
+    # law but about the eigensolver underneath it, whose summation order - and
+    # so its last few bits - depends on how many BLAS threads happen to be
+    # available. Under `pytest -n auto` this failed at rel=1e-9 on a relative
+    # difference of 1.6e-9, which is a property of the thread count and not of
+    # the model.
+    assert two == pytest.approx(4.0 * one, rel=1e-6)
 
 
 def test_explicit_lining_keys_are_used_when_given():
