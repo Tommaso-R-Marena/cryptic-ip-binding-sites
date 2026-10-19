@@ -153,7 +153,7 @@ def test_the_markdown_states_what_it_is_not_evidence_for():
 def test_every_probe_is_listed():
     assert set(script.PROBES) == {
         "identities", "axial", "scan_inflation", "peak_width",
-        "orderings_floor", "calibration", "panel", "power", "transfer",
+        "orderings_floor", "calibration", "panel", "power", "transfer", "local",
     }
 
 
@@ -247,3 +247,89 @@ def test_the_report_says_the_transfer_result_is_a_hard_negative():
     text = script.markdown(json.loads(ARTEFACT.read_text()))
     assert "hard negative" in text
     assert "upper bound" in text
+
+
+# ------------------------------------------- the local statistic, sections 10
+
+def test_the_slab_helper_gives_the_transfer_and_local_probes_the_same_fixture():
+    """The paired comparison is only meaningful if both see one lining per seed."""
+    settings = {"jitter": script.gf.REALISTIC_JITTER, "bulges": None}
+    first, size = script._inward_slab(settings, 3, 14, np.random.default_rng(11))
+    second, again = script._inward_slab(settings, 3, 14, np.random.default_rng(11))
+    assert first == second
+    assert size == again
+    assert len(first) == 14
+
+
+def test_the_slab_helper_reports_a_face_too_small_rather_than_clipping():
+    settings = {"jitter": 0.0, "bulges": None}
+    pick, face = script._inward_slab(settings, 0, 10_000, np.random.default_rng(1))
+    assert pick is None
+    assert face > 0
+
+
+def test_mcnemar_is_exact_and_two_sided():
+    assert script._mcnemar(0, 0) == 1.0
+    assert script._mcnemar(5, 5) == pytest.approx(1.0)
+    assert script._mcnemar(6, 0) == pytest.approx(2 * 0.5 ** 6)
+    assert script._mcnemar(0, 6) == pytest.approx(2 * 0.5 ** 6)
+
+
+def test_the_local_probe_pairs_every_arm_and_scores_every_variant():
+    out = script.probe_local(rng(), n_draws=120, reps=3)
+    assert out["window_sizes"] == list(script.ar.WINDOW_SIZES)
+    assert set(out["adopted"]) == set(script.VARIANTS)
+    for row in out["rows"]:
+        assert 0.0 <= row["pooled_detected"] <= 1.0
+        for name in script.VARIANTS:
+            assert 0.0 <= row[f"{name}_detected"] <= 1.0
+            # A paired table has to add up: concordant plus discordant is every
+            # fixture, never more.
+            assert (row[f"{name}_both"] + row[f"{name}_pooled_only"]
+                    + row[f"{name}_only"]) <= row["reps"]
+            assert row[f"{name}_difference"] == pytest.approx(
+                row[f"{name}_detected"] - row["pooled_detected"])
+            assert set(row[f"{name}_fraction_by_size"]) == set(row["null_mean_by_size"])
+
+
+def test_every_variant_selects_a_subset_of_the_fixed_window_sizes():
+    out = script.probe_local(rng(), n_draws=120, reps=3)
+    for row in out["rows"]:
+        # The rank keeps exactly one size per lining, so its fractions sum to 1.
+        assert sum(row["best_fraction_by_size"].values()) == pytest.approx(1.0)
+        for name in script.VARIANTS:
+            assert all(0.0 <= rate <= 1.0
+                       for rate in row[f"{name}_fraction_by_size"].values())
+
+
+def test_the_decision_rule_is_applied_and_not_asserted():
+    """`adopted` must follow from the measured numbers, in both directions."""
+    out = script.probe_local(rng(), n_draws=120, reps=3)
+    primary = next(r for r in out["rows"] if "realistic" in r["arm"])
+    for name in script.VARIANTS:
+        expected = (primary[f"{name}_detected"] > primary["pooled_detected"]
+                    and out["decoys"][f"{name}_false_positive"] <= 0.05)
+        assert out["adopted"][name] is bool(expected)
+
+
+def test_the_selection_note_says_whether_the_threshold_actually_fired():
+    quiet = [{"pruned_fraction_by_size": {"6": 1.0, "8": 1.0, "10": 1.0},
+              "best_fraction_by_size": {"6": 0.0, "8": 0.0, "10": 1.0}}]
+    fired = [{"pruned_fraction_by_size": {"6": 0.5, "8": 1.0, "10": 1.0},
+              "best_fraction_by_size": {"6": 0.0, "8": 0.2, "10": 0.8}}]
+    local = {"saturated_null": 0.9}
+    assert "never fired" in " ".join(script._selection_note(quiet, local))
+    assert "never fired" not in " ".join(script._selection_note(fired, local))
+    assert "[6]" in " ".join(script._selection_note(fired, local))
+
+
+def test_the_conclusion_follows_the_measurement_in_both_directions():
+    """The report must not assert the negative it was written expecting."""
+    names = list(script.VARIANTS)
+    lost = [{"arm": "jitter 8 deg (realistic)", "pooled_detected": 0.30,
+             **{f"{n}_detected": 0.0 for n in names}}]
+    won = [{"arm": "jitter 8 deg (realistic)", "pooled_detected": 0.30,
+            **{f"{n}_detected": 0.0 for n in names}, "best_detected": 0.60}]
+    assert "Locality is not" in script._conclusion(lost, names)
+    assert "beat the pooled statistic" in script._conclusion(won, names)
+    assert "held-out" in script._conclusion(won, names)

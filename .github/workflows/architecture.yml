@@ -1,0 +1,193 @@
+name: Lining architecture
+
+# docs/ARCHITECTURE_PLAN.md (study Q7), as amended by
+# docs/ARCHITECTURE_PLAN_AMENDMENT_1.md through _5.md.
+#
+# Three jobs, and they are different kinds of thing:
+#
+#   probes     method validation on synthetic fixtures and ideal-geometry barrels, plus
+#              the irregularity test that measures how much of it survives realistic
+#              phi/psi scatter. Touches no study data. Runs on every push to this branch.
+#   real       study Q7 on the real pocket linings committed in this repository, with
+#              the matched decoy arm and the paired within-lining comparison. Reads only
+#              committed tables, so it needs no artifact and no network.
+#   figures    F1-F5, built from the artefacts the first two jobs produce and never
+#              recomputed, so a figure cannot disagree with its report.
+#
+# Everything here is reproducible offline: no structure is fetched, no artifact is
+# downloaded, and every input is a file in the repository.
+
+on:
+  push:
+    # An analysis, not a test: on main it runs on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/ARCHITECTURE_PLAN.md'
+      - 'docs/ARCHITECTURE_PLAN_AMENDMENT_1.md'
+      - 'docs/ARCHITECTURE_PLAN_AMENDMENT_2.md'
+      - 'docs/ARCHITECTURE_PLAN_AMENDMENT_3.md'
+      - 'docs/ARCHITECTURE_PLAN_AMENDMENT_4.md'
+      - 'docs/ARCHITECTURE_PLAN_AMENDMENT_5.md'
+      - 'scripts/architecture_findings.py'
+      - 'cryptic_ip/detect/architecture.py'
+      - 'cryptic_ip/detect/homology.py'
+      - 'cryptic_ip/detect/geometry_fixtures.py'
+      - 'scripts/architecture_probe.py'
+      - 'scripts/homology_probe.py'
+      - 'scripts/real_architecture.py'
+      - 'scripts/basic_face.py'
+      - 'scripts/build_lining_inputs.py'
+      - 'scripts/architecture_figures.py'
+      - '.github/workflows/architecture.yml'
+  workflow_dispatch:
+    inputs:
+      quick:
+        description: 'fewer draws, for a fast check'
+        default: 'false'
+      null_draws:
+        description: 'permutation draws per null'
+        default: '800'
+
+concurrency:
+  group: architecture-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NULL_DRAWS: ${{ inputs.null_draws || '800' }}
+
+jobs:
+  probes:
+    name: Method probes and the irregularity test
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Nine probes, including whether any of it transfers
+        run: |
+          python scripts/architecture_probe.py run \
+            ${{ inputs.quick == 'true' && '--quick' || '' }} \
+            --out architecture.json --markdown ARCHITECTURE.md
+      - name: Fold retrieval, with both controls
+        run: |
+          python scripts/homology_probe.py run --out homology.json --markdown HOMOLOGY.md
+      - name: Print the results
+        run: |
+          python scripts/extract_log_block.py emit ARCHITECTURE_MD_B64 ARCHITECTURE.md
+          python scripts/extract_log_block.py emit ARCHITECTURE_JSON_B64 architecture.json
+          python scripts/extract_log_block.py emit HOMOLOGY_MD_B64 HOMOLOGY.md
+          python scripts/extract_log_block.py emit HOMOLOGY_JSON_B64 homology.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: architecture-probes
+          path: |
+            architecture.json
+            ARCHITECTURE.md
+            homology.json
+            HOMOLOGY.md
+          retention-days: 90
+
+  real:
+    name: Study Q7 on real linings
+    runs-on: ubuntu-latest
+    timeout-minutes: 200
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Build the inputs from the committed tables
+        # No --sequences, so no sequence-inputs file is written. Study Q6 needs
+        # letters and none are invented here.
+        run: |
+          python scripts/build_lining_inputs.py --known specificity-candidates \
+            --architecture-out architecture_inputs.jsonl --report inputs_report.json
+      - name: Real linings against decoys matched on size and span
+        run: |
+          python scripts/real_architecture.py run --inputs architecture_inputs.jsonl \
+            --draws "$NULL_DRAWS" --out real.json --markdown REAL.md
+      - name: Do the basic residues sit on a face
+        run: |
+          python scripts/basic_face.py run --null-draws "$NULL_DRAWS" \
+            --out basic_face.json --markdown BASIC_FACE.md
+      - name: Print the results
+        run: |
+          python scripts/extract_log_block.py emit REAL_MD_B64 REAL.md
+          python scripts/extract_log_block.py emit REAL_JSON_B64 real.json
+          python scripts/extract_log_block.py emit BASIC_FACE_MD_B64 BASIC_FACE.md
+          python scripts/extract_log_block.py emit BASIC_FACE_JSON_B64 basic_face.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: architecture-real
+          path: |
+            architecture_inputs.jsonl
+            inputs_report.json
+            real.json
+            REAL.md
+            basic_face.json
+            BASIC_FACE.md
+          retention-days: 90
+
+  figures:
+    name: Figures
+    needs: [probes, real]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: architecture-*
+          path: parts
+          merge-multiple: true
+      - name: Build F1-F5 from the artefacts, never recomputed
+        run: |
+          python scripts/architecture_figures.py \
+            --architecture parts/architecture.json \
+            --homology parts/homology.json \
+            --real parts/real.json \
+            --out-dir figures
+      - name: Assemble FINDINGS.md from the same artefacts
+        run: |
+          python scripts/architecture_findings.py --out figures/FINDINGS.md
+        env:
+          # The page reads the committed artefacts by their repository paths, so
+          # it reports what is in the repository rather than what this run just
+          # produced. A disagreement between the two is the thing to notice.
+          PYTHONWARNINGS: default
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: architecture-figures
+          path: figures
+          retention-days: 90

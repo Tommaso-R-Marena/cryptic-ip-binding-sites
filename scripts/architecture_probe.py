@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
 import numpy as np
+from scipy.stats import binomtest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -386,6 +387,33 @@ def probe_power(rng: np.random.Generator, n_draws: int = 600) -> Dict[str, objec
 
 # ------------------------------------------- probe 9: does any of it transfer
 
+def _inward_slab(settings: Dict[str, object], rep: int, size: int,
+                 rng: np.random.Generator):
+    """The slab of inward-pointing residues a bound ligand would select.
+
+    Returned as ``(positions or None, face size)``. Shared by the transfer and
+    local probes so that both see the *same* fixture at the same seed: the
+    comparison between the pooled and the local statistic is paired by
+    construction, which it has to be for a paired test to mean anything.
+    """
+    fixture = gf.helix_barrel(NHEL, PER, 9.0, seed=rep, **settings)
+    inward: List[int] = []
+    heights: Dict[int, float] = {}
+    for residue in np.unique(fixture.residue_index):
+        sel = fixture.residue_index == residue
+        atoms = {str(n): c for n, c in
+                 zip(fixture.atom_names[sel], fixture.coords[sel])}
+        if "CA" in atoms and "CB" in atoms:
+            if np.hypot(*atoms["CB"][:2]) < np.hypot(*atoms["CA"][:2]):
+                inward.append(int(residue))
+                heights[int(residue)] = float(atoms["CB"][2])
+    if len(inward) < size:
+        return None, len(inward)
+    centre = float(rng.uniform(min(heights.values()), max(heights.values())))
+    pick = sorted(inward, key=lambda r: abs(heights[r] - centre))[:size]
+    return pick, len(inward)
+
+
 def probe_transfer(rng: np.random.Generator, n_draws: int = 600,
                    reps: int = 30, size: int = 14) -> Dict[str, object]:
     """Does the ideal-geometry result survive realistic irregularity?
@@ -414,22 +442,10 @@ def probe_transfer(rng: np.random.Generator, n_draws: int = 600,
     for label, settings in conditions:
         records, face_sizes = [], []
         for rep in range(reps):
-            fixture = gf.helix_barrel(NHEL, PER, 9.0, seed=rep, **settings)
-            inward: List[int] = []
-            heights: Dict[int, float] = {}
-            for residue in np.unique(fixture.residue_index):
-                sel = fixture.residue_index == residue
-                atoms = {str(n): c for n, c in
-                         zip(fixture.atom_names[sel], fixture.coords[sel])}
-                if "CA" in atoms and "CB" in atoms:
-                    if np.hypot(*atoms["CB"][:2]) < np.hypot(*atoms["CA"][:2]):
-                        inward.append(int(residue))
-                        heights[int(residue)] = float(atoms["CB"][2])
-            if len(inward) < size:
+            pick, face_size = _inward_slab(settings, rep, size, rng)
+            if pick is None:
                 continue
-            face_sizes.append(len(inward))
-            centre = float(rng.uniform(min(heights.values()), max(heights.values())))
-            pick = sorted(inward, key=lambda r: abs(heights[r] - centre))[:size]
+            face_sizes.append(face_size)
             records.append(_detection(ar.describe_architecture(
                 with_linkers(pick), n_draws=n_draws, seed=SEED + rep)))
         if not records:
@@ -451,6 +467,193 @@ def probe_transfer(rng: np.random.Generator, n_draws: int = 600,
     }
 
 
+#: The three geometry arms the local statistic is judged on, fixed in
+#: `docs/ARCHITECTURE_PLAN_AMENDMENT_3.md` before it was computed. The middle
+#: one is primary; the other two are reported whatever it shows.
+LOCAL_ARMS = (
+    ("ideal", {"jitter": 0.0, "bulges": None}),
+    ("jitter 8 deg (realistic)", {"jitter": gf.REALISTIC_JITTER, "bulges": None}),
+    ("bulges + jitter 8 deg",
+     {"jitter": gf.REALISTIC_JITTER, "bulges": {h: [9] for h in range(NHEL)}}),
+)
+
+
+#: The windowed variants, each a *different statistic* with its own Holm family
+#: rather than a tuning of one: `local` is amendment 3's fixed window set,
+#: `pruned` is amendment 4's saturation threshold, and `best` is amendment 5's
+#: rank. All three select from the null alone, which is what keeps the
+#: permutation p-value exact.
+VARIANTS = {"local": "all", "pruned": "unsaturated", "best": "best"}
+
+
+def _mcnemar(pooled_only: int, local_only: int) -> float:
+    """Exact two-sided McNemar p on the discordant pairs."""
+    discordant = int(pooled_only) + int(local_only)
+    if discordant == 0:
+        return 1.0
+    return float(binomtest(int(local_only), discordant, 0.5).pvalue)
+
+
+def probe_local(rng: np.random.Generator, n_draws: int = 600,
+                reps: int = 30, size: int = 14) -> Dict[str, object]:
+    """Does a *locally* phase-locked statistic recover what jitter takes away?
+
+    Pre-registered in `docs/ARCHITECTURE_PLAN_AMENDMENT_3.md`. The pooled
+    resultant is the Neyman-Pearson statistic for a face of one period and one
+    unknown phase, and a jittered helix does not have one phase: the rise per
+    residue drifts and a bulge resets it. The local statistic asks only for
+    *piecewise* phase lock, maximising over windows of consecutive lining
+    positions, with the identical maximum taken on every draw of the same
+    gap-permutation null.
+
+    Paired by fixture: both statistics see the same lining at the same seed, so
+    the comparison is a McNemar on discordant pairs and not two independent
+    rates. The decoy arm is the cost side, and the per-window-size null means
+    are the saturation diagnostic that killed the per-element statistic.
+    """
+    rows, pairs = [], []
+    for label, settings in LOCAL_ARMS:
+        records: List[Dict[str, float]] = []
+        for rep in range(reps):
+            pick, _ = _inward_slab(settings, rep, size, rng)
+            if pick is None:
+                continue
+            positions = with_linkers(pick)
+            pooled = ar.describe_architecture(positions, n_draws=n_draws, seed=SEED + rep)
+            variants = {
+                name: ar.local_architecture(positions, n_draws=n_draws,
+                                            seed=SEED + rep, selection=rule)
+                for name, rule in VARIANTS.items()
+            }
+            pooled_register = pooled.register_p if pooled.register_p is not None else 1.0
+            by_size: Dict[int, float] = {}
+            for result in (variants["local"].helix, variants["local"].strand):
+                if result is not None:
+                    for window, mean in result.null_mean_by_size.items():
+                        by_size[int(window)] = max(by_size.get(int(window), 0.0), float(mean))
+            record = {
+                "arm": label, "rep": rep,
+                "pooled_register_p": float(pooled_register),
+                "pooled_either_p": float(_detection(pooled)["either"]),
+                **{f"null_mean_{k}": v for k, v in by_size.items()},
+            }
+            for name, variant in variants.items():
+                record[f"{name}_p"] = float(
+                    variant.local_p if variant.local_p is not None else 1.0)
+                record[f"{name}_unresolved"] = float(variant.local_p is None)
+                record[f"{name}_sizes"] = sorted(
+                    {int(s) for result in (variant.helix, variant.strand)
+                     if result is not None for s in result.sizes})
+            records.append(record)
+        if not records:
+            continue
+        pairs.extend(records)
+        pooled_hits = np.asarray([r["pooled_register_p"] <= 0.05 for r in records])
+        sizes = sorted({int(k.split("_")[-1]) for r in records for k in r
+                        if k.startswith("null_mean_")})
+        row = {
+            "arm": label, "reps": len(records), "lining_size": size,
+            "pooled_detected": float(np.mean(pooled_hits)),
+            "null_mean_by_size": {
+                str(w): float(np.mean([r[f"null_mean_{w}"] for r in records
+                                       if f"null_mean_{w}" in r]))
+                for w in sizes},
+        }
+        for name in VARIANTS:
+            hits = np.asarray([r[f"{name}_p"] <= 0.05 for r in records])
+            pooled_only = int(np.sum(pooled_hits & ~hits))
+            variant_only = int(np.sum(hits & ~pooled_hits))
+            row.update({
+                f"{name}_detected": float(np.mean(hits)),
+                f"{name}_difference": float(np.mean(hits) - np.mean(pooled_hits)),
+                f"{name}_both": int(np.sum(pooled_hits & hits)),
+                f"{name}_pooled_only": pooled_only,
+                f"{name}_only": variant_only,
+                f"{name}_mcnemar_p": _mcnemar(pooled_only, variant_only),
+                f"{name}_unresolved": float(
+                    np.mean([r[f"{name}_unresolved"] for r in records])),
+                # The *fraction* of fixtures in which each size was selected, not a
+                # union: a union would print every size the moment one lining kept
+                # it, and which sizes survive varies lining by lining.
+                f"{name}_fraction_by_size": {
+                    str(w): float(np.mean([w in r[f"{name}_sizes"] for r in records]))
+                    for w in sizes},
+            })
+        rows.append(row)
+
+    # The cost side: linings with no planted face, matched in size and span to
+    # the realistic arm's linings, scored by the same two statistics.
+    decoys: List[Dict[str, float]] = []
+    realistic = [r for r in pairs if "realistic" in r["arm"]]
+    for index, _ in enumerate(realistic):
+        draw = np.random.default_rng(SEED + 7000 + index)
+        settings = dict(LOCAL_ARMS[1][1])
+        pick, _ = _inward_slab(settings, index, size, draw)
+        if pick is None:
+            continue
+        lining = with_linkers(pick)
+        extent = int(max(lining) - min(lining))
+        positions = sorted(int(v) for v in draw.choice(extent + 1, size=len(lining),
+                                                       replace=False))
+        pooled = ar.describe_architecture(positions, n_draws=n_draws, seed=SEED + index)
+        row = {"pooled_register_p": float(
+            pooled.register_p if pooled.register_p is not None else 1.0)}
+        for name, rule in VARIANTS.items():
+            variant = ar.local_architecture(positions, n_draws=n_draws,
+                                            seed=SEED + index, selection=rule)
+            row[f"{name}_p"] = float(
+                variant.local_p if variant.local_p is not None else 1.0)
+        decoys.append(row)
+    decoy_rates = {}
+    if decoys:
+        decoy_rates = {
+            "n": len(decoys),
+            "pooled_false_positive": float(
+                np.mean([d["pooled_register_p"] <= 0.05 for d in decoys])),
+        }
+        for name in VARIANTS:
+            decoy_rates[f"{name}_false_positive"] = float(
+                np.mean([d[f"{name}_p"] <= 0.05 for d in decoys]))
+            decoy_rates[f"{name}_false_positive_clear"] = float(
+                np.mean([d[f"{name}_p"] <= 0.01 for d in decoys]))
+
+    primary = next((r for r in rows if "realistic" in r["arm"]), None)
+    adopted = {
+        name: bool(
+            primary is not None
+            and primary[f"{name}_detected"] > primary["pooled_detected"]
+            and decoy_rates.get(f"{name}_false_positive", 1.0) <= 0.05
+        )
+        for name in VARIANTS
+    }
+    return {
+        "window_sizes": list(ar.WINDOW_SIZES),
+        "saturated_null": ar.SATURATED_NULL,
+        "pilot_draws": ar.PILOT_DRAWS,
+        "rows": rows,
+        "decoys": decoy_rates,
+        "primary_arm": None if primary is None else primary["arm"],
+        "primary_difference": None if primary is None else primary["local_difference"],
+        "primary_mcnemar_p": None if primary is None else primary["local_mcnemar_p"],
+        "primary_pruned_difference": None if primary is None else primary["pruned_difference"],
+        "primary_pruned_mcnemar_p": None if primary is None else primary["pruned_mcnemar_p"],
+        "adopted": adopted,
+        "prediction": (
+            "amendment 4 predicted that dropping the saturated windows would beat the "
+            "unpruned statistic and still lose to pooled; amendment 5 predicted that the "
+            "rank would select the longest window on every lining, beat both of the "
+            "other variants and still lose to pooled, because a 10-position window of a "
+            "14-position lining is the pooled statistic minus four positions plus a "
+            "maximum over five offsets"
+        ),
+        "decision_rule": (
+            "a variant is adopted only if it detects strictly more than the pooled "
+            "statistic at the realistic arm and its decoy false-positive rate is at or "
+            "below 0.05; otherwise it is recorded as a measured negative"
+        ),
+    }
+
+
 # ------------------------------------------------------------------ driver
 
 PROBES = {
@@ -463,6 +666,7 @@ PROBES = {
     "panel": "recovery of architectures known from the 3-D construction",
     "power": "how completely and in what shape a lining must be seen",
     "transfer": "whether any of it survives realistic phi/psi jitter and bulges",
+    "local": "whether a locally phase-locked statistic recovers what jitter takes",
 }
 
 
@@ -481,7 +685,198 @@ def run_all(*, quick: bool = False) -> Dict[str, object]:
         "panel": probe_panel(rng, n_draws=600 if quick else 1500),
         "power": probe_power(rng, n_draws=draws),
         "transfer": probe_transfer(rng, n_draws=draws, reps=12 if quick else 30),
+        # Last, deliberately: every probe above draws from the same generator in
+        # sequence, so appending here leaves their committed numbers untouched.
+        "local": probe_local(rng, n_draws=draws, reps=12 if quick else 30),
     }
+
+
+def _small(value: float) -> str:
+    """A p-value that may be tiny, printed so it never reads as exactly zero."""
+    value = float(value)
+    return f"{value:.4f}" if value >= 1e-4 else f"{value:.1e}"
+
+
+def _selection_note(rows: Sequence[Dict[str, object]], local: Dict[str, object]) -> List[str]:
+    """What each selection rule actually did, which decides what was measured."""
+    threshold = float(local["saturated_null"])  # type: ignore[index]
+    pruned_rates = [rate for row in rows
+                    for rate in row["pruned_fraction_by_size"].values()]
+    chosen = sorted({int(w) for row in rows
+                     for w, rate in row["best_fraction_by_size"].items() if rate > 0.0})
+    lines = []
+    if pruned_rates and min(pruned_rates) >= 1.0:
+        lines.append(
+            f"**The {threshold} threshold never fired**, which is itself a result: every "
+            "window size was kept on every lining, so `pruned` computed the same "
+            "statistic as `local` and the two columns agree by construction. The "
+            "threshold was fixed in amendment 3 against a size-6 null mean measured at "
+            "0.90 on a different lining; on the barrel slabs it sits just *below*. That "
+            "is a lesson about fixing a cutoff against one observed number - "
+            "pre-registration kept the test honest and also left it with nothing to do - "
+            "and moving the threshold afterwards would be exactly the tuning the "
+            "amendment forbade. Amendment 5 answered it with a **rank** instead, which "
+            "cannot fail to fire and rests on the same validity argument: any function "
+            "of the gap multiset alone is free."
+        )
+    else:
+        dropped = sorted({int(w) for row in rows
+                          for w, rate in row["pruned_fraction_by_size"].items()
+                          if rate < 1.0})
+        lines.append(
+            f"The {threshold} threshold fired: sizes {dropped} were dropped on at least "
+            "some linings, so `pruned` is genuinely a different statistic from `local`."
+        )
+    lines.append("")
+    lines.append(
+        f"The rank selected window size {chosen[0] if len(chosen) == 1 else chosen} "
+        + ("on every lining of every arm, so `best` is a long-window statistic "
+           "described by its selection rule rather than by its number."
+           if len(chosen) == 1 else
+           "across the arms, so it is not reducible to one fixed window length.")
+    )
+    return lines
+
+
+def _local_markdown(local: Dict[str, object]) -> List[str]:
+    """Section 10: the windowed statistics, and what their failure establishes."""
+    rows = local["rows"]  # type: ignore[index]
+    decoys = local["decoys"]  # type: ignore[index]
+    adopted = local["adopted"]  # type: ignore[index]
+    names = list(ar.WINDOW_SIZES) and ["local", "pruned", "best"]
+    lines = [
+        "",
+        "## 10. Can a *local* statistic recover what jitter takes away?",
+        "",
+        "Pre-registered in `docs/ARCHITECTURE_PLAN_AMENDMENT_3.md`, and as each answer "
+        "came back in amendments 4 and 5 - every one dated before the statistic it "
+        "defines had been measured on any fixture, decoy or real lining.",
+        "",
+        "The reasoning is the derivation that justifies the pooled resultant in the first "
+        "place: it is Neyman-Pearson optimal for a face of one period and **one unknown "
+        "phase**, and a jittered helix does not have one phase - the rise per residue "
+        "drifts and a bulge resets it outright. The pooled statistic therefore asks every "
+        "residue of the lining to agree with every other, which over a hundred-residue "
+        "span is a stronger demand than the structure can meet. A **local** statistic "
+        "asks only for piecewise phase lock: the maximum resultant over windows of "
+        f"{local['window_sizes']} consecutive lining positions, with the identical "
+        "maximum taken on every draw of the same gap-permutation null, so nothing is left "
+        "to correct afterwards.",
+        "",
+        "`pruned` and `best` differ from it only in **which window sizes they keep**, and "
+        "they choose from the null rather than from the observation - `pruned` by the "
+        "saturation threshold, `best` by the lowest null mean. That selection is free, "
+        "and it is the one subtle point here: the resultant's modulus is translation "
+        "invariant, so a window's null distribution depends only on the **gap multiset**, "
+        "which the register null holds fixed. A rule stated in terms of it picks the same "
+        "window set for the observation and for every permutation, and a permutation test "
+        "whose statistic is the same function on every draw is exactly valid. The "
+        f"estimate comes from a {local['pilot_draws']}-draw pilot with its own seed, so "
+        "it cannot be a statistic of the null sample it will be judged against.",
+        "",
+        "Paired by fixture - every statistic sees the same lining at the same seed - so "
+        "each comparison is an exact McNemar on the discordant pairs. All three variants "
+        "are **register** statistics, so the column they are judged against is the pooled "
+        "*register* half alone and not the `either` rate quoted elsewhere in this report: "
+        "comparing a register statistic with a best-of-both rate would flatter or damn it "
+        "for the wrong reason.",
+        "",
+        "| arm | pooled register | " + " | ".join(names) + " | "
+        + " | ".join(f"McNemar ({n})" for n in names) + " |",
+        "|---|---|" + "---|" * (2 * len(names)),
+    ]
+    for row in rows:  # type: ignore[union-attr]
+        detected = " | ".join(f"{row[f'{n}_detected']:.2f}" for n in names)
+        tests = " | ".join(_small(row[f"{n}_mcnemar_p"]) for n in names)
+        lines.append(
+            f"| {row['arm']} | {row['pooled_detected']:.2f} | {detected} | {tests} |")
+    if decoys:
+        rates = ", ".join(f"{n} {decoys[f'{n}_false_positive']:.2f}" for n in names)
+        lines += [
+            "",
+            f"On {decoys['n']} decoys matched in size and span, with no planted face: "
+            f"pooled {decoys['pooled_false_positive']:.2f}, {rates}, at 0.05.",
+            "",
+            "Read that beside the detection columns rather than on its own: a statistic "
+            "that detects nothing on a planted face and still calls the occasional decoy "
+            "is not trading sensitivity for specificity, it is weaker on both counts. At "
+            "this decoy count the rate is two or three linings either way and carries no "
+            "interval worth quoting - it is here because the decision rule named it in "
+            "advance, and it is not what decides the question.",
+        ]
+    sizes = sorted({w for row in rows for w in row["null_mean_by_size"]}, key=int)
+    lines += [
+        "",
+        "**Window-size null means, which is the diagnostic that explains all of it.**",
+        "",
+        "| arm | " + " | ".join(f"size {w}" for w in sizes) + " | size the rank chose |",
+        "|---|" + "---|" * (len(sizes) + 1),
+    ]
+    for row in rows:
+        cells = " | ".join(f"{row['null_mean_by_size'].get(w, float('nan')):.3f}"
+                           for w in sizes)
+        picked = ", ".join(f"{w}: {rate:.2f}" for w, rate
+                           in sorted(row["best_fraction_by_size"].items(),
+                                     key=lambda kv: int(kv[0])) if rate > 0.0)
+        lines.append(f"| {row['arm']} | {cells} | {picked} |")
+    verdicts = ", ".join(
+        f"**{name}**: " + ("adopted" if adopted[name] else "not adopted")  # type: ignore[index]
+        for name in names)
+    worst = max(sizes, key=lambda w: rows[0]["null_mean_by_size"][w])
+    lines += [
+        "",
+        f"{verdicts}, by the rule fixed in advance: {local['decision_rule']}.",
+        "",
+        f"The null mean **rises as the window shrinks** - {rows[0]['null_mean_by_size'][worst]:.2f} "
+        f"at size {worst} against "
+        f"{rows[0]['null_mean_by_size'][sizes[-1]]:.2f} at size {sizes[-1]} - because a "
+        "band scan over a handful of positions fits almost any spacing, which is the same "
+        "failure as the per-element statistic in section 8. Since the statistic maximises "
+        "over the sizes it keeps, the shortest window it keeps sets its null, and that is "
+        "why the three variants separate at all.",
+        "",
+    ]
+    lines += _selection_note(rows, local)
+    lines += [
+        "",
+        f"The predictions, recorded before the run: {local['prediction']}.",
+        "",
+        _conclusion(rows, names),
+        "",
+    ]
+    return lines
+
+
+def _conclusion(rows: Sequence[Dict[str, object]], names: Sequence[str]) -> str:
+    """The conclusion the measurement supports - not the one it was hoped for."""
+    primary = next((r for r in rows if "realistic" in str(r["arm"])), rows[0])
+    beaten = [n for n in names if primary[f"{n}_detected"] > primary["pooled_detected"]]
+    if not beaten:
+        ordered = ", ".join(
+            f"{n} {primary[f'{n}_detected']:.2f}" for n in names)
+        return (
+            "What this establishes is worth more than the negative. **Locality is not "
+            "what limits transfer.** At the realistic arm the pooled register half "
+            f"detects {primary['pooled_detected']:.2f} against {ordered}. The ordering "
+            "within the windowed variants is the predicted one and confirms the "
+            "mechanism - the longer the window a variant keeps, the better it does, "
+            "because the short windows carry a saturated null - but the best of them is "
+            "the pooled statistic minus a few positions plus a maximum over offsets, and "
+            "what that maximum buys is less than what the lost positions cost. So the "
+            "pooled statistic is not losing power on jittered helices because it demands "
+            "global phase lock. The limit is the band scan's flexibility on short runs "
+            "of positions, a property of the scan rather than of the geometry, and that "
+            "bounds every windowed variant of this family rather than one implementation "
+            "of it."
+        )
+    return (
+        f"**{', '.join(beaten)} beat the pooled statistic at the realistic arm.** That "
+        "is the opposite of what the amendments predicted and the more interesting "
+        "outcome: it would mean the pooled statistic's single-phase assumption is part "
+        "of what costs the transfer. It is one fixture set and it is not a licence to "
+        "change the detector - the decision in `docs/DETECTOR.md` stands until this "
+        "replicates on a held-out set - but it is the result that would justify looking."
+    )
 
 
 def markdown(report: Dict[str, object]) -> str:
@@ -707,6 +1102,9 @@ def markdown(report: Dict[str, object]) -> str:
             "analysis in `results/architecture/real/REAL.md` must be read beside it.",
             "",
         ]
+    local = report.get("local")
+    if local:
+        lines += _local_markdown(local)
     lines += [
         "## What this cannot be used for",
         "",

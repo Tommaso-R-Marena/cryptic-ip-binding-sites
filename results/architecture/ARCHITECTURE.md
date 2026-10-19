@@ -132,6 +132,47 @@ Every number above comes from barrels built out of exact 3.6-residue helices, a 
 
 That is the single most important limit on this method and it is not a fixable one - a bulge genuinely destroys the periodicity the statistic looks for, because the periodicity is no longer there to find. It bounds what study Q7 can expect from real structures, and it is why the real-lining analysis in `results/architecture/real/REAL.md` must be read beside it.
 
+
+## 10. Can a *local* statistic recover what jitter takes away?
+
+Pre-registered in `docs/ARCHITECTURE_PLAN_AMENDMENT_3.md`, and as each answer came back in amendments 4 and 5 - every one dated before the statistic it defines had been measured on any fixture, decoy or real lining.
+
+The reasoning is the derivation that justifies the pooled resultant in the first place: it is Neyman-Pearson optimal for a face of one period and **one unknown phase**, and a jittered helix does not have one phase - the rise per residue drifts and a bulge resets it outright. The pooled statistic therefore asks every residue of the lining to agree with every other, which over a hundred-residue span is a stronger demand than the structure can meet. A **local** statistic asks only for piecewise phase lock: the maximum resultant over windows of [6, 8, 10] consecutive lining positions, with the identical maximum taken on every draw of the same gap-permutation null, so nothing is left to correct afterwards.
+
+`pruned` and `best` differ from it only in **which window sizes they keep**, and they choose from the null rather than from the observation - `pruned` by the saturation threshold, `best` by the lowest null mean. That selection is free, and it is the one subtle point here: the resultant's modulus is translation invariant, so a window's null distribution depends only on the **gap multiset**, which the register null holds fixed. A rule stated in terms of it picks the same window set for the observation and for every permutation, and a permutation test whose statistic is the same function on every draw is exactly valid. The estimate comes from a 200-draw pilot with its own seed, so it cannot be a statistic of the null sample it will be judged against.
+
+Paired by fixture - every statistic sees the same lining at the same seed - so each comparison is an exact McNemar on the discordant pairs. All three variants are **register** statistics, so the column they are judged against is the pooled *register* half alone and not the `either` rate quoted elsewhere in this report: comparing a register statistic with a best-of-both rate would flatter or damn it for the wrong reason.
+
+| arm | pooled register | local | pruned | best | McNemar (local) | McNemar (pruned) | McNemar (best) |
+|---|---|---|---|---|---|---|---|
+| ideal | 0.80 | 0.00 | 0.00 | 0.10 | 1.2e-07 | 1.2e-07 | 9.5e-07 |
+| jitter 8 deg (realistic) | 0.30 | 0.00 | 0.00 | 0.07 | 0.0039 | 0.0039 | 0.0391 |
+| bulges + jitter 8 deg | 0.10 | 0.00 | 0.00 | 0.10 | 0.2500 | 0.2500 | 1.0000 |
+
+On 30 decoys matched in size and span, with no planted face: pooled 0.00, local 0.07, pruned 0.07, best 0.03, at 0.05.
+
+Read that beside the detection columns rather than on its own: a statistic that detects nothing on a planted face and still calls the occasional decoy is not trading sensitivity for specificity, it is weaker on both counts. At this decoy count the rate is two or three linings either way and carries no interval worth quoting - it is here because the decision rule named it in advance, and it is not what decides the question.
+
+**Window-size null means, which is the diagnostic that explains all of it.**
+
+| arm | size 6 | size 8 | size 10 | size the rank chose |
+|---|---|---|---|---|
+| ideal | 0.884 | 0.796 | 0.717 | 10: 1.00 |
+| jitter 8 deg (realistic) | 0.883 | 0.791 | 0.709 | 10: 1.00 |
+| bulges + jitter 8 deg | 0.849 | 0.749 | 0.667 | 10: 1.00 |
+
+**local**: not adopted, **pruned**: not adopted, **best**: not adopted, by the rule fixed in advance: a variant is adopted only if it detects strictly more than the pooled statistic at the realistic arm and its decoy false-positive rate is at or below 0.05; otherwise it is recorded as a measured negative.
+
+The null mean **rises as the window shrinks** - 0.88 at size 6 against 0.72 at size 10 - because a band scan over a handful of positions fits almost any spacing, which is the same failure as the per-element statistic in section 8. Since the statistic maximises over the sizes it keeps, the shortest window it keeps sets its null, and that is why the three variants separate at all.
+
+**The 0.9 threshold never fired**, which is itself a result: every window size was kept on every lining, so `pruned` computed the same statistic as `local` and the two columns agree by construction. The threshold was fixed in amendment 3 against a size-6 null mean measured at 0.90 on a different lining; on the barrel slabs it sits just *below*. That is a lesson about fixing a cutoff against one observed number - pre-registration kept the test honest and also left it with nothing to do - and moving the threshold afterwards would be exactly the tuning the amendment forbade. Amendment 5 answered it with a **rank** instead, which cannot fail to fire and rests on the same validity argument: any function of the gap multiset alone is free.
+
+The rank selected window size 10 on every lining of every arm, so `best` is a long-window statistic described by its selection rule rather than by its number.
+
+The predictions, recorded before the run: amendment 4 predicted that dropping the saturated windows would beat the unpruned statistic and still lose to pooled; amendment 5 predicted that the rank would select the longest window on every lining, beat both of the other variants and still lose to pooled, because a 10-position window of a 14-position lining is the pooled statistic minus four positions plus a maximum over five offsets.
+
+What this establishes is worth more than the negative. **Locality is not what limits transfer.** At the realistic arm the pooled register half detects 0.30 against local 0.00, pruned 0.00, best 0.07. The ordering within the windowed variants is the predicted one and confirms the mechanism - the longer the window a variant keeps, the better it does, because the short windows carry a saturated null - but the best of them is the pooled statistic minus a few positions plus a maximum over offsets, and what that maximum buys is less than what the lost positions cost. So the pooled statistic is not losing power on jittered helices because it demands global phase lock. The limit is the band scan's flexibility on short runs of positions, a property of the scan rather than of the geometry, and that bounds every windowed variant of this family rather than one implementation of it.
+
 ## What this cannot be used for
 
 * It is not evidence about real binding sites. Every lining here is synthetic or derived from an idealised barrel, and no annotated sequence has been read.

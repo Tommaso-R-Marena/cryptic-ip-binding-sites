@@ -64,12 +64,33 @@ the statistic a band scan actually uses is a maximum over probes, and there
 0.500 admits **26%** of random linings over the helical band and **92%** over a
 full 2-12 scan. Any analytic threshold on a scanned coherence is therefore
 useless, and the only honest null resamples the same statistic.
+
+Local register, and why it did not work
+---------------------------------------
+The pooled resultant is Neyman-Pearson optimal for a face of one period and
+**one** unknown phase, and a real helix with backbone scatter has no single
+phase: the rise per residue drifts and a bulge resets it. `local_register`
+therefore asks the weaker question - whether the lining is **piecewise** phase
+locked - by maximising over windows of consecutive lining positions, with the
+identical maximum taken on every draw of the same gap-permutation null.
+`pilot_sizes` can restrict which window sizes count, chosen **from the null**:
+the resultant's modulus is translation invariant, so a window's null depends
+only on the gap multiset, which the register null holds fixed, and a rule
+stated in terms of it is the same function on the observation and on every
+permutation, which leaves the p-value exact.
+
+It does not beat the pooled statistic on any geometry arm, and the diagnostic
+is one number: the null's own mean at a six-position window is 0.88 out of a
+possible 1. Kept in the module with its proofs, its calibration and its
+negative attached, because the negative bounds a whole family of statistics
+rather than one implementation - see section 10 of
+`results/architecture/ARCHITECTURE.md`.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, Optional, Sequence, Tuple
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 import numpy as np
 
@@ -581,6 +602,486 @@ def register(
         p_one_sided=p_value,
         n_draws=used, n_distinct_orderings=orderings, exact=exact,
     )
+
+
+# ------------------------------------------- register, but only locally
+
+#: Window sizes, in **lining positions** rather than residues, for the local
+#: register statistic. Fixed in `docs/ARCHITECTURE_PLAN_AMENDMENT_3.md` before
+#: the statistic was computed on anything, and deliberately not tuned against
+#: the result: the lower end is `MIN_POSITIONS`, below which a permutation null
+#: has too few orderings, and the upper end is where a window stops being local
+#: on the 15-position median real lining.
+WINDOW_SIZES = (6, 8, 10)
+
+
+def windows(n_positions: int, sizes: Sequence[int] = WINDOW_SIZES) -> List[Tuple[int, int]]:
+    """Every (size, start) window of consecutive lining positions, by index.
+
+    Windows are runs in the *lining*, not in the sequence, so a window spans
+    whatever stretch of chain its positions happen to occupy. Sizes larger than
+    the lining are dropped rather than clipped, because a clipped window is a
+    different window and would make the statistic depend on n in a way the null
+    could not reproduce.
+    """
+    out: List[Tuple[int, int]] = []
+    for size in sorted({int(s) for s in sizes}):
+        if size < 2:
+            raise ArchitectureError(f"a window needs at least 2 positions, got {size}")
+        for start in range(0, int(n_positions) - size + 1):
+            out.append((size, start))
+    return out
+
+
+def windowed_maxima(
+    stacked: np.ndarray,
+    grid: np.ndarray,
+    sizes: Sequence[int] = WINDOW_SIZES,
+) -> Dict[int, np.ndarray]:
+    """Per-window-size maximum resultant for a stack of linings ``(draws, n)``.
+
+    Returned per size rather than already pooled because the per-size null mean
+    is the **saturation diagnostic**: a null mean near 1 means the band scan
+    fits any spacing at that window length, which is exactly what killed the
+    per-element statistic, and it has to be visible rather than inferred.
+    """
+    pos = np.asarray(stacked, dtype=float)
+    if pos.ndim != 2:
+        raise ArchitectureError(f"expected a (draws, n) stack, got shape {pos.shape}")
+    draws, n = pos.shape
+    out: Dict[int, np.ndarray] = {}
+    for size in sorted({int(s) for s in sizes}):
+        if size > n:
+            continue
+        best = np.zeros(draws)
+        # Chunked over draws on the same element budget `register` uses: the
+        # intermediate is (chunk, size, probes) complex and nothing here is
+        # allowed to grow with the number of orderings.
+        step = max(1, int(4_000_000 // (size * grid.size + 1)))
+        for start in range(0, n - size + 1):
+            block = pos[:, start:start + size]
+            for begin in range(0, draws, step):
+                chunk = block[begin:begin + step]
+                best[begin:begin + step] = np.maximum(
+                    best[begin:begin + step], resultants(chunk, grid).max(axis=1))
+        out[size] = best
+    if not out:
+        raise ArchitectureError(
+            f"no window of {tuple(sizes)} fits a lining of {n} positions")
+    return out
+
+
+def best_window(
+    positions: Sequence[int],
+    band: Sequence[float] = HELIX_BAND,
+    *,
+    sizes: Sequence[int] = WINDOW_SIZES,
+    probes: Optional[int] = None,
+) -> Dict[str, float]:
+    """The single best window of a lining, and where it is.
+
+    The grid is the **whole lining's** grid, not the window's, and that is
+    deliberate. Probe spacing comes from the measured peak-width law
+    ``0.58 * omega^2 / span``, so a shorter span needs *fewer* probes; using
+    the full lining's grid is therefore at least as fine as any window requires
+    and, far more importantly, is identical for the observation and for every
+    permutation of the null. A grid that varied with the window would make the
+    maximum incomparable across draws.
+    """
+    ordered = np.asarray(sorted({int(p) for p in positions}), dtype=float)
+    if ordered.size < 2:
+        raise ArchitectureError("a lining needs at least two distinct positions")
+    grid = band_grid(band, int(ordered[-1] - ordered[0]), probes)
+    best = {"resultant": -1.0, "period": float("nan"), "size": 0, "start": -1}
+    for size, start in windows(int(ordered.size), sizes):
+        values = resultants(ordered[start:start + size], grid)
+        index = int(np.argmax(values))
+        if float(values[index]) > best["resultant"]:
+            best = {"resultant": float(values[index]), "period": float(grid[index]),
+                    "size": int(size), "start": int(start)}
+    if best["start"] < 0:
+        raise ArchitectureError(
+            f"no window of {tuple(sizes)} fits a lining of {ordered.size} positions")
+    best["first_position"] = float(ordered[best["start"]])
+    best["last_position"] = float(ordered[best["start"] + best["size"] - 1])
+    return best
+
+
+#: A null mean at or above this is **saturation**: the statistic's own null
+#: already sits where the observation would have to be, so the test has no
+#: power left at that window length. Fixed in amendment 3, before any pruned
+#: statistic existed, and inherited unchanged by the pruning in amendment 4 -
+#: which is the only reason the pruning is not a tuned threshold.
+SATURATED_NULL = 0.9
+
+
+#: How window sizes are chosen. ``all`` keeps every size that fits, as
+#: amendment 3 fixed it. ``unsaturated`` keeps the sizes whose null mean is
+#: below `SATURATED_NULL` (amendment 4). ``best`` keeps the single size with
+#: the **lowest** null mean (amendment 5) - the same selection argument with a
+#: rank in place of a threshold, which is what makes it fire on every lining
+#: instead of only on the linings that happen to cross 0.9.
+SELECTIONS = ("all", "unsaturated", "best")
+
+
+#: Permutations used to *select* window sizes, drawn with their own seed and
+#: independently of the null sample. See `pilot_sizes` for why the separation
+#: matters.
+PILOT_DRAWS = 200
+
+
+def pilot_sizes(
+    positions: Sequence[int],
+    band: Sequence[float] = HELIX_BAND,
+    *,
+    sizes: Sequence[int] = WINDOW_SIZES,
+    probes: Optional[int] = None,
+    pilot_draws: int = PILOT_DRAWS,
+    pilot_seed: int = 20261013,
+    rule: str = "unsaturated",
+) -> Tuple[Tuple[int, ...], Dict[int, float]]:
+    """Which window sizes are not saturated, decided **from the null alone**.
+
+    Tuning window sizes against the observation would invalidate the
+    permutation p-value. Selecting them from the null does not, and the reason
+    is exact rather than approximate: the resultant's modulus is invariant to
+    translation, so the null distribution of a window's maximum resultant
+    depends only on the **gap multiset** - not on its order, and therefore not
+    on the observation. The register null holds that multiset fixed, so a rule
+    stated in terms of it selects the same window set for the observation and
+    for every permutation, and a permutation test whose statistic is the same
+    function on every draw is exactly valid.
+
+    The one piece of care needed is that an estimate taken from the null sample
+    itself is a statistic of that sample. So the estimate comes from a
+    **pilot** sample with its own seed, drawn independently, and the pilot seed
+    is part of the statistic's definition. Below `MAX_EXACT_ORDERINGS` the
+    enumeration is complete and the selection is deterministic, with no pilot
+    involved at all.
+
+    Returns ``(kept sizes, pilot null mean per size)``; an empty tuple of kept
+    sizes means every window length saturates on this lining, which is
+    *unresolved* and never a p of 1.
+    """
+    ordered = sorted({int(p) for p in positions})
+    if len(ordered) < MIN_POSITIONS:
+        raise ArchitectureError(
+            f"{len(ordered)} positions is too few for a register null; "
+            f"{MIN_POSITIONS} are needed")
+    usable = [int(s) for s in sorted({int(s) for s in sizes}) if int(s) <= len(ordered)]
+    if not usable:
+        raise ArchitectureError(
+            f"no window of {tuple(sizes)} fits a lining of {len(ordered)} positions")
+    g = gaps(ordered)
+    start = ordered[0]
+    grid = band_grid(band, int(ordered[-1] - ordered[0]), probes)
+    orderings = distinct_orderings(ordered)
+    if orderings <= MAX_EXACT_ORDERINGS:
+        orders = np.asarray(list(multiset_permutations(g)), dtype=float)
+    else:
+        rng = np.random.default_rng(pilot_seed)
+        orders = np.asarray([rng.permutation(g) for _ in range(int(pilot_draws))],
+                            dtype=float)
+    built = start + np.cumsum(orders, axis=1)
+    stacked = np.concatenate(
+        [np.full((orders.shape[0], 1), float(start)), built], axis=1)
+    means = {size: float(values.mean())
+             for size, values in windowed_maxima(stacked, grid, usable).items()}
+    if rule == "unsaturated":
+        kept = tuple(size for size in usable if means[size] < SATURATED_NULL)
+    elif rule == "best":
+        # The lowest null mean is the size with the most room left between the
+        # null and 1, which is where power can live. A rank, not a threshold,
+        # so it always selects something - and it is still a function of the
+        # gap multiset alone, which is the whole of the validity argument.
+        kept = (min(usable, key=lambda size: (means[size], size)),)
+    else:
+        raise ArchitectureError(f"unknown selection rule {rule!r}")
+    return kept, means
+
+
+@dataclass(frozen=True)
+class LocalRegisterResult:
+    """Local phase coherence beside the same gap-permutation null.
+
+    This is a *separate* test from `RegisterResult` with its own Holm family,
+    as the amendment that introduced it requires, so adding it changes no
+    published number of the pooled statistic.
+    """
+
+    band: Tuple[float, float]
+    observed: float
+    period: float
+    window_size: int
+    window_start: int
+    window_span: Tuple[int, int]
+    null_mean: float
+    null_sd: float
+    null_mean_by_size: Dict[int, float]
+    z: float
+    p_one_sided: float
+    n_draws: int
+    n_distinct_orderings: int
+    sizes: Tuple[int, ...]
+    exact: bool = False
+    selection: str = "all"
+    pruned_out: Tuple[int, ...] = ()
+    pilot_mean_by_size: Dict[int, float] = field(default_factory=dict)
+    pilot_seed: Optional[int] = None
+
+    @property
+    def minimum_attainable_p(self) -> float:
+        return 1.0 / max(1, self.n_distinct_orderings)
+
+    @property
+    def saturated(self) -> Tuple[int, ...]:
+        """Window sizes whose null mean exceeds `SATURATED_NULL`.
+
+        A saturated size cannot contribute power: if a random reordering
+        already reaches the same coherence, no observation can look unusual
+        against it. Reported rather than silently dropped, because dropping it
+        after seeing the result is the selection this module exists to avoid.
+        """
+        return tuple(size for size, mean in sorted(self.null_mean_by_size.items())
+                     if mean >= SATURATED_NULL)
+
+    @property
+    def verdict(self) -> str:
+        if self.n_distinct_orderings < MIN_ORDERINGS:
+            return "unresolved"
+        if self.p_one_sided <= CLEAR_P:
+            return "clear"
+        return "weak" if self.p_one_sided <= WEAK_P else "none"
+
+    def as_dict(self) -> Dict[str, object]:
+        return {
+            "band": [float(self.band[0]), float(self.band[1])],
+            "observed": float(self.observed),
+            "period": float(self.period),
+            "window_size": int(self.window_size),
+            "window_start": int(self.window_start),
+            "window_span": [int(self.window_span[0]), int(self.window_span[1])],
+            "null_mean": float(self.null_mean),
+            "null_sd": float(self.null_sd),
+            "null_mean_by_size": {int(k): float(v) for k, v in self.null_mean_by_size.items()},
+            "z": float(self.z),
+            "p_one_sided": float(self.p_one_sided),
+            "n_draws": int(self.n_draws),
+            "n_distinct_orderings": int(self.n_distinct_orderings),
+            "sizes": [int(s) for s in self.sizes],
+            "exact": bool(self.exact),
+            "selection": str(self.selection),
+            "pruned_out": [int(s) for s in self.pruned_out],
+            "pilot_mean_by_size": {int(k): float(v) for k, v in self.pilot_mean_by_size.items()},
+            "pilot_seed": None if self.pilot_seed is None else int(self.pilot_seed),
+            "minimum_attainable_p": float(self.minimum_attainable_p),
+            "saturated": [int(s) for s in self.saturated],
+            "verdict": self.verdict,
+        }
+
+
+def local_register(
+    positions: Sequence[int],
+    band: Sequence[float] = HELIX_BAND,
+    *,
+    sizes: Sequence[int] = WINDOW_SIZES,
+    probes: Optional[int] = None,
+    n_draws: int = DEFAULT_DRAWS,
+    seed: int = 20261012,
+    selection: str = "all",
+    pilot_draws: int = PILOT_DRAWS,
+    pilot_seed: int = 20261013,
+) -> LocalRegisterResult:
+    """Is any *stretch* of the lining more phase-coherent than its gaps allow?
+
+    The pooled resultant is the Neyman-Pearson statistic for a face of one
+    period and one unknown phase. A real helix with backbone scatter does not
+    have one phase: the rise per residue drifts, phase error accumulates along
+    the chain, and a bulge resets it. This asks the weaker question the
+    structure can actually answer - whether the lining is **piecewise** phase
+    locked - by maximising over windows of consecutive lining positions.
+
+    The maximum over windows and sizes is taken *inside* the statistic and the
+    identical maximum is taken on every permutation of the null, so there is
+    nothing to correct for afterwards. The null is the same gap-multiset
+    permutation null as `register`, which holds n, span, occupancy, gap entropy
+    and the whole topological half exactly fixed.
+    """
+    ordered = sorted({int(p) for p in positions})
+    if len(ordered) < MIN_POSITIONS:
+        raise ArchitectureError(
+            f"{len(ordered)} positions is too few for a register null; "
+            f"{MIN_POSITIONS} are needed and five gaps give 120 orderings"
+        )
+    usable = [int(s) for s in sorted({int(s) for s in sizes}) if int(s) <= len(ordered)]
+    if not usable:
+        raise ArchitectureError(
+            f"no window of {tuple(sizes)} fits a lining of {len(ordered)} positions")
+    if selection not in SELECTIONS:
+        raise ArchitectureError(
+            f"selection must be one of {SELECTIONS}, got {selection!r}")
+    pilot_means: Dict[int, float] = {}
+    dropped: Tuple[int, ...] = ()
+    if selection != "all":
+        kept, pilot_means = pilot_sizes(
+            ordered, band, sizes=usable, probes=probes,
+            pilot_draws=pilot_draws, pilot_seed=pilot_seed, rule=selection)
+        dropped = tuple(s for s in usable if s not in kept)
+        if not kept:
+            raise ArchitectureError(
+                "every window size saturates its own null on this lining "
+                f"(pilot means {pilot_means}), so local register is unresolved")
+        usable = list(kept)
+    g = gaps(ordered)
+    start = ordered[0]
+    grid = band_grid(band, int(ordered[-1] - ordered[0]), probes)
+    best = best_window(ordered, band, sizes=usable, probes=probes)
+    observed = float(best["resultant"])
+    orderings = distinct_orderings(ordered)
+
+    def build(block: np.ndarray) -> np.ndarray:
+        built = start + np.cumsum(block, axis=1)
+        return np.concatenate([np.full((block.shape[0], 1), float(start)), built], axis=1)
+
+    exact = orderings <= MAX_EXACT_ORDERINGS
+    if exact:
+        orders = np.asarray(list(multiset_permutations(g)), dtype=float)
+        used = int(orders.shape[0])
+    else:
+        rng = np.random.default_rng(seed)
+        orders = np.asarray([rng.permutation(g) for _ in range(int(n_draws))], dtype=float)
+        used = int(n_draws)
+    per_size = windowed_maxima(build(orders), grid, usable)
+    draws = np.max(np.stack([per_size[s] for s in usable]), axis=0)
+    if exact:
+        p_value = float(np.mean(draws >= observed - 1e-12))
+    else:
+        p_value = float((int(np.sum(draws >= observed - 1e-12)) + 1) / (int(n_draws) + 1))
+    mean = float(draws.mean())
+    sd = float(draws.std(ddof=1)) if draws.size > 1 else 0.0
+    return LocalRegisterResult(
+        band=(float(band[0]), float(band[1])),
+        observed=observed, period=float(best["period"]),
+        window_size=int(best["size"]), window_start=int(best["start"]),
+        window_span=(int(best["first_position"]), int(best["last_position"])),
+        null_mean=mean, null_sd=sd,
+        null_mean_by_size={int(s): float(per_size[s].mean()) for s in usable},
+        z=0.0 if sd <= 1e-12 else float((observed - mean) / sd),
+        p_one_sided=p_value, n_draws=used, n_distinct_orderings=orderings,
+        sizes=tuple(usable), exact=exact,
+        selection=selection, pruned_out=dropped,
+        pilot_mean_by_size=pilot_means,
+        pilot_seed=int(pilot_seed) if selection != "all" else None,
+    )
+
+
+@dataclass(frozen=True)
+class LocalArchitecture:
+    """The local statistic over both bands, with its **own** Holm family.
+
+    Kept separate from `LiningArchitecture` rather than added to it, because
+    folding a fifth and sixth test into that family would change every
+    published verdict of the pooled statistic. Two detectors, two families.
+    """
+
+    helix: Optional[LocalRegisterResult] = None
+    strand: Optional[LocalRegisterResult] = None
+    reason: Optional[str] = None
+
+    @property
+    def family(self) -> Dict[str, float]:
+        out: Dict[str, float] = {}
+        for name, result in (("helix_local", self.helix), ("strand_local", self.strand)):
+            if result is not None:
+                out[name] = float(result.p_one_sided)
+        return out
+
+    @property
+    def holm(self) -> Dict[str, float]:
+        """Holm over this statistic's own family, by the same rule as the pooled one."""
+        raw = self.family
+        if not raw:
+            return {}
+        items = sorted(raw.items(), key=lambda kv: kv[1])
+        size = len(items)
+        out: Dict[str, float] = {}
+        running = 0.0
+        for index, (name, value) in enumerate(items):
+            running = max(running, min(1.0, (size - index) * value))
+            out[name] = running
+        return out
+
+    @property
+    def local_p(self) -> Optional[float]:
+        corrected = self.holm
+        return min(corrected.values()) if corrected else None
+
+    @property
+    def verdict(self) -> str:
+        p = self.local_p
+        if p is None:
+            return "unresolved"
+        if p <= CLEAR_P:
+            return "clear"
+        return "weak" if p <= WEAK_P else "none"
+
+    @property
+    def saturated(self) -> Tuple[int, ...]:
+        """Window sizes saturated in any band that ran."""
+        hit: Set[int] = set()
+        for result in (self.helix, self.strand):
+            if result is not None:
+                hit.update(result.saturated)
+        return tuple(sorted(hit))
+
+    def as_dict(self) -> Dict[str, object]:
+        return {
+            "helix": None if self.helix is None else self.helix.as_dict(),
+            "strand": None if self.strand is None else self.strand.as_dict(),
+            "reason": self.reason,
+            "holm": {k: float(v) for k, v in self.holm.items()},
+            "local_p": None if self.local_p is None else float(self.local_p),
+            "verdict": self.verdict,
+            "saturated": [int(s) for s in self.saturated],
+        }
+
+
+def local_architecture(
+    positions: Sequence[int],
+    *,
+    sizes: Sequence[int] = WINDOW_SIZES,
+    n_draws: int = DEFAULT_DRAWS,
+    seed: int = 20261012,
+    selection: str = "all",
+) -> LocalArchitecture:
+    """The local register statistic over both bands, or a stated reason it could not run.
+
+    The gate is the same one `describe_architecture` applies to the pooled
+    statistic, for the same reason: below `MIN_ORDERINGS` distinct gap
+    orderings the smallest attainable p is too large for the question to be
+    asked, and that is *unresolved*, never a p of 1.
+    """
+    ordered = sorted({int(p) for p in positions})
+    if len(ordered) < MIN_POSITIONS:
+        return LocalArchitecture(reason=(
+            f"{len(ordered)} positions; {MIN_POSITIONS} are needed for a register null"))
+    orderings = distinct_orderings(ordered)
+    if orderings < MIN_ORDERINGS:
+        return LocalArchitecture(reason=(
+            "every gap is the same width, so the gap multiset has one ordering "
+            "and register cannot be separated from topology"
+            if orderings < 2 else
+            f"the gap multiset has {orderings} orderings, so the smallest "
+            f"attainable p is {1.0 / orderings:.3f} and significance at "
+            f"{WEAK_P} is out of reach"))
+    try:
+        helix = local_register(ordered, HELIX_BAND, sizes=sizes, n_draws=n_draws,
+                               seed=seed, selection=selection)
+        strand = local_register(ordered, STRAND_BAND, sizes=sizes, n_draws=n_draws,
+                                seed=seed + 1, selection=selection)
+    except ArchitectureError as error:
+        return LocalArchitecture(reason=str(error))
+    return LocalArchitecture(helix=helix, strand=strand)
 
 
 # ------------------------------------------------- the topology null

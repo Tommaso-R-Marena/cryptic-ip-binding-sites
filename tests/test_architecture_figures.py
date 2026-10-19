@@ -26,7 +26,7 @@ FIGURES = ROOT / "results" / "architecture" / "figures"
 
 
 def test_every_figure_is_declared():
-    assert set(script.FIGURES) == {"power", "shape", "homology", "transfer"}
+    assert set(script.FIGURES) == {"power", "shape", "homology", "transfer", "local"}
 
 
 def test_only_validated_palette_slots_are_used():

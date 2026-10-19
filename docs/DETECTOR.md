@@ -437,6 +437,38 @@ not fixable: a bulge removes the periodicity rather than hiding it. Every
 fixture number here should be read as an upper bound about twice the realistic
 value.
 
+**The ceiling was attacked, and it held.** The pooled resultant is optimal for
+a face of *one* phase, and a jittered helix has no single phase — so the
+principled repair is a statistic requiring only piecewise phase lock: the
+maximum resultant over windows of 6, 8 and 10 consecutive lining positions,
+with the identical maximum taken on every draw of the same gap-permutation
+null. Two further variants keep only some of those sizes — the unsaturated ones,
+and the single one with the lowest null mean — and selecting them costs nothing,
+which is the one subtle point: the resultant's modulus is translation invariant,
+so a window's null depends only on the gap multiset — the quantity the register
+null holds fixed — and a rule stated in terms of the null selects the same
+windows for the observation and for every permutation, leaving the permutation
+p-value exact. The pilot that estimates it has its own seed so it cannot be a
+statistic of the null sample.
+
+None of the three was adopted, by a rule fixed before any of them was computed.
+At realistic jitter the pooled register half detects 0.30 against 0.00 for the
+two fixed-window variants and 0.07 for the ranked one, and the diagnostic says
+why in one number: the permutation null's own **mean** at the six-position
+window is 0.88 out of a possible 1, so a random reordering of the same gaps is
+already nearly as coherent as that many positions allow. It is the per-element
+negative again — a band scan over a handful of positions fits almost any
+spacing. The ordering among the variants is the predicted one: the longer the
+window a variant keeps, the better it does, and the rank picks the longest
+window on every lining, which makes it the pooled statistic minus four positions
+plus a maximum over five offsets — a trade the measurement says is a loss.
+
+What the failure establishes is the useful part: **locality is not what limits
+transfer**, so no windowed variant of this family will lift the 0.33.
+Pre-registered in `docs/ARCHITECTURE_PLAN_AMENDMENT_3.md`, `_4.md` and `_5.md`;
+measured in section 10 of `results/architecture/ARCHITECTURE.md` and drawn in
+`results/architecture/figures/F5_local.png`.
+
 **On real linings.** `scripts/build_lining_inputs.py` turns the project's
 committed tables into study inputs, and `results/architecture/real/REAL.md`
 runs Q7 on the 75 real candidate-pocket linings in

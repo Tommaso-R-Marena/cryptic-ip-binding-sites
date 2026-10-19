@@ -43,6 +43,180 @@
     "barcode_mismatches": 0,
     "barcode_trials": 300
   },
+  "local": {
+    "adopted": {
+      "best": false,
+      "local": false,
+      "pruned": false
+    },
+    "decision_rule": "a variant is adopted only if it detects strictly more than the pooled statistic at the realistic arm and its decoy false-positive rate is at or below 0.05; otherwise it is recorded as a measured negative",
+    "decoys": {
+      "best_false_positive": 0.03333333333333333,
+      "best_false_positive_clear": 0.0,
+      "local_false_positive": 0.06666666666666667,
+      "local_false_positive_clear": 0.0,
+      "n": 30,
+      "pooled_false_positive": 0.0,
+      "pruned_false_positive": 0.06666666666666667,
+      "pruned_false_positive_clear": 0.0
+    },
+    "pilot_draws": 200,
+    "prediction": "amendment 4 predicted that dropping the saturated windows would beat the unpruned statistic and still lose to pooled; amendment 5 predicted that the rank would select the longest window on every lining, beat both of the other variants and still lose to pooled, because a 10-position window of a 14-position lining is the pooled statistic minus four positions plus a maximum over five offsets",
+    "primary_arm": "jitter 8 deg (realistic)",
+    "primary_difference": -0.3,
+    "primary_mcnemar_p": 0.00390625,
+    "primary_pruned_difference": -0.3,
+    "primary_pruned_mcnemar_p": 0.00390625,
+    "rows": [
+      {
+        "arm": "ideal",
+        "best_both": 3,
+        "best_detected": 0.1,
+        "best_difference": -0.7000000000000001,
+        "best_fraction_by_size": {
+          "10": 1.0,
+          "6": 0.0,
+          "8": 0.0
+        },
+        "best_mcnemar_p": 9.5367431640625e-07,
+        "best_only": 0,
+        "best_pooled_only": 21,
+        "best_unresolved": 0.0,
+        "lining_size": 14,
+        "local_both": 0,
+        "local_detected": 0.0,
+        "local_difference": -0.8,
+        "local_fraction_by_size": {
+          "10": 1.0,
+          "6": 1.0,
+          "8": 1.0
+        },
+        "local_mcnemar_p": 1.1920928955078125e-07,
+        "local_only": 0,
+        "local_pooled_only": 24,
+        "local_unresolved": 0.0,
+        "null_mean_by_size": {
+          "10": 0.7169835562307691,
+          "6": 0.8844134839705098,
+          "8": 0.7961433408082629
+        },
+        "pooled_detected": 0.8,
+        "pruned_both": 0,
+        "pruned_detected": 0.0,
+        "pruned_difference": -0.8,
+        "pruned_fraction_by_size": {
+          "10": 1.0,
+          "6": 1.0,
+          "8": 1.0
+        },
+        "pruned_mcnemar_p": 1.1920928955078125e-07,
+        "pruned_only": 0,
+        "pruned_pooled_only": 24,
+        "pruned_unresolved": 0.0,
+        "reps": 30
+      },
+      {
+        "arm": "jitter 8 deg (realistic)",
+        "best_both": 1,
+        "best_detected": 0.06666666666666667,
+        "best_difference": -0.23333333333333334,
+        "best_fraction_by_size": {
+          "10": 1.0,
+          "6": 0.0,
+          "8": 0.0
+        },
+        "best_mcnemar_p": 0.0390625,
+        "best_only": 1,
+        "best_pooled_only": 8,
+        "best_unresolved": 0.0,
+        "lining_size": 14,
+        "local_both": 0,
+        "local_detected": 0.0,
+        "local_difference": -0.3,
+        "local_fraction_by_size": {
+          "10": 1.0,
+          "6": 1.0,
+          "8": 1.0
+        },
+        "local_mcnemar_p": 0.00390625,
+        "local_only": 0,
+        "local_pooled_only": 9,
+        "local_unresolved": 0.0,
+        "null_mean_by_size": {
+          "10": 0.7093347066211935,
+          "6": 0.8834507165210314,
+          "8": 0.7906830112040575
+        },
+        "pooled_detected": 0.3,
+        "pruned_both": 0,
+        "pruned_detected": 0.0,
+        "pruned_difference": -0.3,
+        "pruned_fraction_by_size": {
+          "10": 1.0,
+          "6": 1.0,
+          "8": 1.0
+        },
+        "pruned_mcnemar_p": 0.00390625,
+        "pruned_only": 0,
+        "pruned_pooled_only": 9,
+        "pruned_unresolved": 0.0,
+        "reps": 30
+      },
+      {
+        "arm": "bulges + jitter 8 deg",
+        "best_both": 1,
+        "best_detected": 0.1,
+        "best_difference": 0.0,
+        "best_fraction_by_size": {
+          "10": 1.0,
+          "6": 0.0,
+          "8": 0.0
+        },
+        "best_mcnemar_p": 1.0,
+        "best_only": 2,
+        "best_pooled_only": 2,
+        "best_unresolved": 0.0,
+        "lining_size": 14,
+        "local_both": 0,
+        "local_detected": 0.0,
+        "local_difference": -0.1,
+        "local_fraction_by_size": {
+          "10": 1.0,
+          "6": 1.0,
+          "8": 1.0
+        },
+        "local_mcnemar_p": 0.25,
+        "local_only": 0,
+        "local_pooled_only": 3,
+        "local_unresolved": 0.0,
+        "null_mean_by_size": {
+          "10": 0.6672770149000014,
+          "6": 0.8489267559121222,
+          "8": 0.7490002320039576
+        },
+        "pooled_detected": 0.1,
+        "pruned_both": 0,
+        "pruned_detected": 0.0,
+        "pruned_difference": -0.1,
+        "pruned_fraction_by_size": {
+          "10": 1.0,
+          "6": 1.0,
+          "8": 1.0
+        },
+        "pruned_mcnemar_p": 0.25,
+        "pruned_only": 0,
+        "pruned_pooled_only": 3,
+        "pruned_unresolved": 0.0,
+        "reps": 30
+      }
+    ],
+    "saturated_null": 0.9,
+    "window_sizes": [
+      6,
+      8,
+      10
+    ]
+  },
   "orderings_floor": {
     "floor_used": 20,
     "rows": [

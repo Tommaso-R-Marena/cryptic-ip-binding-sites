@@ -6,7 +6,7 @@ and `homology.json` - and never recomputed here, so a figure cannot disagree
 with the report it illustrates. If a probe is re-run, the figures change with
 it or the script fails loudly on a missing key.
 
-Three figures:
+Five figures:
 
 * **F1 power** - detection rate against how much of a face a lining captures,
   for random and spatial subsampling, with the band of real IP lining sizes
@@ -15,6 +15,11 @@ Three figures:
   identical lining size. The falsifiable prediction, in one panel.
 * **F3 homology** - fold-family retrieval beside its two controls, and the
   distance matrix that produced it.
+* **F4 transfer** - what realistic phi/psi scatter costs, and where the real
+  linings land on the same axis.
+* **F5 local** - the windowed statistic's negative beside the saturation
+  diagnostic that explains it. A figure of a null result, because the null
+  result is the one that bounds the method.
 
 Rendered light-mode: these are manuscript figures, and a vector PDF for a paper
 has one surface. The PNG beside it is for viewing.
@@ -365,6 +370,95 @@ def figure_transfer(report: Dict[str, object], real: Optional[Dict[str, object]]
     return save(fig, path)
 
 
+def figure_local(report: Dict[str, object], path: Path) -> Path:
+    """The attempt on the transfer ceiling, and the one number that explains it.
+
+    Left: detection rate per geometry arm for the pooled statistic and the two
+    windowed variants, paired on the same fixtures. Right: the diagnostic -
+    the *mean* of each window size's permutation null, with the saturation
+    threshold marked. A null mean at the threshold means a random reordering
+    already reaches the coherence an observation would have to beat, so the
+    left panel's flat zero is not a surprise once the right panel is read.
+    """
+    local = report["local"]
+    rows = list(local["rows"])  # type: ignore[index]
+    arms = [str(r["arm"]) for r in rows]
+    short = [arm.replace(" (realistic)", "").replace(" deg", "°") for arm in arms]
+
+    fig, (left, right) = plt.subplots(
+        1, 2, figsize=(9.2, 3.6), gridspec_kw={"width_ratios": [1.1, 1.0]})
+
+    recede(left)
+    # Three windowed variants in the three validated categorical slots, and the
+    # pooled statistic as an ink reference marker rather than a fourth hue - the
+    # palette has three slots that clear the colour-vision floors, and pooled is
+    # the baseline the others are judged against, not a fourth series.
+    series = (("windowed", "local_detected", SERIES[0]),
+              ("windowed, pruned", "pruned_detected", SERIES[1]),
+              ("windowed, best window", "best_detected", SERIES[2]))
+    width = 0.24
+    base = np.arange(len(rows))
+    for index, (label, key, colour) in enumerate(series):
+        values = [float(r[key]) for r in rows]
+        offset = (index - 1) * width
+        left.bar(base + offset, values, width=width * 0.9, color=colour,
+                 label=label, zorder=3, edgecolor=SURFACE, linewidth=1.2)
+        for position, value in zip(base + offset, values):
+            left.annotate(f"{value:.2f}" if value else "0",
+                          xy=(position, value), xytext=(0, 3),
+                          textcoords="offset points", ha="center", va="bottom",
+                          fontsize=7.5, color=INK if value else INK_MUTED)
+    for position, row in zip(base, rows):
+        pooled = float(row["pooled_detected"])
+        left.plot([position - 1.6 * width, position + 1.6 * width], [pooled, pooled],
+                  color=INK, linewidth=1.6, zorder=4, solid_capstyle="butt")
+        # Left-aligned at the start of the reference line: centring it collides
+        # with a bar label whenever a bar happens to reach the pooled rate.
+        left.annotate(f"pooled {pooled:.2f}", xy=(position - 1.6 * width, pooled),
+                      xytext=(0, 3), textcoords="offset points", ha="left",
+                      va="bottom", fontsize=7.5, color=INK)
+    left.set_xticks(base)
+    left.set_xticklabels(short, fontsize=8)
+    left.set_ylabel("detected at p ≤ 0.05")
+    left.set_ylim(0, 1.12)
+    left.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+    left.set_yticklabels(["0", "25%", "50%", "75%", "100%"])
+    left.set_title("Asking only for local phase lock detects less")
+    handles, labels = left.get_legend_handles_labels()
+    handles.append(Line2D([0], [0], color=INK, linewidth=1.6))
+    labels.append("pooled register")
+    left.legend(handles, labels, loc="upper right", frameon=False, fontsize=7.5)
+
+    recede(right)
+    sizes = sorted({int(w) for r in rows for w in r["null_mean_by_size"]})
+    # Ordered conditions, so an ordered ink ramp - never the categorical hues
+    # of the left panel, whose blue means "pooled" two inches away.
+    ramp = (INK_MUTED, INK_SECONDARY, INK)
+    for colour, row, label in zip(ramp, rows, short):
+        means = [float(row["null_mean_by_size"][str(w)]) for w in sizes]
+        right.plot(sizes, means, color=colour, marker="o", markersize=4.5,
+                   markeredgecolor=SURFACE, markeredgewidth=1.0, label=label,
+                   zorder=3, clip_on=False)
+    threshold = float(local["saturated_null"])  # type: ignore[index]
+    right.axhline(threshold, color=INK_SECONDARY, linestyle=(0, (4, 3)),
+                  linewidth=1.0, zorder=2)
+    reached = max(float(row["null_mean_by_size"][str(w)])
+                  for row in rows for w in sizes) >= threshold
+    note = ("saturated: the null already\nreaches this coherence" if reached else
+            "saturation threshold —\nnot crossed on these linings")
+    right.annotate(note, xy=(sizes[-1], threshold), xytext=(-4, 7),
+                   textcoords="offset points", ha="right", va="bottom",
+                   fontsize=7.5, color=INK_SECONDARY, linespacing=1.3)
+    right.set_xticks(sizes)
+    right.set_xlabel("window size (lining positions)")
+    right.set_ylabel("mean of the permutation null")
+    right.set_ylim(0.55, 1.0)
+    right.set_title("Why: short windows fit anything")
+    right.legend(loc="lower left", frameon=False, fontsize=8)
+    fig.tight_layout()
+    return save(fig, path)
+
+
 # ----------------------------------------------------------------- output
 
 def save(fig, path: Path) -> Path:
@@ -380,6 +474,7 @@ FIGURES = {
     "shape": "ring versus column at identical lining size",
     "homology": "fold retrieval beside its controls, and the distance matrix",
     "transfer": "what realistic irregularity costs, and where real linings land",
+    "local": "the windowed statistic's negative, and the saturation behind it",
 }
 
 
@@ -395,6 +490,7 @@ def build(architecture: Path, homology: Path, out_dir: Path,
         figure_shape(architecture_report, out_dir / "F2_shape"),
         figure_homology(homology_report, out_dir / "F3_homology"),
         figure_transfer(architecture_report, real_report, out_dir / "F4_transfer"),
+        figure_local(architecture_report, out_dir / "F5_local"),
     ]
 
 
