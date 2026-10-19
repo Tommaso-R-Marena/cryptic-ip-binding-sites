@@ -75,7 +75,7 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install -r requirements.txt
           python -m pip install -e .
-      - name: Nine probes, including whether any of it transfers
+      - name: Ten probes, including whether any of it transfers
         run: |
           python scripts/architecture_probe.py run \
             ${{ inputs.quick == 'true' && '--quick' || '' }} \
