@@ -440,18 +440,42 @@ def test_a_power_failure_is_not_reported_as_a_null():
     assert script._verdict({"is_finding": True, "is_evidence": True}) == "**yes**"
 
 
-def test_the_committed_ground_truth_arm_says_it_decided_nothing():
-    """Pinned: the arm as run is underpowered and the report must say so."""
+def test_the_committed_ground_truth_arm_finds_nothing_and_says_it_is_exploratory():
+    """Pinned: the repowered arm clears the group floor and still finds nothing.
+
+    The first version of this test pinned the arm as *underpowered*, which it
+    was before the chain-aware lining repowered it. What must stay pinned is
+    the conclusion, not the sample size: no test is a finding, and the report
+    carries the disclosure that the arm is exploratory.
+    """
     path = ROOT / "results" / "within_protein" / "within_protein_sites.json"
     if not path.exists():
         pytest.skip("the ground-truth arm has not been run")
     report = json.loads(path.read_text())
     runnable = [t for t in report["tests"] if t.get("runnable")]
     assert runnable, "the arm produced no runnable test"
-    assert all(not t["is_evidence"] for t in runnable)
+    assert all(not t["is_finding"] for t in runnable)
+    # Clearing the five-group floor is what the repowering bought.
+    assert any(t["is_evidence"] for t in runnable)
     text = script.markdown(report)
-    assert "did not have the power to decide anything" in text
-    assert "neither supports nor refutes" in text
+    assert "exploratory" in text
+    assert "has never been fetched" in text
+
+
+def test_the_ground_truth_arm_always_carries_its_disclosure():
+    """Whatever it shows, the look that preceded it has to travel with it."""
+    pockets, table = _synthetic(n_proteins=5, n_siblings=12)
+    as_site = table.rename(columns={"uniprot_id": "copy",
+                                    "top_pocket_residues": "residues",
+                                    "cluster": "group"})
+    report = script.measure(pockets, script.as_table(as_site, "site"),
+                            n_draws=120, n_bootstrap=200, rule="recall")
+    report["arm"] = "site"
+    text = script.markdown(report)
+    assert "is not a confirmation of the direction that was seen" in text
+    candidate = script.measure(pockets, table, n_draws=120, n_bootstrap=200)
+    candidate["arm"] = "candidate"
+    assert "This arm is exploratory" not in script.markdown(candidate)
 
 
 # ------------------------------- chain-aware linings (amendment 2)

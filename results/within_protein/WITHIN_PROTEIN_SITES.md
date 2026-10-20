@@ -10,17 +10,17 @@
 
 So the control was built. The same detector re-detects every pocket in the same proteins and keeps each pocket's lining residues. Same protein, same fold, same model, same detector, same lining size - what varies is **which pocket**.
 
-The candidate is re-identified by Jaccard overlap against the committed lining (floor 0.5), because pocket indices do not survive a re-run. Median overlap 1.00, lowest kept 0.60.
+The candidate is re-identified by Jaccard overlap against the committed lining (floor 0.5), because pocket indices do not survive a re-run. Median overlap 0.80, lowest kept 0.56.
 
 Siblings match the candidate's lining size to within 2 residues, at least 8 of them and at most 40, sampled with the seed above. Median 18 siblings per protein.
 
-5 of 28 proteins measured.
+27 of 119 proteins measured.
 
-**Which proteins survive, and why it matters.** The measured candidate linings run 5 to 15 residues (median 8). The exclusions above are almost entirely a size effect: a large lining has few pockets of its own size to be compared with, so the proteins that clear the sibling floor are the smaller-lining end of the table. That is a property of the matched design rather than a result, it was not chosen after seeing anything, and loosening the tolerance afterwards to recover the rest would be exactly the tuning this plan fixed in advance to avoid.
+**Which proteins survive, and why it matters.** The measured candidate linings run 4 to 22 residues (median 8). The exclusions above are almost entirely a size effect: a large lining has few pockets of its own size to be compared with, so the proteins that clear the sibling floor are the smaller-lining end of the table. That is a property of the matched design rather than a result, it was not chosen after seeing anything, and loosening the tolerance afterwards to recover the rest would be exactly the tuning this plan fixed in advance to avoid.
 
 Excluded, by cause:
 
-- 22 — fewer than 8 siblings within 2 residues of the candidate
+- 91 — fewer than 8 siblings within 2 residues of the candidate
 - 1 — selected pocket not re-identified (recall below 0.3)
 
 ## Result
@@ -29,22 +29,27 @@ The per-protein statistic is the candidate's **mid-p quantile** among its matche
 
 | half | proteins | groups | ties | mean quantile | difference from 0.5 | 95% interval | p | Holm | finding |
 |---|---|---|---|---|---|---|---|---|---|
-| topology | 5 | 4 | 0.00 | 0.279 | -0.221 | [-0.444, +0.038] | 0.1404 | 0.2809 | **no evidence** — 4 groups |
-| register | 3 | 3 | 0.00 | 0.328 | -0.172 | [-0.500, +0.038] | 0.4128 | 0.4128 | **no evidence** — 3 groups |
-
-**This arm did not have the power to decide anything, and the table above is not a null result.** the topology half rests on 4 resampling groups and could only have detected a difference of 0.37; the register half rests on 3 resampling groups and could only have detected a difference of 0.47. The project's standing rule is that a stratum with fewer than five groups yields no evidence, and that rule is applied here to the arm as a whole rather than quietly to a footnote. Whatever direction the means point in, this arm neither supports nor refutes the hypothesis.
+| topology | 27 | 8 | 0.10 | 0.336 | -0.164 | [-0.317, -0.001] | 0.1034 | 0.2069 | no |
+| register | 21 | 8 | 0.10 | 0.592 | +0.092 | [-0.126, +0.284] | 0.3793 | 0.3793 | no |
 
 Holm across 2 primary tests, fixed by the plan before any of it was read.
 
-**Secondary.** Candidates called a helical or strand face: 0.20; their matched siblings: 0.09.
+**Secondary.** Candidates called a helical or strand face: 0.07; their matched siblings: 0.08.
 
-**Residual size.** Matching is to within a tolerance, not exact, so the residual is reported: topology -0.10 residues; register +0.45 residues. A result accompanied by a residual difference in the same direction is confounded rather than a finding.
+**Residual size.** Matching is to within a tolerance, not exact, so the residual is reported: topology +0.19 residues; register +0.33 residues. A result accompanied by a residual difference in the same direction is confounded rather than a finding.
 
 **By burial class**, declared secondary and never promoted: a stratum with fewer than five groups gives no evidence, which is the project's standing rule and not a judgement about this table.
 
 | class | proteins | groups | topology | register | evidence |
 |---|---|---|---|---|---|
-| surface | 5 | 4 | 0.273 | 0.328 | no — too few groups |
+| semi_cryptic | 2 | 2 | 0.442 | 0.864 | no — too few groups |
+| surface | 25 | 7 | 0.372 | 0.459 | yes |
+
+## This arm is exploratory, and why
+
+The first run of this arm was read before its lining definition was fixed, and `docs/WITHIN_PROTEIN_PLAN_AMENDMENT_2.md` discloses exactly what was seen: both halves below 0.5, at four and three resampling groups, no evidence by the five-group floor. The chain-aware lining that repowered the arm was written after that look. So whatever this table shows, it is **exploratory** and is not a confirmation of the direction that was seen.
+
+The confirmatory set is named in that amendment and has never been fetched: the 85 eligible IHP copies the census does not mark `selected`. It is to be run only if this arm shows something, and it would test whether the measurement reproduces across copies of the same sites — not whether it generalises to proteins the study has not seen.
 
 ## How to read a null here
 

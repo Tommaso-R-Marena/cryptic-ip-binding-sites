@@ -675,6 +675,24 @@ def markdown(report: Dict[str, object]) -> str:
                 f"{entry['register_mean_quantile']:.3f} | "
                 f"{'yes' if entry['is_evidence'] else 'no — too few groups'} |"
             )
+    if str(report.get("arm", "")) == "site":
+        lines += [
+            "",
+            "## This arm is exploratory, and why",
+            "",
+            "The first run of this arm was read before its lining definition was fixed, "
+            "and `docs/WITHIN_PROTEIN_PLAN_AMENDMENT_2.md` discloses exactly what was "
+            "seen: both halves below 0.5, at four and three resampling groups, no "
+            "evidence by the five-group floor. The chain-aware lining that repowered the "
+            "arm was written after that look. So whatever this table shows, it is "
+            "**exploratory** and is not a confirmation of the direction that was seen.",
+            "",
+            "The confirmatory set is named in that amendment and has never been fetched: "
+            "the 85 eligible IHP copies the census does not mark `selected`. It is to be "
+            "run only if this arm shows something, and it would test whether the "
+            "measurement reproduces across copies of the same sites — not whether it "
+            "generalises to proteins the study has not seen.",
+        ]
     lines += [
         "",
         "## How to read a null here",
