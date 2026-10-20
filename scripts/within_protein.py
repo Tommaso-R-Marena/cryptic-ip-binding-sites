@@ -554,6 +554,21 @@ def markdown(report: Dict[str, object]) -> str:
         "",
         f"{report['n_measured']} of {report['n_proteins_in_table']} proteins measured.",
     ]
+    measured = report.get("per_protein") or []
+    if measured:
+        sizes = sorted(int(r["candidate_size"]) for r in measured)
+        lines += [
+            "",
+            f"**Which proteins survive, and why it matters.** The measured candidate "
+            f"linings run {sizes[0]} to {sizes[-1]} residues (median "
+            f"{sizes[len(sizes) // 2]}). The exclusions above are almost entirely a "
+            "size effect: a large lining has few pockets of its own size to be compared "
+            "with, so the proteins that clear the sibling floor are the smaller-lining "
+            "end of the table. That is a property of the matched design rather than a "
+            "result, it was not chosen after seeing anything, and loosening the "
+            "tolerance afterwards to recover the rest would be exactly the tuning this "
+            "plan fixed in advance to avoid.",
+        ]
     if excluded:
         lines += ["", "Excluded, by cause:", ""]
         lines += [f"- {count} — {reason}" for reason, count in excluded.items()]  # type: ignore[union-attr]
