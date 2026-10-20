@@ -518,6 +518,15 @@ def measure(pockets: pd.DataFrame, table: pd.DataFrame, *, n_draws: int,
     }
 
 
+def _verdict(entry: Dict[str, object]) -> str:
+    """The finding column, which must not read as a null when it is a power failure."""
+    if entry.get("is_finding"):
+        return "**yes**"
+    if not entry.get("is_evidence"):
+        return f"**no evidence** — {entry['n_groups']} groups"
+    return "no"
+
+
 def markdown(report: Dict[str, object]) -> str:
     """The report, with the design's one weak point stated where it is read."""
     excluded = report["excluded"]  # type: ignore[index]
@@ -598,8 +607,24 @@ def markdown(report: Dict[str, object]) -> str:
             f"{entry['mean_tied_fraction']:.2f} | {entry['mean_quantile']:.3f} | "
             f"{entry['difference']:+.3f} | [{low:+.3f}, {high:+.3f}] | "
             f"{entry['p_value']:.4f} | {entry['p_holm']:.4f} | "
-            f"{'**yes**' if entry['is_finding'] else 'no'} |"
+            f"{_verdict(entry)} |"
         )
+    starved = [e for e in report["tests"]  # type: ignore[union-attr]
+               if e.get("runnable") and not e.get("is_evidence")]
+    if starved:
+        lines += [
+            "",
+            "**This arm did not have the power to decide anything, and the table above "
+            "is not a null result.** "
+            + "; ".join(
+                f"the {e['half']} half rests on {e['n_groups']} resampling groups and "
+                f"could only have detected a difference of {e['minimum_detectable']:.2f}"
+                for e in starved)
+            + ". The project's standing rule is that a stratum with fewer than five "
+            "groups yields no evidence, and that rule is applied here to the arm as a "
+            "whole rather than quietly to a footnote. Whatever direction the means "
+            "point in, this arm neither supports nor refutes the hypothesis.",
+        ]
     faces = report["faces"]  # type: ignore[index]
     lines += [
         "",

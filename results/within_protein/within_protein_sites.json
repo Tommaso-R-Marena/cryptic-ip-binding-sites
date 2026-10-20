@@ -1,0 +1,190 @@
+{
+  "arm": "site",
+  "excluded": {
+    "fewer than 8 siblings within 2 residues of the candidate": 22,
+    "selected pocket not re-identified (recall below 0.3)": 1
+  },
+  "faces": {
+    "candidate_face_fraction": 0.2,
+    "sibling_face_fraction": 0.09047619047619047
+  },
+  "holm_family_size": 2,
+  "max_siblings": 40,
+  "min_jaccard": 0.5,
+  "min_siblings": 8,
+  "n_measured": 5,
+  "n_proteins_in_table": 28,
+  "overlap_floor": 0.3,
+  "overlaps": {
+    "median": 1.0,
+    "min": 0.6
+  },
+  "per_protein": [
+    {
+      "candidate_element": "none",
+      "candidate_size": 10,
+      "group": "G:1HG2",
+      "id": "1HG5_A_1282",
+      "mean_sibling_size": 9.5,
+      "n_siblings": 18,
+      "overlap": 1.0,
+      "pocket_id": 5,
+      "register_candidate_p": 0.4394506866416979,
+      "register_quantile": 0.4444444444444444,
+      "register_resolved_siblings": 18,
+      "register_tied_fraction": 0.0,
+      "sibling_face_fraction": 0.0,
+      "size_difference": 0.5,
+      "stratum": "surface",
+      "topology_candidate_p": 0.4394506866416979,
+      "topology_quantile": 0.2222222222222222,
+      "topology_resolved_siblings": 18,
+      "topology_tied_fraction": 0.0
+    },
+    {
+      "candidate_element": "none",
+      "candidate_size": 8,
+      "group": "G:5IJJ",
+      "id": "5IJP_A_302",
+      "mean_sibling_size": 7.642857142857143,
+      "n_siblings": 14,
+      "overlap": 0.7,
+      "pocket_id": 4,
+      "register_candidate_p": 0.3595505617977528,
+      "register_quantile": 0.5384615384615384,
+      "register_resolved_siblings": 13,
+      "register_tied_fraction": 0.0,
+      "sibling_face_fraction": 0.2857142857142857,
+      "size_difference": 0.35714285714285676,
+      "stratum": "surface",
+      "topology_candidate_p": 0.3595505617977528,
+      "topology_quantile": 0.6428571428571429,
+      "topology_resolved_siblings": 14,
+      "topology_tied_fraction": 0.0
+    },
+    {
+      "candidate_element": "none",
+      "candidate_size": 5,
+      "group": "G:30OE",
+      "id": "8EET_A_402",
+      "mean_sibling_size": 6.055555555555555,
+      "n_siblings": 18,
+      "overlap": 1.0,
+      "pocket_id": 5,
+      "sibling_face_fraction": 0.05555555555555555,
+      "size_difference": -1.0555555555555554,
+      "stratum": "surface",
+      "topology_candidate_p": 0.29463171036204744,
+      "topology_quantile": 0.2777777777777778,
+      "topology_resolved_siblings": 18,
+      "topology_tied_fraction": 0.0
+    },
+    {
+      "candidate_element": "none",
+      "candidate_size": 5,
+      "group": "G:30OE",
+      "id": "7URT_A_402",
+      "mean_sibling_size": 5.777777777777778,
+      "n_siblings": 18,
+      "overlap": 1.0,
+      "pocket_id": 9,
+      "sibling_face_fraction": 0.1111111111111111,
+      "size_difference": -0.7777777777777777,
+      "stratum": "surface",
+      "topology_candidate_p": 0.29463171036204744,
+      "topology_quantile": 0.2222222222222222,
+      "topology_resolved_siblings": 18,
+      "topology_tied_fraction": 0.0
+    },
+    {
+      "candidate_element": "helix_face",
+      "candidate_size": 15,
+      "group": "G:1DKP",
+      "id": "1DKP_A_550",
+      "mean_sibling_size": 14.5,
+      "n_siblings": 10,
+      "overlap": 0.6,
+      "pocket_id": 4,
+      "register_candidate_p": 0.019975031210986267,
+      "register_quantile": 0.0,
+      "register_resolved_siblings": 10,
+      "register_tied_fraction": 0.0,
+      "sibling_face_fraction": 0.0,
+      "size_difference": 0.5,
+      "stratum": "surface",
+      "topology_candidate_p": 0.02247191011235955,
+      "topology_quantile": 0.0,
+      "topology_resolved_siblings": 10,
+      "topology_tied_fraction": 0.0
+    }
+  ],
+  "rule": "recall",
+  "seed": 20261020,
+  "siblings": {
+    "median": 18.0
+  },
+  "size_tolerance": 2,
+  "strata": {
+    "surface": {
+      "is_evidence": false,
+      "n_groups": 4,
+      "n_proteins": 5,
+      "register_mean_quantile": 0.3276353276353276,
+      "register_n": 3,
+      "topology_mean_quantile": 0.27301587301587305,
+      "topology_n": 5
+    }
+  },
+  "tests": [
+    {
+      "control_mean": 0.5,
+      "difference": -0.22123015873015872,
+      "exceeds_power": false,
+      "feature": "topology",
+      "half": "topology",
+      "interval": [
+        -0.4444444444444444,
+        0.037698412698412787
+      ],
+      "is_evidence": false,
+      "is_finding": false,
+      "mean_quantile": 0.2787698412698413,
+      "mean_size_difference": -0.09523809523809526,
+      "mean_tied_fraction": 0.0,
+      "minimum_detectable": 0.3743878891233887,
+      "n_control_groups": 4,
+      "n_groups": 4,
+      "n_proteins": 5,
+      "n_site_groups": 4,
+      "p_holm": 0.28085957021489255,
+      "p_value": 0.14042978510744628,
+      "runnable": true,
+      "site_mean": 0.2787698412698413
+    },
+    {
+      "control_mean": 0.5,
+      "difference": -0.1723646723646724,
+      "exceeds_power": false,
+      "feature": "register",
+      "half": "register",
+      "interval": [
+        -0.5,
+        0.038461538461538436
+      ],
+      "is_evidence": false,
+      "is_finding": false,
+      "mean_quantile": 0.3276353276353276,
+      "mean_size_difference": 0.4523809523809523,
+      "mean_tied_fraction": 0.0,
+      "minimum_detectable": 0.4652051290587978,
+      "n_control_groups": 3,
+      "n_groups": 3,
+      "n_proteins": 3,
+      "n_site_groups": 3,
+      "p_holm": 0.4127936031984008,
+      "p_value": 0.4127936031984008,
+      "runnable": true,
+      "site_mean": 0.3276353276353276
+    }
+  ]
+}
