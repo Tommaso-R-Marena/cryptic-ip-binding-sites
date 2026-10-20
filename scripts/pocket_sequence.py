@@ -249,10 +249,19 @@ def sequence_index(sequences: pd.DataFrame) -> Dict[Tuple[str, str], Dict[int, s
     return out
 
 
-def windows_for_pockets(pockets: pd.DataFrame, index: Dict[Tuple[str, str], Dict[int, str]],
-                        *, key_of, chain_of, group_of, statistics: Sequence[str],
-                        shuffles: int) -> List[Dict[str, object]]:
-    """One row per pocket whose `local` window can carry an order null."""
+def windows_for_pockets(pockets: pd.DataFrame,
+                        index: Dict[Tuple[str, str], Dict[int, str]],
+                        *, key_of, chain_of, group_of) -> List[Dict[str, object]]:
+    """One row per pocket whose `local` window can carry an order null.
+
+    Windows only: the order null costs 2000 shuffles of eight statistics per
+    window, and a 2500-residue model has well over a hundred pockets of which
+    this study scores ten. Scoring is deferred to `score_windows`, after the
+    arms have chosen, which is the difference between minutes and hours.
+
+    The seed travels with the row, so a window's null does not depend on which
+    arm selected it or on how many pockets were scored before it.
+    """
     rows: List[Dict[str, object]] = []
     for position, pocket in enumerate(pockets.itertuples()):
         numbers = index.get((key_of(pocket), chain_of(pocket)))
@@ -262,7 +271,7 @@ def windows_for_pockets(pockets: pd.DataFrame, index: Dict[Tuple[str, str], Dict
         text = local_window(numbers, residues)
         if text is None:
             continue
-        row: Dict[str, object] = {
+        rows.append({
             "id": str(getattr(pocket, "uniprot_id", "")),
             "group": str(group_of(pocket)),
             "pocket_id": int(pocket.pocket_id),
@@ -270,16 +279,26 @@ def windows_for_pockets(pockets: pd.DataFrame, index: Dict[Tuple[str, str], Dict
             "length": len(text),
             "n_lining": len(residues),
             "window": text,
-        }
-        for statistic in statistics:
-            row[f"z_{statistic}"] = window_z(text, statistic, shuffles=shuffles,
-                                             seed=SEED + position)
-        rows.append(row)
+            "seed": SEED + position,
+        })
     return rows
 
 
+def score_windows(rows: Sequence[Dict[str, object]], statistics: Sequence[str],
+                  *, shuffles: int) -> None:
+    """Fill each row's order-null z, in place, once and only once."""
+    for row in rows:
+        if row.get("scored"):
+            continue
+        for statistic in statistics:
+            row[f"z_{statistic}"] = window_z(
+                str(row["window"]), statistic, shuffles=shuffles,
+                seed=int(row["seed"]))
+        row["scored"] = True
+
+
 def formation(rows: List[Dict[str, object]], *, n_bootstrap: int,
-              statistics: Sequence[str]) -> List[Dict[str, object]]:
+              statistics: Sequence[str], shuffles: int) -> List[Dict[str, object]]:
     """Q9a: fpocket's best-ranked pockets against its worst, within each protein."""
     rng = np.random.default_rng(SEED)
     top: List[Dict[str, object]] = []
@@ -298,12 +317,13 @@ def formation(rows: List[Dict[str, object]], *, n_bootstrap: int,
         matched_best, matched_worst = match_on_length(best, worst, rng)
         top.extend(matched_best)
         bottom.extend(matched_worst)
+    score_windows(top + bottom, statistics, shuffles=shuffles)
     return [contrast("formation", top, bottom, statistic, n_bootstrap=n_bootstrap)
             for statistic in statistics]
 
 
 def pocket_type(rows: List[Dict[str, object]], *, n_bootstrap: int,
-                statistics: Sequence[str], n_draws: int) -> List[Dict[str, object]]:
+                statistics: Sequence[str], shuffles: int) -> List[Dict[str, object]]:
     """Q9b: do the letters anticipate the architecture class of the positions?
 
     The class is computed from positions alone and reads no letters, so the two
@@ -319,6 +339,7 @@ def pocket_type(rows: List[Dict[str, object]], *, n_bootstrap: int,
         elif element == "none":
             others.append(row)
     matched_faces, matched_others = match_on_length(faces, others, rng)
+    score_windows(matched_faces + matched_others, statistics, shuffles=shuffles)
     return [contrast("type", matched_faces, matched_others, statistic,
                      n_bootstrap=n_bootstrap)
             for statistic in statistics]
@@ -420,21 +441,21 @@ def run(sequences: pd.DataFrame, pockets: pd.DataFrame, sites: Optional[pd.DataF
             by_pocket_class[(str(row.uniprot_id), int(row.pocket_id))] = str(row.element)
 
     pocket_rows = windows_for_pockets(
-        pockets, index,
+        pockets, index,  # windows only; the null runs after the arms choose
         key_of=lambda p: str(p.model).replace(".pdb", "").replace(".ent", ""),
         # An AlphaFold model is one chain, always A, so the lookup is exact
         # rather than a guess; the deposited structures take their chain from
         # the census row instead, in `function`.
         chain_of=lambda p: "A",
-        group_of=lambda p: str(getattr(p, "cluster", p.uniprot_id)),
-        statistics=statistics, shuffles=shuffles)
+        group_of=lambda p: str(getattr(p, "cluster", p.uniprot_id)))
     for row in pocket_rows:
         row["element"] = by_pocket_class.get((str(row["id"]), int(row["pocket_id"])))
 
     entries: List[Dict[str, object]] = []
-    entries += formation(pocket_rows, n_bootstrap=n_bootstrap, statistics=statistics)
+    entries += formation(pocket_rows, n_bootstrap=n_bootstrap, statistics=statistics,
+                         shuffles=shuffles)
     entries += pocket_type(pocket_rows, n_bootstrap=n_bootstrap, statistics=statistics,
-                           n_draws=shuffles)
+                           shuffles=shuffles)
     site_rows: List[Dict[str, object]] = []
     control_rows: List[Dict[str, object]] = []
     if sites is not None and not sites.empty:
@@ -458,6 +479,7 @@ def run(sequences: pd.DataFrame, pockets: pd.DataFrame, sites: Optional[pd.DataF
         "max_window": MAX_WINDOW, "min_window": MIN_WINDOW,
         "top_rank": TOP_RANK, "length_tolerance": LENGTH_TOLERANCE,
         "n_pocket_windows": len(pocket_rows),
+        "n_scored_windows": int(sum(1 for r in pocket_rows if r.get("scored"))),
         "n_site_windows": len(site_rows),
         "n_control_windows": len(control_rows),
         "n_classified": int(sum(1 for r in pocket_rows if r.get("element"))),

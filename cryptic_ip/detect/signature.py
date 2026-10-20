@@ -59,6 +59,12 @@ POSITIONAL_STATISTICS = frozenset({
     "helix_charge_periodicity",
     "strand_charge_periodicity",
     "dominant_period_power",
+    # The hydropathy track of study Q9 is periodicity exactly as the charge
+    # track is, so it is positional for exactly the same reason: closing the
+    # gaps in a lining destroys what a period means.
+    "helix_hydropathy_periodicity",
+    "strand_hydropathy_periodicity",
+    "dominant_hydropathy_period_power",
 })
 
 #: Statistics that are functions of the multiset of letters and their order

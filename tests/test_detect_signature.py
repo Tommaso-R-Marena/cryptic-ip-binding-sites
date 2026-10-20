@@ -365,3 +365,25 @@ def test_periodicity_power_is_invariant_under_reversal():
     for name in sg.POSITIONAL_STATISTICS:
         assert sq.STATISTICS[name](window) == pytest.approx(
             sq.STATISTICS[name](window[::-1])), name
+
+
+def test_the_hydropathy_statistics_are_classified_as_positional():
+    """They are periodicity measures, so the gap-closed window must refuse them.
+
+    This is the fence working as designed: three statistics were added to
+    `sequence.STATISTICS` for study Q9 and CI failed until they were
+    classified, which is exactly the failure the fence exists to force.
+    """
+    for name in ("helix_hydropathy_periodicity", "strand_hydropathy_periodicity",
+                 "dominant_hydropathy_period_power"):
+        assert name in sg.POSITIONAL_STATISTICS
+        assert name not in sg.NON_POSITIONAL_STATISTICS
+
+
+def test_a_hydropathy_statistic_is_refused_on_the_gap_closed_window():
+    windows = sg.SiteWindows(
+        lining="LKKLLKKLLKKLLKKL", local="LKKLLKKLLKKLLKKLLKKL",
+        positions=(10, 11, 12, 13, 14, 15, 16, 17),
+        local_start=10, local_end=29, n_nonstandard=0, truncated=False)
+    with pytest.raises(sg.WindowError):
+        sg.statistic_for_window(windows, "lining", "helix_hydropathy_periodicity")

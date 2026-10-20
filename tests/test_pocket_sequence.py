@@ -15,6 +15,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
@@ -153,7 +154,10 @@ def test_an_underpowered_contrast_cannot_be_a_finding():
 
 # --------------------------------------------- planted signal, matched noise
 
-def _synthetic(planted: bool, n_proteins: int = 8, seed: int = 0):
+def _synthetic(planted: bool, n_proteins: int = 8, seed: int = 0, middle: int = 0):
+    """Eight proteins, five top-ranked pockets, five bottom-ranked, and
+    optionally `middle` more that neither arm selects - which is what a real
+    model looks like, and what makes the deferred scoring worth having."""
     rng = np.random.default_rng(seed)
     sequences, pockets = [], []
     for index in range(n_proteins):
@@ -161,6 +165,7 @@ def _synthetic(planted: bool, n_proteins: int = 8, seed: int = 0):
         letters = list(rng.choice(ALPHABET, size=400))
         top = list(range(20, 220, 40))
         bottom = list(range(240, 400, 32))
+        between = [225 + 4 * i for i in range(middle)]
         if planted:
             for start in top:
                 for offset in range(20):
@@ -169,13 +174,14 @@ def _synthetic(planted: bool, n_proteins: int = 8, seed: int = 0):
                           "first": 1, "last": 400, "n_residues": 400,
                           "numbers": ",".join(str(n) for n in range(1, 401)),
                           "letters": "".join(letters)})
-        for rank, start in enumerate(top + bottom, start=1):
+        for rank, start in enumerate(top + between + bottom, start=1):
             pockets.append({"uniprot_id": f"P{index}", "model": stem + ".pdb",
                             "pocket_id": rank, "cluster": f"c{index}",
                             "residues": ",".join(str(start + i) for i in range(0, 20, 3))})
     return pd.DataFrame(sequences), pd.DataFrame(pockets)
 
 
+@pytest.mark.slow
 def test_the_pipeline_finds_a_planted_arrangement():
     sequences, pockets = _synthetic(planted=True)
     report = script.run(sequences, pockets, None, None, shuffles=200,
@@ -187,6 +193,7 @@ def test_the_pipeline_finds_a_planted_arrangement():
     assert any(t["is_finding"] for t in primary)
 
 
+@pytest.mark.slow
 def test_the_pipeline_stays_quiet_on_matched_noise():
     """Same construction, no planted arrangement: nothing may fire."""
     sequences, pockets = _synthetic(planted=False, seed=1)
@@ -198,6 +205,7 @@ def test_the_pipeline_stays_quiet_on_matched_noise():
     assert not any(t["is_finding"] for t in primary)
 
 
+@pytest.mark.slow
 def test_the_report_states_the_decomposition_and_its_limits():
     sequences, pockets = _synthetic(planted=False, seed=2)
     text = script.markdown(script.run(sequences, pockets, None, None, shuffles=100,
@@ -205,3 +213,34 @@ def test_the_report_states_the_decomposition_and_its_limits():
     assert "composition" in text and "order" in text
     assert "never on a raw measure" in text
     assert "predicts fpocket, not nature" in text
+
+
+@pytest.mark.slow
+def test_only_the_windows_an_arm_selected_are_scored():
+    """A 2500-residue model has hundreds of pockets and this study scores ten."""
+    sequences, pockets = _synthetic(planted=False, seed=4, middle=6)
+    report = script.run(sequences, pockets, None, None, shuffles=50,
+                        n_bootstrap=100, per_site=2)
+    assert report["n_scored_windows"] < report["n_pocket_windows"]
+    assert report["n_scored_windows"] > 0
+
+
+def test_a_window_s_null_does_not_depend_on_what_selected_it():
+    """The seed travels with the row, so the z is a property of the window."""
+    numbers = {n: ALPHABET[n % 20] for n in range(1, 60)}
+    text = script.local_window(numbers, [10, 30])
+    assert text is not None
+    row = {"window": text, "seed": 7}
+    other = {"window": text, "seed": 7}
+    script.score_windows([row], ["helix_charge_periodicity"], shuffles=80)
+    script.score_windows([other], ["helix_charge_periodicity"], shuffles=80)
+    assert row["z_helix_charge_periodicity"] == other["z_helix_charge_periodicity"]
+
+
+def test_scoring_twice_does_not_rescore():
+    row = {"window": "LKKLLKKLLKKLLKKLLKKL", "seed": 1}
+    script.score_windows([row], ["helix_charge_periodicity"], shuffles=50)
+    first = row["z_helix_charge_periodicity"]
+    row["window"] = "AAAAAAAAAAAAAAAAAAAA"      # would score differently if rescored
+    script.score_windows([row], ["helix_charge_periodicity"], shuffles=50)
+    assert row["z_helix_charge_periodicity"] == first
