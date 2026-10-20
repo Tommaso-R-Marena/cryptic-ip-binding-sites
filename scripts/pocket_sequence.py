@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -83,8 +84,12 @@ WINDOW_KINDS = ("local", "dense")
 RECORDED_LOOK = {"arm": "formation", "statistic": "helix_hydropathy_periodicity",
                  "n_site": 10, "n_groups": 9, "difference": 1.317}
 
-#: How close a difference has to be to count as the same number.
-LOOK_TOLERANCE = 0.001
+#: How many Monte-Carlo standard errors a difference may move and still count as
+#: the same number. Amendment 2 section 3: a re-seeded null is a fresh draw on
+#: the same windows, so the right unit is the spread the shuffle count implies
+#: and not a fixed constant - which is what the first version of this check used,
+#: and why it reported a gap of 0.41 standard errors as a failure to reproduce.
+LOOK_SPREAD_BOUND = 3.0
 
 #: Arms that may become a finding. The plan's two, plus the one confirmatory
 #: arm amendment 1 adds; everything else is reported and never promoted.
@@ -648,6 +653,66 @@ def holm_over(entries: List[Dict[str, object]], family: Sequence[str]) -> None:
             and not entry["length_confounded"])
 
 
+def null_spread(shuffles: int, n_windows: int, z: float = 1.0) -> float:
+    """How far a fresh draw of the same windows' nulls moves a contrast.
+
+    A ``composition_z`` against ``m`` shuffles carries Monte-Carlo error of about
+    ``sqrt((1 + z**2 / 2) / m)`` from its null mean and standard deviation. An
+    arm averages that over its windows, the contrast subtracts two such arms,
+    and comparing two independent draws doubles the variance again - so two
+    factors of root two on top of the per-window error.
+    """
+    if shuffles <= 0 or n_windows <= 0:
+        return float("inf")
+    per_window = math.sqrt((1.0 + z * z / 2.0) / float(shuffles))
+    return 2.0 * per_window / math.sqrt(float(n_windows))
+
+
+def look_reproduction(entries: Sequence[Dict[str, object]], *, shuffles: int
+                      ) -> Dict[str, object]:
+    """Whether this run is looking at the data amendment 1 section 1 disclosed.
+
+    Selection and Monte-Carlo noise are judged separately, because only one of
+    them can be exact. The selection rule reads ranks and lengths and never a
+    seed, so the window and group counts must match with no tolerance at all;
+    the difference is a mean of permutation z-scores, so it moves whenever the
+    nulls are redrawn and is judged against the spread its own shuffle count
+    implies. Both numbers are reported, so the arithmetic can be checked
+    instead of the verdict being taken on trust.
+    """
+    found = [e for e in entries
+             if e.get("runnable") and e.get("arm") == RECORDED_LOOK["arm"]
+             and e.get("statistic") == RECORDED_LOOK["statistic"]]
+    if not found:
+        return {"recorded": RECORDED_LOOK, "verdict": "not reproduced",
+                "reason": "the pre-registered arm did not run at all",
+                "selection_reproduced": False}
+    entry = found[0]
+    n_site, n_groups = int(entry["n_site"]), int(entry["n_groups"])
+    difference = float(entry["difference"])
+    selection = (n_site == RECORDED_LOOK["n_site"]
+                 and n_groups == RECORDED_LOOK["n_groups"])
+    gap = abs(difference - float(RECORDED_LOOK["difference"]))
+    spread = null_spread(shuffles, n_site)
+    within = gap <= LOOK_SPREAD_BOUND * spread
+    if selection and within:
+        reason = ("the same windows in the same groups, and a difference within "
+                  "the spread a redrawn null implies")
+    elif not selection:
+        reason = "the selection differs, which no re-seeding can cause"
+    else:
+        reason = "the selection holds but the difference moved further than a redrawn null explains"
+    return {
+        "recorded": RECORDED_LOOK, "n_site": n_site, "n_groups": n_groups,
+        "difference": difference, "selection_reproduced": selection,
+        "difference_gap": gap, "expected_spread": spread,
+        "gap_in_spreads": (gap / spread) if spread > 0 else float("inf"),
+        "spread_bound": LOOK_SPREAD_BOUND,
+        "verdict": "reproduced" if (selection and within) else "not reproduced",
+        "reason": reason,
+    }
+
+
 def run(sequences: pd.DataFrame, pockets: pd.DataFrame, sites: Optional[pd.DataFrame],
         classes: Optional[pd.DataFrame], *, shuffles: int, n_bootstrap: int,
         per_site: int) -> Dict[str, object]:
@@ -722,22 +787,7 @@ def run(sequences: pd.DataFrame, pockets: pd.DataFrame, sites: Optional[pd.DataF
     heldout_family = [f"formation_heldout:{statistic}" for statistic in PRIMARY]
     holm_over([e for e in entries if e.get("arm") == "formation_heldout"], heldout_family)
 
-    recorded = [e for e in entries
-                if e.get("runnable") and e.get("arm") == RECORDED_LOOK["arm"]
-                and e.get("statistic") == RECORDED_LOOK["statistic"]]
-    reproduction: Dict[str, object] = {"recorded": RECORDED_LOOK}
-    if not recorded:
-        reproduction["verdict"] = "the pre-registered arm did not run at all"
-    else:
-        found = recorded[0]
-        same = (int(found["n_site"]) == RECORDED_LOOK["n_site"]
-                and int(found["n_groups"]) == RECORDED_LOOK["n_groups"]
-                and abs(float(found["difference"]) - float(RECORDED_LOOK["difference"]))
-                <= LOOK_TOLERANCE)
-        reproduction.update({
-            "n_site": int(found["n_site"]), "n_groups": int(found["n_groups"]),
-            "difference": float(found["difference"]),
-            "verdict": "reproduced" if same else "not reproduced"})
+    reproduction = look_reproduction(entries, shuffles=shuffles)
 
     report: Dict[str, object] = {
         "seed": SEED, "shuffles": shuffles,
@@ -892,25 +942,41 @@ def markdown(report: Dict[str, object]) -> str:
     reproduction = report.get("look_reproduction") or {}
     verdict = str(reproduction.get("verdict", "unknown"))
     recorded = reproduction.get("recorded") or {}
+    arithmetic = (
+        f"Amendment 1 section 1 records {recorded.get('n_site')} windows across "
+        f"{recorded.get('n_groups')} groups at a difference of "
+        f"{recorded.get('difference')}; this run selected "
+        f"{reproduction.get('n_site')} across {reproduction.get('n_groups')} and "
+        f"gives {float(reproduction.get('difference', float('nan'))):.6f}, a gap of "
+        f"{float(reproduction.get('difference_gap', float('nan'))):.5f} against an "
+        f"expected redraw spread of "
+        f"{float(reproduction.get('expected_spread', float('nan'))):.5f} "
+        f"({float(reproduction.get('gap_in_spreads', float('nan'))):.2f} of it, bound "
+        f"{reproduction.get('spread_bound')}).")
     if verdict == "reproduced":
         audit = (
-            "The pre-registered arm reproduced the run amendment 1 section 1 "
-            f"discloses exactly - {reproduction.get('n_site')} windows across "
-            f"{reproduction.get('n_groups')} groups, difference "
-            f"{float(reproduction.get('difference', float('nan'))):+.3f} - so this is "
-            "the same pocket table that was looked at, and the exclusion above is the "
-            "set of groups that look covered.")
+            "The pre-registered arm reproduced the disclosed look: the selection is "
+            "identical, and the difference moved only as far as a redrawn null "
+            f"explains. {arithmetic} So this is the same pocket table that was looked "
+            "at, and the exclusion above is the set of groups that look covered."
+        )
+    elif reproduction.get("selection_reproduced"):
+        audit = (
+            "**The selection reproduced but the difference did not.** "
+            f"{arithmetic} The windows and groups are the ones that were looked at, so "
+            "the exclusion above is the right set; but something other than the null's "
+            "seed has moved the contrast, and that **must be explained before the "
+            "held-out arm is read as confirmatory**."
+        )
     else:
         audit = (
-            f"**The pre-registered arm did not reproduce the disclosed look** ({verdict}): "
-            f"amendment 1 section 1 records {recorded.get('n_site')} windows across "
-            f"{recorded.get('n_groups')} groups at a difference of "
-            f"{recorded.get('difference')}, and this run gives "
-            f"{reproduction.get('n_site')} across {reproduction.get('n_groups')} at "
-            f"{reproduction.get('difference')}. The pocket table is therefore not the "
-            "one that was looked at, so the held-out arm cannot be assumed held out "
-            "from anything and **must be read as exploratory** until the difference is "
-            "explained.")
+            "**The pre-registered arm did not select what it selected before** "
+            f"({reproduction.get('reason')}). {arithmetic} The selection rule reads "
+            "ranks and lengths and never a seed, so the pocket table is not the one "
+            "that was looked at, the exclusion above is not the set that look covered, "
+            "and the held-out arm **must be read as exploratory** until the difference "
+            "is explained."
+        )
     lines += [
         "",
         "## The held-out arm",

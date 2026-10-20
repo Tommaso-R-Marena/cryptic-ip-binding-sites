@@ -10,6 +10,7 @@ scores, and must stay quiet when the same construction carries no signal.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -486,21 +487,82 @@ def test_the_classes_step_reads_positions_and_writes_an_element(tmp_path):
                                      "periodic_other"}
 
 
+def _look(n_site, n_groups, difference):
+    return [{"arm": script.RECORDED_LOOK["arm"],
+             "statistic": script.RECORDED_LOOK["statistic"], "runnable": True,
+             "n_site": n_site, "n_groups": n_groups, "difference": difference}]
+
+
+def test_a_redrawn_null_still_counts_as_the_same_look():
+    """Amendment 2 section 2: the real gap was 0.41 of one standard error."""
+    recorded = script.RECORDED_LOOK
+    check = script.look_reproduction(
+        _look(recorded["n_site"], recorded["n_groups"], 1.309855329), shuffles=2000)
+    assert check["selection_reproduced"] is True
+    assert check["verdict"] == "reproduced"
+    assert check["gap_in_spreads"] < 1.0
+    # And the spread is the quantity the shuffle count implies, not a constant.
+    assert check["expected_spread"] == pytest.approx(
+        script.null_spread(2000, recorded["n_site"]))
+
+
+def test_a_difference_a_redraw_cannot_explain_is_not_the_same_look():
+    recorded = script.RECORDED_LOOK
+    check = script.look_reproduction(
+        _look(recorded["n_site"], recorded["n_groups"], 0.4), shuffles=2000)
+    assert check["selection_reproduced"] is True
+    assert check["verdict"] == "not reproduced"
+    assert check["gap_in_spreads"] > script.LOOK_SPREAD_BOUND
+
+
+def test_a_changed_selection_is_never_excused_by_noise():
+    """No tolerance at all on the selection: no re-seeding can move it."""
+    recorded = script.RECORDED_LOOK
+    for n_site, n_groups in ((recorded["n_site"] + 1, recorded["n_groups"]),
+                             (recorded["n_site"], recorded["n_groups"] - 1)):
+        check = script.look_reproduction(
+            _look(n_site, n_groups, recorded["difference"]), shuffles=2000)
+        assert check["selection_reproduced"] is False
+        assert check["verdict"] == "not reproduced"
+
+
+def test_an_arm_that_did_not_run_cannot_reproduce_anything():
+    check = script.look_reproduction([], shuffles=2000)
+    assert check["verdict"] == "not reproduced"
+    assert check["selection_reproduced"] is False
+    assert "did not run" in str(check["reason"])
+
+
+def test_the_redraw_spread_shrinks_with_shuffles_and_windows():
+    assert script.null_spread(8000, 10) < script.null_spread(2000, 10)
+    assert script.null_spread(2000, 40) < script.null_spread(2000, 10)
+    assert script.null_spread(0, 10) == float("inf")
+    assert script.null_spread(2000, 0) == float("inf")
+
+
 def test_the_report_says_whether_the_disclosed_look_reproduced():
     """The held-out arm is only held out if the data underneath it is unchanged."""
     base = {"seed": 1, "shuffles": 2, "n_pocket_windows": 0, "n_dense_windows": 0,
             "n_classified": 0, "n_site_windows": 0, "n_control_windows": 0,
             "n_scored_windows": 0, "top_rank": 5, "heldout_groups_excluded": ["a"],
             "window_yield": {}, "tests": []}
-    good = dict(base, look_reproduction={
-        "recorded": script.RECORDED_LOOK, "verdict": "reproduced",
-        "n_site": 10, "n_groups": 9, "difference": 1.317})
-    assert "reproduced the run amendment 1 section 1" in script.markdown(good)
-    bad = dict(base, look_reproduction={
-        "recorded": script.RECORDED_LOOK, "verdict": "not reproduced",
-        "n_site": 4, "n_groups": 3, "difference": 0.2})
-    text = script.markdown(bad)
-    assert "did not reproduce the disclosed look" in text
+    good = dict(base, look_reproduction=script.look_reproduction(
+        _look(10, 9, 1.309855329), shuffles=2000))
+    assert "reproduced the disclosed look" in script.markdown(good)
+
+    # The selection held and the contrast moved further than a redraw explains:
+    # the exclusion is right, but something unexplained moved the number.
+    drifted = dict(base, look_reproduction=script.look_reproduction(
+        _look(10, 9, 0.4), shuffles=2000))
+    text = script.markdown(drifted)
+    assert "selection reproduced but the difference did not" in text
+    assert "before the held-out arm is read as confirmatory" in text
+
+    # A changed selection is the serious case, and reads as exploratory.
+    changed = dict(base, look_reproduction=script.look_reproduction(
+        _look(4, 3, 0.2), shuffles=2000))
+    text = script.markdown(changed)
+    assert "did not select what it selected before" in text
     assert "must be read as exploratory" in text
 
 
@@ -509,3 +571,61 @@ def test_the_recorded_look_is_the_one_the_amendment_discloses():
     assert str(script.RECORDED_LOOK["n_site"]) in text
     assert str(script.RECORDED_LOOK["n_groups"]) in text
     assert f"+{script.RECORDED_LOOK['difference']}" in text
+
+
+# ------------------------------------------- what the committed run must keep saying
+
+def _committed():
+    return json.loads(
+        (ROOT / "results" / "pocket_sequence" / "pocket_sequence.json").read_text())
+
+
+def test_the_committed_run_found_nothing_and_says_so():
+    report = _committed()
+    primary = [t for t in report["tests"]
+               if t.get("runnable") and t.get("family") == "primary"]
+    assert primary
+    assert not any(t["is_finding"] for t in primary), \
+        "a Q9 primary test became a finding; the reports and amendments say none did"
+
+
+def test_the_confirmatory_heldout_arm_is_powered_and_null():
+    """Amendment 2 section 1: this is the arm the whole re-specification was for."""
+    report = _committed()
+    rows = [t for t in report["tests"]
+            if t.get("runnable") and t["arm"] == "formation_heldout"
+            and t["statistic"] in script.PRIMARY]
+    assert len(rows) == len(script.PRIMARY)
+    for row in rows:
+        assert row["n_groups"] >= 5, "below the plan's evidence floor"
+        assert row["exceeds_power"] is False, \
+            "the arm now detects its own difference, so it is no longer a null result"
+        assert abs(row["difference"]) < row["minimum_detectable"]
+        assert row["is_finding"] is False
+
+
+def test_the_underpowered_look_did_not_survive_power():
+    """The +1.3 of amendment 1 section 1 against every better-powered form of it."""
+    report = _committed()
+    by_arm = {t["arm"]: t for t in report["tests"]
+              if t.get("runnable") and t["statistic"] == "helix_hydropathy_periodicity"}
+    assert by_arm["formation"]["difference"] > 1.0          # the look, reproduced
+    assert by_arm["formation"]["n_site"] == 10
+    for arm in ("formation_matched", "formation_dense", "formation_matched_dense",
+                "formation_heldout"):
+        row = by_arm[arm]
+        assert row["n_site"] >= 100, f"{arm} is not the powered form of the contrast"
+        assert abs(row["difference"]) < 0.2, \
+            f"{arm} no longer collapses the look; the amendments say it does"
+
+
+def test_every_exploratory_arm_in_the_committed_run_is_marked_exploratory():
+    report = _committed()
+    for test in report["tests"]:
+        if not test.get("runnable"):
+            continue
+        if test["arm"] in script.CONFIRMATORY_ARMS:
+            continue
+        assert test.get("family") == "exploratory", test["arm"]
+        assert test.get("p_holm") is None
+        assert test["is_finding"] is False

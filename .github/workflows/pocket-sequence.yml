@@ -31,6 +31,7 @@ on:
     paths:
       - 'docs/POCKET_SEQUENCE_PLAN.md'
       - 'docs/POCKET_SEQUENCE_PLAN_AMENDMENT_1.md'
+      - 'docs/POCKET_SEQUENCE_PLAN_AMENDMENT_2.md'
       - 'scripts/pocket_sequence.py'
       - 'cryptic_ip/detect/sequence.py'
       - '.github/workflows/pocket-sequence.yml'
