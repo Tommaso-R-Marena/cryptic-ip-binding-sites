@@ -10,10 +10,19 @@ name: Sequence and pockets
 # Three jobs:
 #
 #   pockets    re-detects every pocket in the 75 candidate models, exactly as
-#              the within-protein workflow does. Needs fpocket.
-#   sequences  reads the chain sequences out of the same structure files and
-#              runs no detection at all, so it is minutes.
-#   analyse    the three arms. A pure function of the two tables above.
+#              the within-protein workflow does, reads their chain sequences,
+#              and classifies each pocket's architecture from its positions.
+#              Needs fpocket.
+#   sites      the function arm's inputs: every annotated inositol-phosphate
+#              copy's contact shell, from its deposited structure, with NO
+#              pocket detection - Q9c needs the shell and the chain sequence
+#              and nothing else, so this is minutes rather than hours.
+#   analyse    every arm. A pure function of the tables above.
+#
+# Amendment 1 (docs/POCKET_SEQUENCE_PLAN_AMENDMENT_1.md) is why the first run
+# is not simply repeated: it never passed --sites or --classes, so two of the
+# three arms had no input at all, and the third ran on ten windows because
+# fpocket's rank is collinear with window length in this dataset.
 
 on:
   push:
@@ -21,6 +30,7 @@ on:
       - main
     paths:
       - 'docs/POCKET_SEQUENCE_PLAN.md'
+      - 'docs/POCKET_SEQUENCE_PLAN_AMENDMENT_1.md'
       - 'scripts/pocket_sequence.py'
       - 'cryptic_ip/detect/sequence.py'
       - '.github/workflows/pocket-sequence.yml'
@@ -32,6 +42,9 @@ on:
       limit:
         description: 'at most this many proteins (0 = all)'
         default: '0'
+      class_draws:
+        description: 'permutation draws per architecture null in the class step'
+        default: '800'
 
 concurrency:
   group: pocket-sequence-${{ github.ref }}
@@ -43,6 +56,7 @@ permissions:
 env:
   SHUFFLES: ${{ inputs.shuffles || '2000' }}
   LIMIT: ${{ inputs.limit || '0' }}
+  CLASS_DRAWS: ${{ inputs.class_draws || '800' }}
 
 jobs:
   pockets:
@@ -83,6 +97,14 @@ jobs:
         run: |
           python scripts/pocket_sequence.py sequences \
             --structures structures/alphafold --out sequences.csv
+      - name: Classify each pocket's architecture from its positions
+        shell: bash -l {0}
+        # The class reads positions and never letters, which is what makes the
+        # two sides of the type arm independent by construction.
+        run: |
+          python scripts/pocket_sequence.py classes \
+            --sequences sequences.csv --pockets pockets.csv \
+            --draws "$CLASS_DRAWS" --out classes.csv
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -90,12 +112,79 @@ jobs:
           path: |
             pockets.csv
             sequences.csv
+            classes.csv
             pockets_report.json
+          retention-days: 90
+
+  sites:
+    name: Annotated contact shells, and the sequences they sit in
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Cache the deposited structures
+        uses: actions/cache@v5
+        with:
+          path: structures/rcsb
+          key: within-protein-rcsb-v1
+      - name: List the entries this arm needs
+        # The within-protein study's census filter, called rather than copied,
+        # so the two studies cannot drift apart about which copies count.
+        run: |
+          python - <<'PY'
+          import importlib.util, sys
+          import pandas as pd
+          spec = importlib.util.spec_from_file_location("wp", "scripts/within_protein.py")
+          wp = importlib.util.module_from_spec(spec)
+          sys.modules["wp"] = wp
+          spec.loader.exec_module(wp)
+          copies = wp.select_copies(pd.read_csv("results/redocking/census.csv"))
+          ids = sorted(set(copies["pdb_id"].astype(str)))
+          pd.DataFrame({"pdb_id": ids}).to_csv("entries.csv", index=False)
+          print(f"{len(copies)} copies across {len(ids)} entries")
+          PY
+      - name: Download them
+        run: |
+          python scripts/fetch_structures.py rcsb \
+            --out structures/rcsb --prefer pdb \
+            --ids-csv entries.csv --column pdb_id
+      - name: The contact shells
+        run: |
+          python scripts/pocket_sequence.py sites \
+            --census results/redocking/census.csv \
+            --structures structures/rcsb \
+            --limit "$LIMIT" \
+            --out sites.csv --report sites_report.json
+      - name: And the sequences of the same files
+        run: |
+          python scripts/pocket_sequence.py sequences \
+            --structures structures/rcsb --out site_sequences.csv
+      - name: Print the tables
+        run: |
+          python scripts/extract_log_block.py emit Q9_SITES_B64 sites.csv
+          python scripts/extract_log_block.py emit Q9_SITES_REPORT_JSON sites_report.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pocket-sequence-sites
+          path: |
+            sites.csv
+            site_sequences.csv
+            sites_report.json
           retention-days: 90
 
   analyse:
     name: Formation, type and function
-    needs: [pockets]
+    needs: [pockets, sites]
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
@@ -113,11 +202,17 @@ jobs:
         with:
           name: pocket-sequence-inputs
           path: parts
+      - uses: actions/download-artifact@v7
+        with:
+          name: pocket-sequence-sites
+          path: parts
       - name: Run study Q9
         run: |
           python scripts/pocket_sequence.py analyse \
-            --sequences parts/sequences.csv \
+            --sequences parts/sequences.csv parts/site_sequences.csv \
             --pockets parts/pockets.csv \
+            --classes parts/classes.csv \
+            --sites parts/sites.csv \
             --shuffles "$SHUFFLES" \
             --out pocket_sequence.json --markdown POCKET_SEQUENCE.md
       - name: Print the results

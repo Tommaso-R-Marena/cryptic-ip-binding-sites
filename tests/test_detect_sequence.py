@@ -722,3 +722,81 @@ def test_hydropathy_and_charge_are_different_questions():
     face = "LAALLAALLAALLAALLAAL"
     assert sq.helix_hydropathy_periodicity(face) > 0.5
     assert sq.helix_charge_periodicity(face) < 0.5
+
+
+# ------------------------------------- the vectorised periodogram is the same fit
+
+def _lstsq_reference(series, period):
+    """The least-squares fit `periodicity_power` was written as, verbatim.
+
+    Kept here rather than in the module, so the vectorised form is pinned
+    against the code it replaced instead of against itself.
+    """
+    series = np.asarray(series, dtype=float)
+    n = series.size
+    centred = series - series.mean()
+    variance = float(np.sum(centred * centred))
+    if variance == 0.0:
+        return 0.0
+    angles = 2.0 * np.pi * np.arange(n) / float(period)
+    basis = np.column_stack([np.cos(angles), np.sin(angles)])
+    keep = np.linalg.norm(basis, axis=0) > 1e-12
+    basis = basis[:, keep]
+    if basis.shape[1] == 0:
+        return 0.0
+    coefficients, *_ = np.linalg.lstsq(basis, centred, rcond=None)
+    explained = float(np.sum((basis @ coefficients) ** 2))
+    return float(min(1.0, explained / variance))
+
+
+def test_the_vectorised_fit_is_the_least_squares_fit():
+    """A performance change that moved a number would have moved every result."""
+    rng = np.random.default_rng(0)
+    worst = 0.0
+    for _ in range(200):
+        n = int(rng.integers(4, 60))
+        series = rng.normal(size=n)
+        for period in list(rng.uniform(1.01, 14.0, size=5)) + [2.0, 3.0, 3.6, 4.2]:
+            worst = max(worst, abs(_lstsq_reference(series, period)
+                                   - sq.periodicity_power(series, period)))
+    assert worst < 1e-9
+
+
+def test_the_nyquist_quadrature_is_still_dropped():
+    """At period 2 the sine vanishes; fitting it would return more than one."""
+    alternating = np.array([1.0, -1.0] * 12)
+    assert sq.periodicity_power(alternating, 2.0) == pytest.approx(1.0)
+    assert sq.periodicity_power(alternating, 2.0) <= 1.0
+
+
+def test_a_grid_of_probes_agrees_with_the_probes_one_at_a_time():
+    rng = np.random.default_rng(3)
+    series = rng.normal(size=37)
+    grid = [2.0, 2.5, 3.0, 3.6, 4.2, 7.0, 11.5]
+    together = sq.probe_powers(series, grid)
+    apart = [sq.periodicity_power(series, period) for period in grid]
+    assert together == pytest.approx(apart, abs=1e-12)
+
+
+def test_a_flat_series_has_no_periodicity_at_any_probe():
+    flat = np.zeros(20)
+    assert sq.probe_powers(flat, [2.0, 3.6, 9.0]) == pytest.approx([0.0, 0.0, 0.0])
+
+
+def test_a_probe_grid_is_still_refused_where_a_single_probe_would_be():
+    with pytest.raises(sq.SequenceError):
+        sq.probe_powers(np.zeros(3), [3.6])
+    with pytest.raises(sq.SequenceError):
+        sq.probe_powers(np.zeros(20), [1.0])
+    with pytest.raises(sq.SequenceError):
+        sq.probe_powers(np.zeros(20), [])
+
+
+def test_the_basis_cache_does_not_leak_between_window_lengths():
+    """Same period grid, different lengths: each must get its own basis."""
+    rng = np.random.default_rng(7)
+    short, long = rng.normal(size=12), rng.normal(size=48)
+    assert sq.probe_powers(short, [3.6])[0] == pytest.approx(
+        _lstsq_reference(short, 3.6), abs=1e-9)
+    assert sq.probe_powers(long, [3.6])[0] == pytest.approx(
+        _lstsq_reference(long, 3.6), abs=1e-9)

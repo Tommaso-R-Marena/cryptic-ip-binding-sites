@@ -22,6 +22,7 @@ minutes rather than hours; `analyse` is a pure function of committed tables.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -53,6 +54,41 @@ TOP_RANK = 5
 #: Window lengths must match within this many residues, or the comparison is
 #: reported as length-confounded.
 LENGTH_TOLERANCE = 2
+
+#: Amendment 1 section 4: the `dense` window's fixed length. The same cap as
+#: `local`, used as a width rather than as a refusal, so every window of this
+#: kind is exactly this long and the length confound is zero by construction.
+DENSE_WINDOW = MAX_WINDOW
+
+#: Amendment 1 section 3: at most this many matched pairs from one protein, so
+#: a model with two hundred pockets cannot carry an arm on its own.
+MAX_PAIRS_PER_PROTEIN = 12
+
+#: And at most this many from an arm that is not split by protein.
+MAX_PAIRS_PER_ARM = 400
+
+#: Permutation draws per architecture null in the `classes` step. The
+#: architecture module's own default, fixed here so the class table is
+#: reproducible from the committed command line alone.
+CLASS_DRAWS = 800
+
+#: The two window definitions. `local` is the plan's; `dense` is amendment 1's
+#: and is exploratory on every arm.
+WINDOW_KINDS = ("local", "dense")
+
+#: What the pre-registered arm reported in the one run amendment 1 section 1
+#: discloses, so that this run can say whether it is looking at the same data.
+#: If these do not reproduce, the pocket table has changed and the held-out
+#: arm's claim to be held out from anything has to be re-established.
+RECORDED_LOOK = {"arm": "formation", "statistic": "helix_hydropathy_periodicity",
+                 "n_site": 10, "n_groups": 9, "difference": 1.317}
+
+#: How close a difference has to be to count as the same number.
+LOOK_TOLERANCE = 0.001
+
+#: Arms that may become a finding. The plan's two, plus the one confirmatory
+#: arm amendment 1 adds; everything else is reported and never promoted.
+CONFIRMATORY_ARMS = ("formation", "function", "type", "formation_heldout")
 
 #: The primary family, fixed by the plan: two statistics on two arms.
 PRIMARY = ("helix_charge_periodicity", "helix_hydropathy_periodicity")
@@ -110,8 +146,13 @@ def chain_sequences(path: Path) -> Dict[str, Dict[int, str]]:
 
 def cmd_sequences(args: argparse.Namespace) -> int:
     rows = []
-    paths = sorted(p for p in args.structures.iterdir()
-                   if p.suffix.lower() in {".pdb", ".ent"})
+    paths = []
+    for directory in args.structures:
+        if not directory.is_dir():
+            print(f"no such directory: {directory}", flush=True)
+            continue
+        paths += sorted(path for path in directory.iterdir()
+                        if path.suffix.lower() in {".pdb", ".ent"})
     for index, path in enumerate(paths, start=1):
         try:
             chains = chain_sequences(path)
@@ -162,6 +203,73 @@ def local_window(numbers: Dict[int, str], positions: Sequence[int]) -> Optional[
     if len(text) < MIN_WINDOW or not set(text) <= STANDARD:
         return None
     return text
+
+
+def dense_starts(numbers: Dict[int, str]) -> Tuple[np.ndarray, Dict[int, str]]:
+    """Every start of a complete, standard, `DENSE_WINDOW`-long stretch of a chain.
+
+    Built once per chain, because a 2500-residue model has as many starts as it
+    has residues and as many pockets as fpocket cares to find.
+    """
+    ordered = sorted(numbers)
+    texts: Dict[int, str] = {}
+    if len(ordered) < DENSE_WINDOW:
+        return np.empty(0, dtype=int), texts
+    for start in ordered:
+        letters = [numbers.get(n) for n in range(start, start + DENSE_WINDOW)]
+        if any(letter is None for letter in letters):
+            continue
+        text = "".join(letter for letter in letters if letter)
+        if not set(text) <= STANDARD:
+            continue
+        texts[start] = text
+    return np.asarray(sorted(texts), dtype=int), texts
+
+
+def dense_window(starts: np.ndarray, texts: Dict[int, str],
+                 positions: Sequence[int]) -> Optional[str]:
+    """Amendment 1's window: the densest fixed-width stretch the lining sits in.
+
+    The `DENSE_WINDOW`-residue contiguous stretch containing the most of the
+    lining's positions, ties going to the lowest start. It reads positions only
+    - never the letters it will be scored on - and every window it returns is
+    exactly `DENSE_WINDOW` long, so the length confound the plan matches away
+    is zero here by construction. Exploratory on every arm; see the amendment.
+    """
+    if starts.size == 0:
+        return None
+    wanted = np.asarray(sorted({int(p) for p in positions}), dtype=int)
+    if wanted.size == 0:
+        return None
+    inside = (np.searchsorted(wanted, starts + DENSE_WINDOW, side="left")
+              - np.searchsorted(wanted, starts, side="left"))
+    best = int(np.argmax(inside))
+    if int(inside[best]) <= 0:
+        return None
+    return texts[int(starts[best])]
+
+
+def refusal(numbers: Dict[int, str], positions: Sequence[int]) -> Optional[str]:
+    """Why `local_window` refused a lining, for the yield diagnostics.
+
+    Amendment 1 section 6. Reporting only: it reproduces the refusal `local_window`
+    already made rather than deciding anything.
+    """
+    wanted = sorted({int(p) for p in positions})
+    if not wanted:
+        return "no positions"
+    first, last = wanted[0], wanted[-1]
+    if last - first + 1 > MAX_WINDOW:
+        return "span over the cap"
+    letters = [numbers.get(n) for n in range(first, last + 1)]
+    if any(letter is None for letter in letters):
+        return "gap in the model"
+    text = "".join(letter for letter in letters if letter)
+    if len(text) < MIN_WINDOW:
+        return "under the floor"
+    if not set(text) <= STANDARD:
+        return "non-standard letter"
+    return None
 
 
 def window_z(text: str, statistic: str, *, shuffles: int, seed: int) -> Optional[float]:
@@ -251,7 +359,9 @@ def sequence_index(sequences: pd.DataFrame) -> Dict[Tuple[str, str], Dict[int, s
 
 def windows_for_pockets(pockets: pd.DataFrame,
                         index: Dict[Tuple[str, str], Dict[int, str]],
-                        *, key_of, chain_of, group_of) -> List[Dict[str, object]]:
+                        *, key_of, chain_of, group_of, kind: str = "local",
+                        yields: Optional[Dict[str, int]] = None
+                        ) -> List[Dict[str, object]]:
     """One row per pocket whose `local` window can carry an order null.
 
     Windows only: the order null costs 2000 shuffles of eight statistics per
@@ -263,12 +373,28 @@ def windows_for_pockets(pockets: pd.DataFrame,
     arm selected it or on how many pockets were scored before it.
     """
     rows: List[Dict[str, object]] = []
+    dense_cache: Dict[Tuple[str, str], Tuple[np.ndarray, Dict[int, str]]] = {}
     for position, pocket in enumerate(pockets.itertuples()):
-        numbers = index.get((key_of(pocket), chain_of(pocket)))
+        key = (key_of(pocket), chain_of(pocket))
+        numbers = index.get(key)
         if numbers is None:
+            if yields is not None:
+                yields["chain not in the sequence table"] = yields.get(
+                    "chain not in the sequence table", 0) + 1
             continue
         residues = [int(r) for r in str(pocket.residues).split(",") if r.strip()]
-        text = local_window(numbers, residues)
+        if kind == "local":
+            text = local_window(numbers, residues)
+            if text is None and yields is not None:
+                reason = refusal(numbers, residues) or "refused"
+                yields[reason] = yields.get(reason, 0) + 1
+        else:
+            if key not in dense_cache:
+                dense_cache[key] = dense_starts(numbers)
+            starts, texts = dense_cache[key]
+            text = dense_window(starts, texts, residues)
+            if text is None and yields is not None:
+                yields["no dense stretch"] = yields.get("no dense stretch", 0) + 1
         if text is None:
             continue
         rows.append({
@@ -279,9 +405,31 @@ def windows_for_pockets(pockets: pd.DataFrame,
             "length": len(text),
             "n_lining": len(residues),
             "window": text,
-            "seed": SEED + position,
+            # The seed is the window's, not the arm's: a window keyed by its
+            # own letters gives the same null wherever it is selected, and the
+            # same null for `local` and `dense` when they coincide.
+            "seed": SEED + (hash_window(text) % 1_000_003),
         })
     return rows
+
+
+def hash_window(text: str) -> int:
+    """A stable integer for a window's letters, across processes and runs.
+
+    `hash()` is salted per process, so it cannot seed anything that has to be
+    reproducible from a committed command line.
+    """
+    return int(hashlib.sha256(text.encode("ascii")).hexdigest()[:12], 16)
+
+
+def cap_pairs(left: List[Dict[str, object]], right: List[Dict[str, object]],
+              limit: int, rng: np.random.Generator
+              ) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
+    """Keep at most `limit` of the matched pairs, seeded (amendment 1 section 3)."""
+    if limit <= 0 or len(left) <= limit:
+        return left, right
+    keep = sorted(rng.choice(len(left), size=limit, replace=False).tolist())
+    return [left[i] for i in keep], [right[i] for i in keep]
 
 
 def score_windows(rows: Sequence[Dict[str, object]], statistics: Sequence[str],
@@ -297,16 +445,27 @@ def score_windows(rows: Sequence[Dict[str, object]], statistics: Sequence[str],
         row["scored"] = True
 
 
+def by_protein_of(rows: Sequence[Dict[str, object]]) -> Dict[str, List[Dict[str, object]]]:
+    out: Dict[str, List[Dict[str, object]]] = {}
+    for row in rows:
+        out.setdefault(str(row["id"]), []).append(row)
+    return out
+
+
 def formation(rows: List[Dict[str, object]], *, n_bootstrap: int,
-              statistics: Sequence[str], shuffles: int) -> List[Dict[str, object]]:
-    """Q9a: fpocket's best-ranked pockets against its worst, within each protein."""
+              statistics: Sequence[str], shuffles: int, arm: str = "formation"
+              ) -> Tuple[List[Dict[str, object]], frozenset]:
+    """Q9a as pre-registered: fpocket's top-ranked pockets against its bottom.
+
+    Unchanged by amendment 1, which re-specifies the arm beside this one rather
+    than in place of it. The second return value is the set of resampling groups
+    this rule selected, which is what defines the amendment's held-out set - so
+    that set is a function of the plan and not of me.
+    """
     rng = np.random.default_rng(SEED)
     top: List[Dict[str, object]] = []
     bottom: List[Dict[str, object]] = []
-    by_protein: Dict[str, List[Dict[str, object]]] = {}
-    for row in rows:
-        by_protein.setdefault(str(row["id"]), []).append(row)
-    for protein, found in by_protein.items():
+    for _, found in sorted(by_protein_of(rows).items()):
         ordered = sorted(found, key=lambda r: int(r["rank"]))
         if len(ordered) < 2 * TOP_RANK:
             continue
@@ -318,12 +477,50 @@ def formation(rows: List[Dict[str, object]], *, n_bootstrap: int,
         top.extend(matched_best)
         bottom.extend(matched_worst)
     score_windows(top + bottom, statistics, shuffles=shuffles)
-    return [contrast("formation", top, bottom, statistic, n_bootstrap=n_bootstrap)
+    selected = frozenset(str(row["group"]) for row in top + bottom)
+    return ([contrast(arm, top, bottom, statistic, n_bootstrap=n_bootstrap)
+             for statistic in statistics], selected)
+
+
+def formation_split(rows: List[Dict[str, object]], *, n_bootstrap: int,
+                    statistics: Sequence[str], shuffles: int, arm: str,
+                    skip_groups: frozenset = frozenset()) -> List[Dict[str, object]]:
+    """Amendment 1 section 3: the rank split taken inside the surviving windows.
+
+    Each protein's windows are ordered by fpocket rank and cut at the median,
+    then length-matched across the cut. Rank is no longer collinear with length,
+    because the comparison is made among the windows that exist rather than
+    between a size class that survives the span cap and one that does not.
+
+    `skip_groups` drops whole resampling groups, which is how the held-out arm
+    is built: the groups the pre-registered rule selected are exactly the ones
+    whose values have been looked at.
+    """
+    rng = np.random.default_rng(SEED + 3)
+    better: List[Dict[str, object]] = []
+    worse: List[Dict[str, object]] = []
+    for _, found in sorted(by_protein_of(rows).items()):
+        if any(str(row["group"]) in skip_groups for row in found):
+            continue
+        ordered = sorted(found, key=lambda r: int(r["rank"]))
+        if len(ordered) < 2:
+            continue
+        half = len(ordered) // 2
+        matched_better, matched_worse = match_on_length(
+            ordered[:half], ordered[len(ordered) - half:], rng)
+        matched_better, matched_worse = cap_pairs(
+            matched_better, matched_worse, MAX_PAIRS_PER_PROTEIN, rng)
+        better.extend(matched_better)
+        worse.extend(matched_worse)
+    better, worse = cap_pairs(better, worse, MAX_PAIRS_PER_ARM, rng)
+    score_windows(better + worse, statistics, shuffles=shuffles)
+    return [contrast(arm, better, worse, statistic, n_bootstrap=n_bootstrap)
             for statistic in statistics]
 
 
 def pocket_type(rows: List[Dict[str, object]], *, n_bootstrap: int,
-                statistics: Sequence[str], shuffles: int) -> List[Dict[str, object]]:
+                statistics: Sequence[str], shuffles: int, arm: str = "type"
+                ) -> List[Dict[str, object]]:
     """Q9b: do the letters anticipate the architecture class of the positions?
 
     The class is computed from positions alone and reads no letters, so the two
@@ -339,8 +536,10 @@ def pocket_type(rows: List[Dict[str, object]], *, n_bootstrap: int,
         elif element == "none":
             others.append(row)
     matched_faces, matched_others = match_on_length(faces, others, rng)
+    matched_faces, matched_others = cap_pairs(
+        matched_faces, matched_others, MAX_PAIRS_PER_ARM, rng)
     score_windows(matched_faces + matched_others, statistics, shuffles=shuffles)
-    return [contrast("type", matched_faces, matched_others, statistic,
+    return [contrast(arm, matched_faces, matched_others, statistic,
                      n_bootstrap=n_bootstrap)
             for statistic in statistics]
 
@@ -370,40 +569,55 @@ def sampled_windows(numbers: Dict[int, str], exclude: Sequence[int], length: int
 
 
 def function(sites: pd.DataFrame, index: Dict[Tuple[str, str], Dict[int, str]],
-             *, n_bootstrap: int, statistics: Sequence[str], shuffles: int,
-             per_site: int) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
-    """Q9c: an annotated contact shell against windows of its own chain."""
+             *, statistics: Sequence[str], shuffles: int, per_site: int,
+             kind: str = "local", yields: Optional[Dict[str, int]] = None
+             ) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
+    """Q9c: an annotated contact shell against windows of its own chain.
+
+    The controls are drawn from the shell's own chain, length-matched to it and
+    clear of it, so the comparison is within one sequence and one organism.
+    """
     rng = np.random.default_rng(SEED + 2)
     site_rows: List[Dict[str, object]] = []
     control_rows: List[Dict[str, object]] = []
-    for position, row in enumerate(sites.itertuples()):
+    dense_cache: Dict[Tuple[str, str], Tuple[np.ndarray, Dict[int, str]]] = {}
+    for row in sites.itertuples():
         stem = str(row.pdb_id).upper()
-        numbers = index.get((stem, str(row.chain))) or index.get(
-            (stem.lower(), str(row.chain)))
+        key = (stem, str(row.chain))
+        numbers = index.get(key)
         if numbers is None:
+            key = (stem.lower(), str(row.chain))
+            numbers = index.get(key)
+        if numbers is None:
+            if yields is not None:
+                yields["chain not in the sequence table"] = yields.get(
+                    "chain not in the sequence table", 0) + 1
             continue
         residues = [int(r) for r in str(row.residues).split(",") if r.strip()]
-        text = local_window(numbers, residues)
+        if kind == "local":
+            text = local_window(numbers, residues)
+            if text is None and yields is not None:
+                reason = refusal(numbers, residues) or "refused"
+                yields[reason] = yields.get(reason, 0) + 1
+        else:
+            if key not in dense_cache:
+                dense_cache[key] = dense_starts(numbers)
+            starts, texts = dense_cache[key]
+            text = dense_window(starts, texts, residues)
+            if text is None and yields is not None:
+                yields["no dense stretch"] = yields.get("no dense stretch", 0) + 1
         if text is None:
             continue
         group = str(getattr(row, "group", row.pdb_id))
-        entry: Dict[str, object] = {"id": str(row.copy), "group": group,
-                                    "length": len(text), "window": text,
-                                    "n_lining": len(residues)}
-        for statistic in statistics:
-            entry[f"z_{statistic}"] = window_z(text, statistic, shuffles=shuffles,
-                                               seed=SEED + position)
-        site_rows.append(entry)
-        for offset, control in enumerate(
-                sampled_windows(numbers, residues, len(text), per_site, rng)):
-            item: Dict[str, object] = {"id": f"{row.copy}:control{offset}",
-                                       "group": group, "length": len(control),
-                                       "window": control}
-            for statistic in statistics:
-                item[f"z_{statistic}"] = window_z(
-                    control, statistic, shuffles=shuffles,
-                    seed=SEED + 10_000 + position * per_site + offset)
-            control_rows.append(item)
+        site_rows.append({"id": str(row.copy), "group": group,
+                          "length": len(text), "window": text,
+                          "n_lining": len(residues),
+                          "seed": SEED + (hash_window(text) % 1_000_003)})
+        for control in sampled_windows(numbers, residues, len(text), per_site, rng):
+            control_rows.append({"id": f"{row.copy}:control", "group": group,
+                                 "length": len(control), "window": control,
+                                 "seed": SEED + (hash_window(control) % 1_000_003)})
+    score_windows(site_rows + control_rows, statistics, shuffles=shuffles)
     return site_rows, control_rows
 
 
@@ -418,13 +632,18 @@ def holm_over(entries: List[Dict[str, object]], family: Sequence[str]) -> None:
             continue
         key = f"{entry['arm']}:{entry['statistic']}"
         if key not in corrected:
-            entry["family"] = "secondary"
+            # Exploratory by declaration, not by outcome: an arm the amendment
+            # named exploratory is in no family, so no Holm value exists for it
+            # and `is_finding` cannot become true however the row reads.
+            exploratory = str(entry["arm"]) not in CONFIRMATORY_ARMS
+            entry["family"] = "exploratory" if exploratory else "secondary"
             entry["is_finding"] = False
             continue
         entry["family"] = "primary"
         entry["p_holm"] = corrected[key]
         entry["is_finding"] = bool(
-            corrected[key] < 0.05 and entry["is_evidence"] and entry["exceeds_power"]
+            str(entry["arm"]) in CONFIRMATORY_ARMS
+            and corrected[key] < 0.05 and entry["is_evidence"] and entry["exceeds_power"]
             and not (entry["interval"][0] <= 0.0 <= entry["interval"][1])
             and not entry["length_confounded"])
 
@@ -432,7 +651,14 @@ def holm_over(entries: List[Dict[str, object]], family: Sequence[str]) -> None:
 def run(sequences: pd.DataFrame, pockets: pd.DataFrame, sites: Optional[pd.DataFrame],
         classes: Optional[pd.DataFrame], *, shuffles: int, n_bootstrap: int,
         per_site: int) -> Dict[str, object]:
-    """All three arms, on the statistics the plan fixed."""
+    """Every arm, on the statistics the plan fixed, in both window definitions.
+
+    The plan's arms (`formation`, `type`, `function`) run on the plan's `local`
+    window and are the only ones that may become a finding, together with the
+    one confirmatory arm amendment 1 adds. Everything suffixed `_dense`, and
+    `formation_matched`, are exploratory by declaration and can never be
+    promoted however they come out.
+    """
     statistics = list(PRIMARY) + list(SECONDARY)
     index = sequence_index(sequences)
     by_pocket_class: Dict[Tuple[str, int], str] = {}
@@ -440,51 +666,106 @@ def run(sequences: pd.DataFrame, pockets: pd.DataFrame, sites: Optional[pd.DataF
         for row in classes.itertuples():
             by_pocket_class[(str(row.uniprot_id), int(row.pocket_id))] = str(row.element)
 
-    pocket_rows = windows_for_pockets(
-        pockets, index,  # windows only; the null runs after the arms choose
-        key_of=lambda p: str(p.model).replace(".pdb", "").replace(".ent", ""),
-        # An AlphaFold model is one chain, always A, so the lookup is exact
-        # rather than a guess; the deposited structures take their chain from
-        # the census row instead, in `function`.
-        chain_of=lambda p: "A",
-        group_of=lambda p: str(getattr(p, "cluster", p.uniprot_id)))
-    for row in pocket_rows:
-        row["element"] = by_pocket_class.get((str(row["id"]), int(row["pocket_id"])))
+    yields: Dict[str, Dict[str, int]] = {}
+    pocket_rows: Dict[str, List[Dict[str, object]]] = {}
+    for kind in WINDOW_KINDS:
+        yields[f"pockets/{kind}"] = {}
+        pocket_rows[kind] = windows_for_pockets(
+            pockets, index,  # windows only; the null runs after the arms choose
+            key_of=lambda p: str(p.model).replace(".pdb", "").replace(".ent", ""),
+            # An AlphaFold model is one chain, always A, so the lookup is exact
+            # rather than a guess; the deposited structures take their chain
+            # from the census row instead, in `function`.
+            chain_of=lambda p: "A",
+            group_of=lambda p: str(getattr(p, "cluster", p.uniprot_id)),
+            kind=kind, yields=yields[f"pockets/{kind}"])
+        for row in pocket_rows[kind]:
+            row["element"] = by_pocket_class.get((str(row["id"]), int(row["pocket_id"])))
 
     entries: List[Dict[str, object]] = []
-    entries += formation(pocket_rows, n_bootstrap=n_bootstrap, statistics=statistics,
-                         shuffles=shuffles)
-    entries += pocket_type(pocket_rows, n_bootstrap=n_bootstrap, statistics=statistics,
-                           shuffles=shuffles)
-    site_rows: List[Dict[str, object]] = []
-    control_rows: List[Dict[str, object]] = []
-    if sites is not None and not sites.empty:
-        site_rows, control_rows = function(
-            sites, index, n_bootstrap=n_bootstrap, statistics=statistics,
-            shuffles=shuffles, per_site=per_site)
-        entries += [contrast("function", site_rows, control_rows, statistic,
-                             n_bootstrap=n_bootstrap) for statistic in statistics]
+    shared = dict(n_bootstrap=n_bootstrap, statistics=statistics, shuffles=shuffles)
 
+    # The pre-registered rule first, because its selection defines the held-out
+    # set the amendment's confirmatory arm runs on.
+    pre_entries, selected = formation(pocket_rows["local"], arm="formation", **shared)
+    entries += pre_entries
+    entries += formation(pocket_rows["dense"], arm="formation_dense", **shared)[0]
+    entries += formation_split(pocket_rows["local"], arm="formation_matched", **shared)
+    entries += formation_split(pocket_rows["dense"], arm="formation_matched_dense",
+                               **shared)
+    entries += formation_split(pocket_rows["local"], arm="formation_heldout",
+                               skip_groups=selected, **shared)
+    entries += pocket_type(pocket_rows["local"], arm="type", **shared)
+    entries += pocket_type(pocket_rows["dense"], arm="type_dense", **shared)
+
+    counts: Dict[str, int] = {}
+    if sites is not None and not sites.empty:
+        for kind in WINDOW_KINDS:
+            arm = "function" if kind == "local" else "function_dense"
+            yields[f"sites/{kind}"] = {}
+            site_rows, control_rows = function(
+                sites, index, statistics=statistics, shuffles=shuffles,
+                per_site=per_site, kind=kind, yields=yields[f"sites/{kind}"])
+            counts[f"n_site_windows_{kind}"] = len(site_rows)
+            counts[f"n_control_windows_{kind}"] = len(control_rows)
+            entries += [contrast(arm, site_rows, control_rows, statistic,
+                                 n_bootstrap=n_bootstrap) for statistic in statistics]
+
+    # The plan's family, untouched by the amendment.
     primary_family = [f"{arm}:{statistic}"
                       for arm in ("formation", "function") for statistic in PRIMARY]
     holm_over(entries, primary_family)
+    # Q9b asks a different question of a different contrast, so its own family.
     type_family = [f"type:{statistic}" for statistic in PRIMARY]
-    type_entries = [e for e in entries if e.get("arm") == "type"]
-    holm_over(type_entries, type_family)
+    holm_over([e for e in entries if e.get("arm") == "type"], type_family)
+    # And amendment 1's one confirmatory arm, in a third family of its own.
+    heldout_family = [f"formation_heldout:{statistic}" for statistic in PRIMARY]
+    holm_over([e for e in entries if e.get("arm") == "formation_heldout"], heldout_family)
 
-    return {
+    recorded = [e for e in entries
+                if e.get("runnable") and e.get("arm") == RECORDED_LOOK["arm"]
+                and e.get("statistic") == RECORDED_LOOK["statistic"]]
+    reproduction: Dict[str, object] = {"recorded": RECORDED_LOOK}
+    if not recorded:
+        reproduction["verdict"] = "the pre-registered arm did not run at all"
+    else:
+        found = recorded[0]
+        same = (int(found["n_site"]) == RECORDED_LOOK["n_site"]
+                and int(found["n_groups"]) == RECORDED_LOOK["n_groups"]
+                and abs(float(found["difference"]) - float(RECORDED_LOOK["difference"]))
+                <= LOOK_TOLERANCE)
+        reproduction.update({
+            "n_site": int(found["n_site"]), "n_groups": int(found["n_groups"]),
+            "difference": float(found["difference"]),
+            "verdict": "reproduced" if same else "not reproduced"})
+
+    report: Dict[str, object] = {
         "seed": SEED, "shuffles": shuffles,
+        "look_reproduction": reproduction,
         "primary_family": primary_family,
         "type_family": type_family,
+        "heldout_family": heldout_family,
+        "confirmatory_arms": list(CONFIRMATORY_ARMS),
         "max_window": MAX_WINDOW, "min_window": MIN_WINDOW,
+        "dense_window": DENSE_WINDOW,
         "top_rank": TOP_RANK, "length_tolerance": LENGTH_TOLERANCE,
-        "n_pocket_windows": len(pocket_rows),
-        "n_scored_windows": int(sum(1 for r in pocket_rows if r.get("scored"))),
-        "n_site_windows": len(site_rows),
-        "n_control_windows": len(control_rows),
-        "n_classified": int(sum(1 for r in pocket_rows if r.get("element"))),
+        "max_pairs_per_protein": MAX_PAIRS_PER_PROTEIN,
+        "max_pairs_per_arm": MAX_PAIRS_PER_ARM,
+        "heldout_groups_excluded": sorted(selected),
+        "window_yield": yields,
+        "n_pocket_windows": len(pocket_rows["local"]),
+        "n_dense_windows": len(pocket_rows["dense"]),
+        "n_scored_windows": int(sum(1 for rows in pocket_rows.values()
+                                    for r in rows if r.get("scored"))),
+        "n_scored_local": int(sum(1 for r in pocket_rows["local"] if r.get("scored"))),
+        "n_scored_dense": int(sum(1 for r in pocket_rows["dense"] if r.get("scored"))),
+        "n_classified": int(sum(1 for r in pocket_rows["local"] if r.get("element"))),
+        "n_site_windows": counts.get("n_site_windows_local", 0),
+        "n_control_windows": counts.get("n_control_windows_local", 0),
         "tests": entries,
     }
+    report.update(counts)
+    return report
 
 
 def markdown(report: Dict[str, object]) -> str:
@@ -510,10 +791,22 @@ def markdown(report: Dict[str, object]) -> str:
         "hydrophobic. A non-zero z says the *arrangement* carries something the letters "
         "alone do not, which is the only form of the question this study calls open.",
         "",
-        f"{report['n_pocket_windows']} pocket windows, of which "
+        f"{report['n_pocket_windows']} `local` pocket windows and "
+        f"{report.get('n_dense_windows', 0)} `dense` ones, of which "
         f"{report['n_classified']} carry an architecture class; "
         f"{report['n_site_windows']} annotated-site windows against "
-        f"{report['n_control_windows']} length-matched controls from the same chains.",
+        f"{report['n_control_windows']} length-matched controls from the same chains. "
+        f"{report.get('n_scored_windows', 0)} windows carried an order null.",
+        "",
+        "**Amendment 1** (`docs/POCKET_SEQUENCE_PLAN_AMENDMENT_1.md`, dated after the "
+        "first run and before any of what it adds was read) re-specifies the formation "
+        "arm, which the pre-registered rule could only run on ten windows out of two "
+        "thousand, and adds a second window definition. Of what it adds, **only "
+        "`formation_heldout` may become a finding** — the rule restricted to the "
+        "resampling groups the pre-registered rule selected nothing from, so disjoint "
+        "from everything already looked at. Every arm named `*_dense`, and "
+        "`formation_matched`, is **exploratory by declaration**: no Holm family, and "
+        "`is_finding` cannot become true for it however the row reads.",
         "",
         "The three arms: **formation** is fpocket's best-ranked pockets against its worst "
         f"within the same protein (rank ≤ {report['top_rank']}), which asks whether the "
@@ -547,6 +840,8 @@ def markdown(report: Dict[str, object]) -> str:
 
     primary = [e for e in report["tests"]  # type: ignore[union-attr]
                if e.get("runnable") and e.get("family") == "primary"]
+    for entry in primary:
+        entry.setdefault("confirmatory", str(entry["arm"]) in CONFIRMATORY_ARMS)
     for entry in sorted(primary, key=lambda e: (str(e["arm"]), str(e["statistic"]))):
         lines.append(row_for(entry))
     if not primary:
@@ -560,24 +855,74 @@ def markdown(report: Dict[str, object]) -> str:
         "an observed difference larger than the minimum detectable one, and matched window "
         "lengths — all five, fixed by the plan before any of this ran.",
         "",
-        "## Secondary, reported and never promoted",
+        "## Secondary and exploratory, reported and never promoted",
         "",
-        "| arm | statistic | windows | groups | difference | Holm family | length-confounded |",
-        "|---|---|---|---|---|---|---|",
+        "| arm | statistic | windows | groups | mean z (site) | mean z (control) | "
+        "difference | 95% interval | could have detected | family |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for entry in sorted((e for e in report["tests"]  # type: ignore[union-attr]
                          if e.get("runnable") and e.get("family") != "primary"),
                         key=lambda e: (str(e["arm"]), str(e["statistic"]))):
+        low, high = entry["interval"]
         lines.append(
             f"| {entry['arm']} | `{entry['statistic']}` | {entry['n_site']} | "
-            f"{entry['n_groups']} | {entry['difference']:+.3f} | {entry.get('family')} | "
-            f"{'yes' if entry['length_confounded'] else 'no'} |"
+            f"{entry['n_groups']} | {entry['mean_site_z']:+.2f} | "
+            f"{entry['mean_control_z']:+.2f} | {entry['difference']:+.3f} | "
+            f"[{low:+.3f}, {high:+.3f}] | {entry['minimum_detectable']:.3f} | "
+            f"{entry.get('family')}"
+            f"{' — length-confounded' if entry['length_confounded'] else ''} |"
         )
     skipped = [e for e in report["tests"] if not e.get("runnable")]  # type: ignore[union-attr]
     if skipped:
         lines += ["", "Not runnable:", ""]
         lines += [f"- {e['arm']}:{e['statistic']} — {e['reason']}" for e in skipped]
+    yields = report.get("window_yield") or {}
+    if yields:
+        lines += ["", "## Why a lining produced no window", "",
+                  "Amendment 1 section 6. A refused lining is not a pocket without "
+                  "sequence signal; it is a pocket whose positions the window "
+                  "definition cannot carry a period over.", "",
+                  "| source | reason | linings |", "|---|---|---|"]
+        for source in sorted(yields):
+            for reason, count in sorted(yields[source].items(),
+                                        key=lambda kv: (-kv[1], kv[0])):
+                lines.append(f"| `{source}` | {reason} | {count} |")
+    excluded = report.get("heldout_groups_excluded") or []
+    reproduction = report.get("look_reproduction") or {}
+    verdict = str(reproduction.get("verdict", "unknown"))
+    recorded = reproduction.get("recorded") or {}
+    if verdict == "reproduced":
+        audit = (
+            "The pre-registered arm reproduced the run amendment 1 section 1 "
+            f"discloses exactly - {reproduction.get('n_site')} windows across "
+            f"{reproduction.get('n_groups')} groups, difference "
+            f"{float(reproduction.get('difference', float('nan'))):+.3f} - so this is "
+            "the same pocket table that was looked at, and the exclusion above is the "
+            "set of groups that look covered.")
+    else:
+        audit = (
+            f"**The pre-registered arm did not reproduce the disclosed look** ({verdict}): "
+            f"amendment 1 section 1 records {recorded.get('n_site')} windows across "
+            f"{recorded.get('n_groups')} groups at a difference of "
+            f"{recorded.get('difference')}, and this run gives "
+            f"{reproduction.get('n_site')} across {reproduction.get('n_groups')} at "
+            f"{reproduction.get('difference')}. The pocket table is therefore not the "
+            "one that was looked at, so the held-out arm cannot be assumed held out "
+            "from anything and **must be read as exploratory** until the difference is "
+            "explained.")
     lines += [
+        "",
+        "## The held-out arm",
+        "",
+        f"The pre-registered rule selected windows from {len(excluded)} resampling "
+        "groups, and those are exactly the groups whose values were read before "
+        "amendment 1 was written. `formation_heldout` runs the amendment's rule with "
+        "all of them removed, so it is a confirmatory test on data no decision in the "
+        "amendment could have been tuned to. Its Holm family is its own two primary "
+        "statistics, and the plan's five decision rules apply to it unchanged.",
+        "",
+        "**The held-out claim is only as good as that reproduction.** " + audit,
         "",
         "## What this cannot conclude",
         "",
@@ -593,8 +938,127 @@ def markdown(report: Dict[str, object]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def read_sequences(paths: Sequence[Path]) -> pd.DataFrame:
+    """One sequence table from however many the data steps wrote.
+
+    The predicted models and the deposited structures are read by different
+    jobs, because only one of them needs the network, and the arms need both.
+    """
+    frames = [pd.read_csv(path) for path in paths if Path(path).exists()]
+    if not frames:
+        raise SystemExit(f"no sequence table exists among {[str(p) for p in paths]}")
+    return pd.concat(frames, ignore_index=True)
+
+
+def cmd_sites(args: argparse.Namespace) -> int:
+    """The function arm's data step: contact shells, and nothing else.
+
+    Q9c needs each annotated copy's shell and its chain's sequence. It does not
+    need a pocket, so this runs no detector - which is the difference between
+    minutes and the within-protein study's hours - and it reuses that study's
+    census filter rather than writing a second one, so the two arms select the
+    same copies for the same stated reason.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import within_protein as wp  # noqa: E402  (a sibling script, not a package)
+    from cryptic_ip.analysis.structure_arrays import load_structure_arrays
+
+    copies = wp.select_copies(pd.read_csv(args.census), args.comp_id)
+    if args.limit:
+        copies = copies.head(int(args.limit))
+    rows, excluded = [], {}
+    for index, row in enumerate(copies.itertuples(), start=1):
+        key = f"{row.pdb_id}_{row.chain}_{row.resseq}"
+        stem = str(row.pdb_id).lower()
+        found = sorted(args.structures.glob(f"{stem}.*")) + \
+            sorted(args.structures.glob(f"{stem.upper()}.*"))
+        if not found:
+            excluded["structure not downloaded"] = excluded.get(
+                "structure not downloaded", 0) + 1
+            continue
+        icode = "" if pd.isna(getattr(row, "icode", "")) else str(getattr(row, "icode", ""))
+        try:
+            arrays = load_structure_arrays(found[0])
+            contacts = wp.contact_residues(arrays, str(row.chain), int(row.resseq),
+                                           icode, comp_id=args.comp_id)
+        except Exception as error:  # noqa: BLE001 - one bad entry is not the run
+            reason = f"{type(error).__name__}"
+            excluded[reason] = excluded.get(reason, 0) + 1
+            print(f"[{index}/{len(copies)}] {key}: {reason}", flush=True)
+            continue
+        by_chain = contacts["by_chain"]
+        if not contacts["found"] or str(row.chain) not in by_chain:
+            reason = ("ligand copy not present in the structure" if not contacts["found"]
+                      else "no contact with the ligand's own chain")
+            excluded[reason] = excluded.get(reason, 0) + 1
+            continue
+        residues = list(by_chain[str(row.chain)])
+        rows.append({"copy": key, "pdb_id": row.pdb_id, "chain": row.chain,
+                     "group": getattr(row, "homology_group_strict", row.pdb_id),
+                     "burial_class": getattr(row, "burial_class", ""),
+                     "n_site_residues": len(residues),
+                     "residues": ",".join(str(int(r)) for r in residues)})
+        print(f"[{index}/{len(copies)}] {key}: {len(residues)} site residues", flush=True)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_csv(args.out, index=False)
+    report = {"n_copies": int(len(copies)), "n_measured": len(rows),
+              "n_groups": len({r["group"] for r in rows}), "excluded": excluded}
+    if args.report:
+        args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    print(json.dumps(report, indent=2, sort_keys=True, default=str))
+    return 0
+
+
+def cmd_classes(args: argparse.Namespace) -> int:
+    """The type arm's data step: each pocket's architecture class, from positions.
+
+    Only pockets that produced a window are classified, because only those can
+    enter an arm; the class reads positions and never letters, which is what
+    makes Q9b's two sides independent by construction.
+    """
+    from cryptic_ip.detect.architecture import ArchitectureError, describe_architecture
+
+    sequences = read_sequences(args.sequences)
+    pockets = pd.read_csv(args.pockets)
+    index = sequence_index(sequences)
+    wanted = set()
+    for kind in WINDOW_KINDS:
+        for row in windows_for_pockets(
+                pockets, index,
+                key_of=lambda p: str(p.model).replace(".pdb", "").replace(".ent", ""),
+                chain_of=lambda p: "A",
+                group_of=lambda p: str(getattr(p, "cluster", p.uniprot_id)),
+                kind=kind):
+            wanted.add((str(row["id"]), int(row["pocket_id"])))
+
+    rows, failures = [], {}
+    for pocket in pockets.itertuples():
+        key = (str(getattr(pocket, "uniprot_id", "")), int(pocket.pocket_id))
+        if key not in wanted:
+            continue
+        residues = sorted({int(r) for r in str(pocket.residues).split(",") if r.strip()})
+        try:
+            described = describe_architecture(residues, n_draws=args.draws, seed=SEED)
+        except ArchitectureError as error:
+            reason = str(error)[:80]
+            failures[reason] = failures.get(reason, 0) + 1
+            continue
+        rows.append({"uniprot_id": key[0], "pocket_id": key[1],
+                     "n_positions": len(residues), "element": described.element,
+                     "architecture_class": described.architecture_class})
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    frame = pd.DataFrame(rows)
+    frame.to_csv(args.out, index=False)
+    counts = ({} if frame.empty
+              else {str(k): int(v) for k, v in frame["element"].value_counts().items()})
+    print(json.dumps({"n_windows": len(wanted), "n_classified": len(rows),
+                      "elements": counts, "failures": failures},
+                     indent=2, sort_keys=True))
+    return 0
+
+
 def cmd_analyse(args: argparse.Namespace) -> int:
-    sequences = pd.read_csv(args.sequences)
+    sequences = read_sequences(args.sequences)
     pockets = pd.read_csv(args.pockets)
     sites = pd.read_csv(args.sites) if args.sites and args.sites.exists() else None
     classes = pd.read_csv(args.classes) if args.classes and args.classes.exists() else None
@@ -614,11 +1078,25 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     grab = sub.add_parser("sequences", help="chain sequences from structures, no detection")
-    grab.add_argument("--structures", type=Path, required=True)
+    grab.add_argument("--structures", type=Path, nargs="+", required=True)
     grab.add_argument("--out", type=Path, required=True)
 
+    shells = sub.add_parser("sites", help="annotated contact shells, no pocket detection")
+    shells.add_argument("--census", type=Path, default=Path("results/redocking/census.csv"))
+    shells.add_argument("--structures", type=Path, required=True)
+    shells.add_argument("--comp-id", default="IHP")
+    shells.add_argument("--out", type=Path, required=True)
+    shells.add_argument("--report", type=Path, default=None)
+    shells.add_argument("--limit", type=int, default=0)
+
+    label = sub.add_parser("classes", help="each pocket's architecture class, from positions")
+    label.add_argument("--sequences", type=Path, nargs="+", required=True)
+    label.add_argument("--pockets", type=Path, required=True)
+    label.add_argument("--out", type=Path, required=True)
+    label.add_argument("--draws", type=int, default=CLASS_DRAWS)
+
     analyse = sub.add_parser("analyse", help="the three arms")
-    analyse.add_argument("--sequences", type=Path, required=True)
+    analyse.add_argument("--sequences", type=Path, nargs="+", required=True)
     analyse.add_argument("--pockets", type=Path, required=True)
     analyse.add_argument("--sites", type=Path, default=None)
     analyse.add_argument("--classes", type=Path, default=None)
@@ -629,7 +1107,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     analyse.add_argument("--controls-per-site", type=int, default=5)
 
     args = parser.parse_args(argv)
-    return cmd_sequences(args) if args.command == "sequences" else cmd_analyse(args)
+    return {"sequences": cmd_sequences, "sites": cmd_sites,
+            "classes": cmd_classes, "analyse": cmd_analyse}[args.command](args)
 
 
 if __name__ == "__main__":

@@ -59,7 +59,8 @@ import bz2
 import lzma
 import zlib
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Mapping, Optional, Sequence
+from functools import lru_cache
+from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 from scipy.special import digamma
@@ -364,6 +365,74 @@ def as_track(sequence: str, track: str = "charge") -> np.ndarray:
     return np.asarray(values, dtype=float)
 
 
+@lru_cache(maxsize=64)
+def _grid(low: float, high: float, probes: int) -> Tuple[float, ...]:
+    """A period grid as a hashable tuple, so the basis cache keys on it."""
+    return tuple(float(value) for value in np.linspace(float(low), float(high), int(probes)))
+
+
+#: A basis column whose norm falls below this is a quadrature that is
+#: numerically absent - which is what happens to the sine at the Nyquist period
+#: of 2 - and fitting it would fit noise.
+QUADRATURE_FLOOR = 1e-12
+
+
+@lru_cache(maxsize=512)
+def _probe_basis(n: int, periods: Tuple[float, ...]) -> Tuple[np.ndarray, np.ndarray]:
+    """Cos/sin bases for a grid of periods on ``n`` points, and their Gram inverses.
+
+    Both depend only on the window length and the period grid, never on the
+    series, so they are built once and reused across every draw of an order
+    null. That is the whole trick: a 2000-shuffle null on a hundred-probe scan
+    used to rebuild a hundred bases two thousand times over.
+
+    The second return value is the pseudo-inverse of each probe's 2x2 Gram
+    matrix. ``lstsq`` returns the minimum-norm least-squares solution, which is
+    ``pinv(B) @ y``, and ``pinv(B) == pinv(B.T @ B) @ B.T`` for every ``B`` - so
+    a pseudo-inverse of the Gram reproduces the fit exactly, rank-deficient
+    cases included, at the cost of a 2x2 decomposition instead of an n-by-2 one.
+    """
+    grid = np.asarray(periods, dtype=float)
+    angles = 2.0 * np.pi * np.arange(n, dtype=float)[None, :] / grid[:, None]
+    basis = np.stack([np.cos(angles), np.sin(angles)], axis=-1)
+    absent = np.linalg.norm(basis, axis=1) <= QUADRATURE_FLOOR
+    basis = np.where(absent[:, None, :], 0.0, basis)
+    gram = np.einsum("pnk,pnl->pkl", basis, basis)
+    return basis, np.linalg.pinv(gram)
+
+
+def probe_powers(series: np.ndarray, periods: Sequence[float]) -> np.ndarray:
+    """Explained variance at every period in a grid, in one pass.
+
+    The vectorised form of :func:`periodicity_power`. Same fit, same
+    normalisation, same quadrature drop; it differs only in the order the
+    arithmetic happens, so values agree to floating-point noise and
+    :mod:`tests.test_detect_sequence` pins that agreement against the
+    least-squares reference.
+    """
+    series = np.asarray(series, dtype=float)
+    n = series.size
+    if n < 4:
+        raise SequenceError("too short for a periodicity estimate")
+    grid = tuple(float(period) for period in periods)
+    if not grid:
+        raise SequenceError("a period grid needs at least one period")
+    for period in grid:
+        if period <= 1.0:
+            raise SequenceError(f"period must exceed 1 residue, got {period}")
+    centred = series - series.mean()
+    variance = float(centred @ centred)
+    if variance == 0.0:
+        return np.zeros(len(grid))
+    basis, inverse = _probe_basis(n, grid)
+    projected = np.einsum("pnk,n->pk", basis, centred)
+    coefficients = np.einsum("pkl,pl->pk", inverse, projected)
+    # ||B c||**2 == c.T B.T B c == c.T (B.T y) when c solves the normal
+    # equations, so the fitted series never has to be formed.
+    explained = np.einsum("pk,pk->p", coefficients, projected)
+    return np.minimum(1.0, np.maximum(0.0, explained / variance))
+
+
 def periodicity_power(series: np.ndarray, period: float) -> float:
     """The fraction of ``series`` variance explained by a sinusoid at ``period``.
 
@@ -381,27 +450,7 @@ def periodicity_power(series: np.ndarray, period: float) -> float:
     * Least squares handles both cases without a special case, because it
       normalises by the basis it actually fitted.
     """
-    series = np.asarray(series, dtype=float)
-    n = series.size
-    if n < 4:
-        raise SequenceError("too short for a periodicity estimate")
-    if period <= 1.0:
-        raise SequenceError(f"period must exceed 1 residue, got {period}")
-    centred = series - series.mean()
-    variance = float(np.sum(centred * centred))
-    if variance == 0.0:
-        return 0.0
-    angles = 2.0 * np.pi * np.arange(n) / float(period)
-    basis = np.column_stack([np.cos(angles), np.sin(angles)])
-    # Drop a quadrature that is numerically zero, which is what happens at the
-    # Nyquist period; lstsq would otherwise fit noise to it.
-    keep = np.linalg.norm(basis, axis=0) > 1e-12
-    basis = basis[:, keep]
-    if basis.shape[1] == 0:
-        return 0.0
-    coefficients, *_ = np.linalg.lstsq(basis, centred, rcond=None)
-    explained = float(np.sum((basis @ coefficients) ** 2))
-    return float(min(1.0, explained / variance))
+    return float(probe_powers(series, (float(period),))[0])
 
 
 #: The alpha-helical band, in residues per turn. A single exact probe is
@@ -440,10 +489,7 @@ def band_periodicity(
         raise SequenceError(f"a band needs low below high, got {band}")
     if probes < 2:
         raise SequenceError(f"a band needs at least 2 probes, got {probes}")
-    return max(
-        periodicity_power(series, period)
-        for period in np.linspace(low, high, probes)
-    )
+    return float(probe_powers(series, _grid(low, high, probes)).max())
 
 
 #: The widest period worth scanning, in residues. Past about twelve a "period"
@@ -475,8 +521,8 @@ def dominant_period(
     low, high = float(band[0]), float(band[1])
     if not low < high:
         raise SequenceError(f"a band needs low below high, got {band}")
-    periods = np.linspace(low, high, int(probes))
-    powers = np.array([periodicity_power(series, period) for period in periods])
+    periods = _grid(low, high, int(probes))
+    powers = probe_powers(series, periods)
     best = int(np.argmax(powers))
     period = float(periods[best])
     return {
