@@ -627,3 +627,34 @@ def test_a_report_carries_its_q6b_section():
     report = script.run_report(sites, n_bootstrap=100)
     assert report["strata"]["runnable"] is True
     assert "Q6b: by pocket type" in script.report_markdown(report)
+
+
+# -------------------------------- the committed validation must stay committed
+
+def test_the_committed_validation_still_reproduces_exactly(tmp_path):
+    """The one real fence on a change to the periodicity machinery.
+
+    `results/sequence/validation.json` is deterministic, offline and committed,
+    so any change to `periodicity_power` and the band scan that moved a number
+    would move these. It is the check the vectorised periodogram was accepted
+    against: every committed figure reproduced to 3.6e-15, which is summation
+    order and nothing else.
+    """
+    committed = json.loads(
+        (ROOT / "results" / "sequence" / "validation.json").read_text())
+    out = tmp_path / "validation.json"
+    assert script.main(["validate", "--windows", "40", "--length", "24",
+                        "--shuffles", str(committed["n_shuffles"]),
+                        "--out", str(out)]) == 0
+    fresh = json.loads(out.read_text())
+
+    assert fresh["checks"] == committed["checks"]
+    assert fresh["all_checks_pass"] is True
+    assert fresh["statistic"] == committed["statistic"]
+    assert [pool["pool"] for pool in fresh["pools"]] == \
+        [pool["pool"] for pool in committed["pools"]]
+    for was, is_now in zip(committed["pools"], fresh["pools"]):
+        for key in ("mean_raw", "mean_z", "mean_entropy", "basic_fraction",
+                    "fraction_firing", "distinct_letters", "n_windows"):
+            assert float(is_now[key]) == pytest.approx(float(was[key]), abs=1e-9), \
+                f"{was['pool']}: {key} moved"
