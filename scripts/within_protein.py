@@ -231,27 +231,39 @@ def contact_residues(arrays, chain: str, resseq: int, icode: str,
     return {"found": True, "by_chain": {k: sorted(v) for k, v in by_chain.items()}}
 
 
-def chain_numbering_is_ambiguous(arrays, chain: str) -> bool:
-    """Whether another polymer chain shares any residue number with this one.
-
-    The detector's pocket residue lists are chain-blind numbers, so when two
-    chains share numbering a pocket's residues cannot be assigned to a chain
-    and the copy is excluded. Conservative, and it discards homodimers.
-    """
-    polymer = np.asarray(arrays.is_polymer)
-    chains = np.asarray(arrays.chain_ids)[polymer]
-    numbers = np.asarray(arrays.resseqs)[polymer].astype(int)
-    mine = set(int(n) for n in numbers[chains == chain])
-    others = set(int(n) for n in numbers[chains != chain])
-    return bool(mine & others)
-
-
 def recall(pocket: Sequence[int], site: Sequence[int]) -> float:
     """How much of the annotated site a pocket's lining covers."""
     a, b = set(int(x) for x in pocket), set(int(x) for x in site)
     if not b:
         return 0.0
     return len(a & b) / len(b)
+
+
+def chain_aware_linings(pockets_dir: Path, pocket_id: int) -> Dict[str, List[int]]:
+    """One pocket's lining residues **per chain**, from fpocket's own atom file.
+
+    The detector's shared parser reads the residue number from columns 23-26 of
+    exactly these records and drops the chain in column 22, which is why a
+    homodimer's two residue 50s are indistinguishable downstream. Reading the
+    one extra column gives a chain-aware lining with no heuristic and no second
+    definition of what a lining is: it is still fpocket's own set of lining
+    atoms. See `docs/WITHIN_PROTEIN_PLAN_AMENDMENT_2.md`.
+    """
+    path = pockets_dir / f"pocket{int(pocket_id)}_atm.pdb"
+    out: Dict[str, Set[int]] = {}
+    if not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if not (line.startswith("ATOM") or line.startswith("HETATM")):
+                continue
+            chain = line[21:22].strip() or " "
+            try:
+                number = int(line[22:26].strip())
+            except ValueError:
+                continue
+            out.setdefault(chain, set()).add(number)
+    return {chain: sorted(numbers) for chain, numbers in out.items()}
 
 
 def site_one(structure_path: Path, chain: str, resseq: int, icode: str, work: Path,
@@ -274,24 +286,26 @@ def site_one(structure_path: Path, chain: str, resseq: int, icode: str, work: Pa
         if chain not in by_chain:
             record["error"] = "no contact with the ligand's own chain"
             return record
-        if chain_numbering_is_ambiguous(arrays, chain):
-            record["error"] = "another chain shares this chain's residue numbering"
-            return record
         record["site"] = list(by_chain[chain])
         analyzer = factory(structure_path, work, timeout_s)
         pockets = analyzer.detect_pockets()
-        rows = []
+        # fpocket writes its output beside the structure it read, which is this
+        # copy's own temporary directory.
+        pockets_dir = Path(structure_path).parent / f"{Path(structure_path).stem}_out" / "pockets"
+        rows, skipped = [], 0
         for pocket_id in pockets["pocket_id"]:
-            try:
-                residues = analyzer.get_pocket_residues(int(pocket_id))
-            except Exception as error:  # noqa: BLE001
-                rows.append({"pocket_id": int(pocket_id), "residues": "",
-                             "error": f"{type(error).__name__}: {error}"[:200]})
+            by_pocket_chain = chain_aware_linings(pockets_dir, int(pocket_id))
+            residues = by_pocket_chain.get(chain, [])
+            if not residues:
+                # A pocket with no residue in the ligand's chain is not a pocket
+                # of that chain, and pooling chains would not give a lining.
+                skipped += 1
                 continue
             rows.append({"pocket_id": int(pocket_id),
-                         "residues": ",".join(str(int(r)) for r in sorted(set(residues))),
+                         "residues": ",".join(str(int(r)) for r in residues),
                          "error": ""})
         record["pockets"] = rows
+        record["skipped_other_chain"] = skipped
     except Exception as error:  # noqa: BLE001
         record["error"] = f"{type(error).__name__}: {error}"[:300]
     return record
@@ -756,7 +770,12 @@ def cmd_sites(args: argparse.Namespace) -> int:
             report["excluded"][entry["error"]] = report["excluded"].get(entry["error"], 0) + 1
     if args.report:
         args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
-    print(json.dumps({k: v for k, v in report.items() if k != "status"}, indent=2))
+    # The per-copy status goes in the artefact; the log gets the summary, so
+    # that reading why copies were lost does not mean reading 137 entries.
+    summary = {k: v for k, v in report.items() if k != "status"}
+    if args.summary:
+        args.summary.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+    print(json.dumps(summary, indent=2))
     return 0
 
 
@@ -830,6 +849,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     sites.add_argument("--out", type=Path, required=True)
     sites.add_argument("--sites", type=Path, required=True)
     sites.add_argument("--report", type=Path, default=None)
+    sites.add_argument("--summary", type=Path, default=None)
     sites.add_argument("--fpocket-timeout", type=float, default=900.0)
     sites.add_argument("--limit", type=int, default=0)
 

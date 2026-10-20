@@ -162,13 +162,14 @@ jobs:
             --census results/redocking/census.csv \
             --structures structures/rcsb \
             --limit "$LIMIT" \
-            --out site_pockets.csv --sites sites.csv --report sites_report.json
+            --out site_pockets.csv --sites sites.csv \
+            --report sites_report.json --summary sites_summary.json
       - name: Print the tables
         shell: bash -l {0}
         run: |
           python scripts/extract_log_block.py emit Q8_SITE_POCKETS_B64 site_pockets.csv
           python scripts/extract_log_block.py emit Q8_SITES_B64 sites.csv
-          python scripts/extract_log_block.py emit Q8_SITES_REPORT_JSON sites_report.json
+          python scripts/extract_log_block.py emit Q8_SITES_SUMMARY_JSON sites_summary.json
       - uses: actions/upload-artifact@v6
         if: always()
         with:
@@ -177,6 +178,7 @@ jobs:
             site_pockets.csv
             sites.csv
             sites_report.json
+            sites_summary.json
           retention-days: 90
 
   analyse:

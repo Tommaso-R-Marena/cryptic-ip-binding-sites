@@ -327,11 +327,6 @@ def test_a_ligand_copy_that_is_not_there_is_reported_not_guessed():
     assert out["found"] is False
 
 
-def test_shared_chain_numbering_is_detected():
-    assert script.chain_numbering_is_ambiguous(_Arrays(shared_numbering=True), "A") is True
-    assert script.chain_numbering_is_ambiguous(_Arrays(), "A") is False
-
-
 def test_recall_is_coverage_of_the_site_not_a_symmetric_overlap():
     """A pocket may legitimately be larger than a ligand's contact shell."""
     assert script.recall(list(range(1, 101)), [1, 2, 3, 4]) == 1.0
@@ -457,3 +452,40 @@ def test_the_committed_ground_truth_arm_says_it_decided_nothing():
     text = script.markdown(report)
     assert "did not have the power to decide anything" in text
     assert "neither supports nor refutes" in text
+
+
+# ------------------------------- chain-aware linings (amendment 2)
+
+POCKET_ATOMS = """\
+ATOM      1  N   ALA A  10      11.104  13.207  10.000  1.00 20.00           N
+ATOM      2  CA  ALA A  10      12.104  13.207  10.000  1.00 20.00           C
+ATOM      3  N   LYS A  14      13.104  13.207  10.000  1.00 20.00           N
+ATOM      4  N   ALA B  10      14.104  13.207  10.000  1.00 20.00           N
+HETATM    5  O   HOH B  99      15.104  13.207  10.000  1.00 20.00           O
+MISREAD   6  ?   ???  ???
+"""
+
+
+def test_a_lining_is_read_per_chain_from_fpocket_s_own_atoms(tmp_path):
+    """The one column the shared parser drops is the one homodimers need."""
+    pockets = tmp_path / "pockets"
+    pockets.mkdir()
+    (pockets / "pocket7_atm.pdb").write_text(POCKET_ATOMS)
+    out = script.chain_aware_linings(pockets, 7)
+    assert out == {"A": [10, 14], "B": [10, 99]}
+
+
+def test_a_missing_pocket_file_is_empty_not_an_error(tmp_path):
+    assert script.chain_aware_linings(tmp_path, 3) == {}
+
+
+def test_the_chain_aware_lining_separates_shared_numbering(tmp_path):
+    """Chain-blind reading would merge these into one meaningless lining."""
+    pockets = tmp_path / "pockets"
+    pockets.mkdir()
+    (pockets / "pocket1_atm.pdb").write_text(POCKET_ATOMS)
+    out = script.chain_aware_linings(pockets, 1)
+    assert out["A"] != out["B"]
+    blind = sorted({r for residues in out.values() for r in residues})
+    assert blind == [10, 14, 99]          # what the old path would have returned
+    assert out["A"] == [10, 14]           # what this one returns for chain A
