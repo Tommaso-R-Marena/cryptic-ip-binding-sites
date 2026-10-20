@@ -57,7 +57,23 @@ from anything fetched.
    and a copy whose best recall is below `MIN_RECALL = 0.3` is **excluded with
    a counted reason**: no detected pocket contains the site, so there is
    nothing to compare. The recall distribution is reported whatever it shows.
-5. **Siblings and statistics.** Identical to the candidate arm: other pockets
+5. **One chain, or nothing.** A crystal structure is often several chains, and
+   the detector's pocket residue lists are **chain-blind residue numbers** — a
+   homodimer's two residue 50s are indistinguishable in them. The architecture
+   statistic reads positions along one chain, so a lining pooled across chains
+   is not a lining at all. The rule, fixed here before any structure is
+   fetched: keep the **ligand-bearing chain**, and **exclude the copy** when
+   another polymer chain in the same structure shares any residue number with
+   it, because the pocket's residue list cannot then be assigned to a chain.
+   The number of copies this removes is reported. It is a conservative rule —
+   it discards homodimers, which are common — and it is preferred to a second
+   lining definition, because the arms must compute the same statistic on the
+   same kind of input for their comparison to mean anything.
+
+   *(Added to this file before any structure for this arm was fetched and
+   before any of its results existed; the arm had not run.)*
+
+6. **Siblings and statistics.** Identical to the candidate arm: other pockets
    of the same structure matched on lining size to within two residues, at
    least eight and at most forty, the candidate's mid-p quantile among them per
    half, an unresolved half left unresolved, a group bootstrap over
