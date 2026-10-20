@@ -409,3 +409,26 @@ def test_a_table_without_a_burial_class_reports_no_strata():
     report = script.measure(pockets, table, n_draws=120, n_bootstrap=200)
     assert report["strata"] == {}
     assert "By burial class" not in script.markdown(report)
+
+
+def test_the_census_filter_is_the_one_the_amendment_names():
+    """Pinned against the committed census: 137 copies, 135 entries, 17 groups."""
+    census = pd.read_csv(ROOT / "results" / "redocking" / "census.csv")
+    copies = script.select_copies(census)
+    assert len(copies) == 137
+    assert copies["pdb_id"].nunique() == 135
+    assert copies["homology_group_strict"].nunique() == 17
+    assert set(copies["comp_id"].astype(str).str.upper()) == {"IHP"}
+
+
+def test_the_filter_drops_symmetry_contacts_and_keeps_unknown_ones():
+    census = pd.DataFrame([
+        {"comp_id": "IHP", "status": "eligible", "complete": True, "selected": True,
+         "symmetry_contact": True, "pdb_id": "1AAA"},
+        {"comp_id": "IHP", "status": "eligible", "complete": True, "selected": True,
+         "symmetry_contact": float("nan"), "pdb_id": "2BBB"},
+        {"comp_id": "IHP", "status": "excluded: crystal artefact", "complete": True,
+         "selected": True, "symmetry_contact": False, "pdb_id": "3CCC"},
+    ])
+    kept = script.select_copies(census)
+    assert list(kept["pdb_id"]) == ["2BBB"]

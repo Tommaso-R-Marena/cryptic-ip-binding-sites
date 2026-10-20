@@ -644,6 +644,24 @@ def markdown(report: Dict[str, object]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def select_copies(census: pd.DataFrame, comp_id: str = "IHP") -> pd.DataFrame:
+    """The copies the amendment names, by the census's own columns.
+
+    The filter is the census's, not a new one: the right ligand, eligible,
+    complete, not a symmetry contact, and the census's own selected
+    representative per site. Kept in one function so the workflow's download
+    list and the analysis cannot drift apart.
+    """
+    wanted = (census["comp_id"].astype(str).str.upper() == comp_id.upper())
+    for column, value in (("status", "eligible"), ("complete", True),
+                          ("selected", True)):
+        if column in census.columns:
+            wanted &= (census[column] == value)
+    if "symmetry_contact" in census.columns:
+        wanted &= (census["symmetry_contact"] != True)  # noqa: E712 - NaN must survive
+    return census[wanted]
+
+
 def cmd_sites(args: argparse.Namespace) -> int:
     """The ground-truth arm's data step: annotated sites and their structures' pockets.
 
@@ -651,15 +669,7 @@ def cmd_sites(args: argparse.Namespace) -> int:
     writes, plus a table of annotated site linings, so that `analyse` runs the
     identical statistic on both arms.
     """
-    census = pd.read_csv(args.census)
-    wanted = (census["comp_id"].astype(str).str.upper() == args.comp_id.upper())
-    for column, value in (("status", "eligible"), ("complete", True),
-                          ("selected", True)):
-        if column in census.columns:
-            wanted &= (census[column] == value)
-    if "symmetry_contact" in census.columns:
-        wanted &= (census["symmetry_contact"] != True)  # noqa: E712 - NaN must survive
-    copies = census[wanted]
+    copies = select_copies(pd.read_csv(args.census), args.comp_id)
     if args.limit:
         copies = copies.head(int(args.limit))
     rows, sites, status = [], [], []

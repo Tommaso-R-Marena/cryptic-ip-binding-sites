@@ -135,17 +135,16 @@ jobs:
         # analysis exactly.
         run: |
           python - <<'PY'
+          import importlib.util, sys
           import pandas as pd
-          census = pd.read_csv("results/redocking/census.csv")
-          wanted = (census["comp_id"].astype(str).str.upper() == "IHP")
-          for column, value in (("status", "eligible"), ("complete", True), ("selected", True)):
-              if column in census.columns:
-                  wanted &= (census[column] == value)
-          if "symmetry_contact" in census.columns:
-              wanted &= (census["symmetry_contact"] != True)   # noqa: E712
-          ids = sorted(set(census[wanted]["pdb_id"].astype(str)))
+          spec = importlib.util.spec_from_file_location("wp", "scripts/within_protein.py")
+          wp = importlib.util.module_from_spec(spec)
+          sys.modules["wp"] = wp
+          spec.loader.exec_module(wp)
+          copies = wp.select_copies(pd.read_csv("results/redocking/census.csv"))
+          ids = sorted(set(copies["pdb_id"].astype(str)))
           pd.DataFrame({"pdb_id": ids}).to_csv("entries.csv", index=False)
-          print(f"{len(ids)} entries")
+          print(f"{len(copies)} copies across {len(ids)} entries")
           PY
       - name: Download them
         shell: bash -l {0}
