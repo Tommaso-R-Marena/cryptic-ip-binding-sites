@@ -483,7 +483,19 @@ That comparison has a control it does not have, stated where it is read: a
 random position set is not a protein, so *any* real pocket lining would beat
 that null. It shows the instrument registers real linings; it shows nothing
 specific to inositol-phosphate sites. The control that would is other pockets
-from the same proteins, and no committed table carries them.
+from the same proteins — which no committed table carried, so study Q8 built
+it: the same detector re-detects every pocket in the same proteins and keeps
+each lining, and a candidate is compared with its own protein's other pockets
+**of the same lining size**.
+
+**Both arms are null.** Candidate pockets sit at 0.434 (topology) and 0.538
+(register) against a uniform 0.5; annotated inositol-hexakisphosphate sites,
+run through the identical statistic, sit at 0.336 and 0.592. Nothing is a
+finding and nothing clears its own power floor. The annotated arm is the one
+that matters for reading the other: it can fail, and its failure means the
+candidate null is as much a statement about the instrument as about
+candidates. It is also exploratory, for a reason its amendment discloses. See
+`docs/WITHIN_PROTEIN_PLAN.md` and `results/within_protein/`.
 
 ### `homology.py` — are two pockets lined the same way?
 

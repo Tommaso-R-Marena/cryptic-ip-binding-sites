@@ -192,3 +192,36 @@ def test_the_artefacts_are_json_as_committed():
     for name, path in script.SOURCES.items():
         if path.exists():
             assert isinstance(json.loads(path.read_text()), dict), name
+
+
+# ------------------------------------------- the within-protein control
+
+def test_the_page_no_longer_claims_the_control_does_not_exist(artefacts):
+    """It was built; a page saying otherwise would be wrong, not merely stale."""
+    text = script.render(artefacts)
+    assert "no committed table carries residue lists" not in text
+    assert "The control that did not exist, built" in text
+
+
+def test_both_within_protein_arms_reach_the_page(artefacts):
+    text = script.render(artefacts)
+    for name in ("within", "sites"):
+        for test in artefacts[name]["tests"]:
+            if test.get("runnable"):
+                assert f"{test['mean_quantile']:.3f}" in text
+                assert f"{test['minimum_detectable']:.3f}" in text
+
+
+def test_a_within_protein_finding_would_break_the_section(artefacts):
+    """The section asserts nothing fired; if that changes it must be rewritten."""
+    damaged = copy.deepcopy(artefacts)
+    damaged["sites"]["tests"][0]["is_finding"] = True
+    damaged["sites"]["tests"][0]["runnable"] = True
+    with pytest.raises(script.MissingFigure):
+        script.render(damaged)
+
+
+def test_the_ground_truth_arm_is_named_as_what_decides_the_other(artefacts):
+    text = script.render(artefacts)
+    assert "decides how to read the other" in text
+    assert "exploratory" in text

@@ -8,6 +8,8 @@ This page is **generated** by `scripts/architecture_findings.py` from the commit
 | homology | `results/architecture/homology.json` | `scripts/homology_probe.py run` |
 | real | `results/architecture/real/real.json` | `scripts/real_architecture.py run` |
 | paired | `results/architecture/real/basic_face.json` | `scripts/basic_face.py run` |
+| within | `results/within_protein/within_protein.json` | `scripts/within_protein.py analyse --arm candidate` |
+| sites | `results/within_protein/within_protein_sites.json` | `scripts/within_protein.py analyse --arm site` |
 
 The pre-registered plans are `docs/ARCHITECTURE_PLAN.md` and its five dated amendments; the module-level account is the `architecture.py` and `homology.py` sections of `docs/DETECTOR.md`; figures are in `results/architecture/figures/`.
 
@@ -103,11 +105,32 @@ The real-lining rate (33%) is the same figure the jittered fixtures give. That i
 
 The one pre-registered split — pockets another polyanion explains against the rest — is null on every feature after Holm (0 findings of 4 features).
 
-**The control this comparison does not have, stated where it is read.** A random position set is not a protein, so *any* real pocket lining would beat that null. The table shows the instrument registers real linings; it shows nothing specific to inositol-phosphate sites. The control that would is other pockets from the same proteins, and no committed table carries residue lists for them — `results/ml_training/validation_pocket_features.csv` has 12,190 pockets across 136 structures but descriptors only.
+**The control this comparison does not have.** A random position set is not a protein, so *any* real pocket lining would beat that null. The table shows the instrument registers real linings; it shows nothing specific to inositol-phosphate sites. The control that would is other pockets from the same proteins — and it did not exist as a file, so it was built. Section 5a.
+
+## 5a. The control that did not exist, built — and null in both arms
+
+Pre-registered in `docs/WITHIN_PROTEIN_PLAN.md` before any structure was fetched. The same detector re-detects **every** pocket in the same proteins and keeps each lining, so a candidate pocket can be compared with its own protein's other pockets **of the same lining size**. Protein, fold, model, detector and size are then fixed by construction and only the choice of pocket varies. Size matching is the design: both halves of the decomposition depend on n, so an unmatched comparison would rediscover that the selected pocket is bigger.
+
+| arm | half | units | groups | mean quantile | difference | Holm | could have detected |
+|---|---|---|---|---|---|---|---|
+| candidate | topology | 36 | 33 | 0.434 | -0.066 | 0.457 | 0.152 |
+| candidate | register | 34 | 32 | 0.538 | +0.038 | 0.481 | 0.150 |
+| annotated site | topology | 27 | 8 | 0.336 | -0.164 | 0.207 | 0.245 |
+| annotated site | register | 21 | 8 | 0.592 | +0.092 | 0.379 | 0.308 |
+
+**Below 0.5 means more structured than the protein's own same-size pockets.** Nothing is a finding, and the last column is why that is weak evidence rather than evidence of absence: in every row the difference observed is smaller than the difference the design could have detected.
+
+**The annotated-site arm is the one that decides how to read the other.** It runs the identical statistic on deposited inositol-hexakisphosphate sites, so it can fail — and a failure would mean the candidate arm's null is a statement about the instrument rather than about candidates. It does not separate real sites from their own proteins' pockets at the power available, so that is where this stands.
+
+Two details of that arm are worth carrying. It is **exploratory**: an earlier, underpowered version was read before its lining definition was fixed, and `docs/WITHIN_PROTEIN_PLAN_AMENDMENT_2.md` discloses what was seen. And the direction did not survive repowering — the register half sat below 0.5 at the first look and sits at 0.592 with four times the data, which is what a non-signal looks like.
+
+One thing the arm established for free: re-detection reproduced the committed candidate linings exactly, at a median Jaccard overlap of 1.00 against the screened `top_pocket_residues`. The candidates in `results/specificity/candidates.csv` are reproducible from current AlphaFold models with current fpocket, which nothing in this project had checked.
+
+What both arms do not cover is stated by their exclusions: 36 of 75 candidate proteins and 27 of 119 annotated copies cleared the matched-sibling floor, and the survivors are the smaller-lining end, because a large lining has few pockets of its own size to be compared with.
 
 ## 6. The design whose control is not tautological
 
-Section 5's weakness is fixable in one direction without new data: compare each pocket's **basic residues** with random subsets **of that same pocket's lining, of the same size**. Protein, fold, lining and subset size are then held fixed by construction, and a difference can only be which residues were chosen. Pre-registered in `docs/ARCHITECTURE_PLAN_AMENDMENT_2.md` before any basic-residue subset was measured.
+Section 5a fixed the missing control by building it. This section fixes a different part of the same weakness, and it needed no new data at all: compare each pocket's **basic residues** with random subsets **of that same pocket's lining, of the same size**. Protein, fold, lining and subset size are then held fixed by construction, and a difference can only be which residues were chosen. Pre-registered in `docs/ARCHITECTURE_PLAN_AMENDMENT_2.md` before any basic-residue subset was measured.
 
 The per-pocket statistic is the subset's mid-p quantile among 50 matched draws, uniform on [0, 1] under the null. **Below 0.5 is more structured than chance.** 99 subset measurements from 75 pockets.
 
@@ -126,6 +149,6 @@ Section 3's ceiling stands over all of this: at realistic φ/ψ scatter the meth
 
 ## 7. What this line is, and is not, for
 
-These descriptors are **deliberately not** features of the detector's score, and `docs/DETECTOR.md` records the decision with its reason: a feature earns a place in the scorer by carrying signal on the inputs the scorer sees, which are real structures with real backbone scatter, and two thirds of the measured sensitivity here is an artefact of ideal fixtures. Section 6 adds that there is no real-data effect to carry in either. Section 3a is the attempt to lift that ceiling and the measurement that says this family of statistics cannot.
+These descriptors are **deliberately not** features of the detector's score, and `docs/DETECTOR.md` records the decision with its reason: a feature earns a place in the scorer by carrying signal on the inputs the scorer sees, which are real structures with real backbone scatter, and two thirds of the measured sensitivity here is an artefact of ideal fixtures. Section 6 adds that there is no real-data effect to carry in either, and section 5a adds the strongest version of that: with the within-protein control built and run, neither candidate pockets nor **annotated inositol-phosphate sites** separate from their own proteins' same-size pockets at the power available. Section 3a is the attempt to lift the ceiling and the measurement that says this family of statistics cannot.
 
 So the line is an instrument with its proofs and its calibration attached, reported beside the score and never folded into it. Nothing on this page is evidence that a pocket binds an inositol phosphate.
