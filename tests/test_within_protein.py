@@ -384,3 +384,28 @@ def test_the_site_arm_runs_the_same_statistic_as_the_candidate_arm():
     for left, right in zip(candidate["tests"], site["tests"]):
         if left.get("runnable") and right.get("runnable"):
             assert left["mean_quantile"] == pytest.approx(right["mean_quantile"])
+
+
+def test_the_burial_split_is_reported_and_never_promoted():
+    """Declared secondary: a stratum under five groups is not evidence."""
+    pockets, table = _synthetic(n_proteins=6, n_siblings=12)
+    table = table.copy()
+    table["burial_class"] = ["cryptic", "cryptic", "surface", "surface",
+                             "surface", "surface"]
+    report = script.measure(pockets, table, n_draws=120, n_bootstrap=200)
+    strata = report["strata"]
+    assert set(strata) == {"cryptic", "surface"}
+    # Each protein is its own cluster here, so neither stratum reaches five
+    # groups except the larger one.
+    assert strata["cryptic"]["is_evidence"] is False
+    assert strata["cryptic"]["n_groups"] == 2
+    text = script.markdown(report)
+    assert "By burial class" in text
+    assert "too few groups" in text
+
+
+def test_a_table_without_a_burial_class_reports_no_strata():
+    pockets, table = _synthetic(n_proteins=3, n_siblings=10)
+    report = script.measure(pockets, table, n_draws=120, n_bootstrap=200)
+    assert report["strata"] == {}
+    assert "By burial class" not in script.markdown(report)

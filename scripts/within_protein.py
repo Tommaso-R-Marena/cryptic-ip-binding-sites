@@ -412,6 +412,7 @@ def measure(pockets: pd.DataFrame, table: pd.DataFrame, *, n_draws: int,
             "mean_sibling_size": float(np.mean([s["size"] for s in matched])),
             "size_difference": float(int(candidate["size"])
                                      - np.mean([s["size"] for s in matched])),
+            "stratum": str(row.get("burial_class", "") or ""),
             "candidate_element": candidate.get("element"),
             "sibling_face_fraction": float(np.mean(
                 [1.0 if s.get("element") in {"helix_face", "strand_face"} else 0.0
@@ -463,6 +464,23 @@ def measure(pockets: pd.DataFrame, table: pd.DataFrame, *, n_draws: int,
                 entry["p_holm"] is not None and entry["p_holm"] < 0.05
                 and entry["is_evidence"] and entry["exceeds_power"]
                 and not (entry["interval"][0] <= 0.0 <= entry["interval"][1]))
+    # Declared secondary: the same quantiles split by the census's burial class.
+    # Reported, never promoted - a stratum with fewer than five groups gives no
+    # evidence, and that floor is the project's standing rule.
+    strata: Dict[str, Dict[str, object]] = {}
+    for name in sorted({str(r.get("stratum", "")) for r in per_protein} - {""}):
+        in_stratum = [r for r in per_protein if str(r.get("stratum", "")) == name]
+        entry: Dict[str, object] = {
+            "n_proteins": len(in_stratum),
+            "n_groups": len({str(r["group"]) for r in in_stratum}),
+        }
+        for half in HALVES:
+            values = [float(r[f"{half}_quantile"]) for r in in_stratum
+                      if f"{half}_quantile" in r]
+            entry[f"{half}_mean_quantile"] = float(np.mean(values)) if values else float("nan")
+            entry[f"{half}_n"] = len(values)
+        entry["is_evidence"] = bool(entry["n_groups"] >= 5)
+        strata[name] = entry
     faces = [r for r in per_protein if r.get("candidate_element")]
     return {
         "seed": SEED,
@@ -493,6 +511,7 @@ def measure(pockets: pd.DataFrame, table: pd.DataFrame, *, n_draws: int,
                 [r["sibling_face_fraction"] for r in per_protein]))
             if per_protein else float("nan"),
         },
+        "strata": strata,
         "per_protein": per_protein,
         "tests": tests,
         "holm_family_size": len(p_values),
@@ -583,6 +602,26 @@ def markdown(report: Dict[str, object]) -> str:
             for e in report["tests"] if e.get("runnable"))  # type: ignore[union-attr]
         + ". A result accompanied by a residual difference in the same direction is "
         "confounded rather than a finding.",
+    ]
+    strata = report.get("strata") or {}
+    if strata:
+        lines += [
+            "",
+            "**By burial class**, declared secondary and never promoted: a stratum with "
+            "fewer than five groups gives no evidence, which is the project's standing "
+            "rule and not a judgement about this table.",
+            "",
+            "| class | proteins | groups | topology | register | evidence |",
+            "|---|---|---|---|---|---|",
+        ]
+        for name, entry in strata.items():  # type: ignore[union-attr]
+            lines.append(
+                f"| {name} | {entry['n_proteins']} | {entry['n_groups']} | "
+                f"{entry['topology_mean_quantile']:.3f} | "
+                f"{entry['register_mean_quantile']:.3f} | "
+                f"{'yes' if entry['is_evidence'] else 'no — too few groups'} |"
+            )
+    lines += [
         "",
         "## How to read a null here",
         "",
