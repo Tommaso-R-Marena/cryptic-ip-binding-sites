@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -123,6 +124,14 @@ def detect_one(uniprot_id: str, cache_dir: Path, timeout_s: float = 900.0,
     try:
         path = Path(fetch(uniprot_id, cache_dir))
         record["model"] = path.name
+        # fpocket writes its output directory next to the structure it reads, so
+        # the model is copied into this protein's own temporary directory first:
+        # otherwise every run would leave a pocket directory beside the cached
+        # model and the model cache would carry them from run to run.
+        if path.exists():
+            local = work / path.name
+            shutil.copy(path, local)
+            path = local
         analyzer = analyzer_factory(path, work, timeout_s)
         pockets = analyzer.detect_pockets()
         rows = []
@@ -141,7 +150,6 @@ def detect_one(uniprot_id: str, cache_dir: Path, timeout_s: float = 900.0,
     except Exception as error:  # noqa: BLE001
         record["error"] = f"{type(error).__name__}: {error}"[:300]
     finally:
-        import shutil
         shutil.rmtree(work, ignore_errors=True)
     return record
 
