@@ -675,3 +675,50 @@ def test_holm_never_exceeds_one():
 def test_holm_covers_every_feature_tried():
     family = {f"f{i}": 0.01 * (i + 1) for i in range(6)}
     assert set(sq.holm(family)) == set(family)
+
+
+# ------------------------------- the hydropathy track (study Q9)
+
+def test_an_amphipathic_helix_shows_hydropathy_periodicity():
+    """One face hydrophobic, the other not, at the helical repeat."""
+    amphipathic = "LKKLLKKLLKKLLKKLLKKL"
+    assert sq.helix_hydropathy_periodicity(amphipathic) > 0.8
+
+
+def test_the_same_letters_in_blocks_do_not():
+    """Composition is identical; only the arrangement differs."""
+    amphipathic = "LKKLLKKLLKKLLKKLLKKL"
+    blocky = "LLLLLLLLLLKKKKKKKKKK"
+    assert sorted(amphipathic) == sorted(blocky)
+    assert sq.helix_hydropathy_periodicity(blocky) < sq.helix_hydropathy_periodicity(amphipathic)
+
+
+def test_the_hydropathy_z_separates_arrangement_from_letters():
+    """The whole design of study Q9 in one assertion."""
+    amphipathic = sq.composition_z("LKKLLKKLLKKLLKKLLKKL",
+                                   "helix_hydropathy_periodicity", n_shuffles=400)
+    blocky = sq.composition_z("LLLLLLLLLLKKKKKKKKKK",
+                              "helix_hydropathy_periodicity", n_shuffles=400)
+    assert amphipathic.z > 3.0
+    assert blocky.z < 2.0
+
+
+def test_the_strand_hydropathy_statistic_fires_on_alternation():
+    alternating = "LKLKLKLKLKLKLKLKLKLK"
+    assert sq.strand_hydropathy_periodicity(alternating) > 0.8
+    assert sq.helix_hydropathy_periodicity(alternating) < \
+        sq.strand_hydropathy_periodicity(alternating)
+
+
+def test_the_hydropathy_statistics_are_registered_for_the_null():
+    for name in ("helix_hydropathy_periodicity", "strand_hydropathy_periodicity",
+                 "dominant_hydropathy_period_power"):
+        assert name in sq.STATISTICS
+        assert sq.composition_z("LKKLLKKLLKKLLKKLLKKL", name, n_shuffles=50).n_shuffles == 50
+
+
+def test_hydropathy_and_charge_are_different_questions():
+    """A hydrophobic face with no charge pattern must not fire the charge test."""
+    face = "LAALLAALLAALLAALLAAL"
+    assert sq.helix_hydropathy_periodicity(face) > 0.5
+    assert sq.helix_charge_periodicity(face) < 0.5

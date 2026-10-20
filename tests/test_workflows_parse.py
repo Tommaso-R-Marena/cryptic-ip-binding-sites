@@ -43,7 +43,7 @@ ANALYSES = {
     "hull-gate.yml", "redocking-audit.yml", "rerank.yml", "sampling.yml", "triage.yml",
     "orthogonal.yml", "coevolution.yml", "kinase.yml", "cofold-probe.yml",
     "template-fit.yml", "template2.yml", "flexible.yml", "sequence.yml",
-    "architecture.yml", "within-protein.yml",
+    "architecture.yml", "within-protein.yml", "pocket-sequence.yml",
 }
 
 #: Workflows written under the conventions below from the start; older ones are
@@ -51,7 +51,8 @@ ANALYSES = {
 STRICT = {"redocking.yml", "arrestin.yml", "specificity.yml", "hull-gate.yml", "redocking-audit.yml",
           "rerank.yml", "sampling.yml", "triage.yml", "orthogonal.yml", "coevolution.yml", "kinase.yml",
           "cofold-probe.yml", "template-fit.yml", "template2.yml", "flexible.yml",
-          "sequence.yml", "architecture.yml", "within-protein.yml"}
+          "sequence.yml", "architecture.yml", "within-protein.yml",
+          "pocket-sequence.yml"}
 
 
 @pytest.mark.parametrize("path", [p for p in WORKFLOWS if p.name in ANALYSES], ids=lambda p: p.name)

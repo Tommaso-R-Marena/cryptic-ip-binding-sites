@@ -509,6 +509,32 @@ def strand_charge_periodicity(sequence: str) -> float:
     return band_periodicity(as_track(sequence, "charge"), STRAND_BAND)
 
 
+def dominant_hydropathy_period(sequence: str) -> Dict[str, float]:
+    """The dominant period of a window's hydropathy track."""
+    return dominant_period(as_track(sequence, "hydropathy"))
+
+
+def helix_hydropathy_periodicity(sequence: str) -> float:
+    """Fraction of the hydropathy variation in the helical band.
+
+    The charge statistics above are the right track for an inositol-phosphate
+    site, which is basic. **Pocket formation in general is a hydropathy
+    question**: an amphipathic helix puts one face against a cavity and the
+    other against solvent, and that is a periodicity in Kyte-Doolittle
+    hydropathy at the helical repeat rather than in charge.
+
+    Declared in `docs/POCKET_SEQUENCE_PLAN.md` before any sequence was read for
+    study Q9, and defined exactly as its charge counterpart on the hydropathy
+    scale already in this module - no new scale, no new estimator.
+    """
+    return band_periodicity(as_track(sequence, "hydropathy"), HELIX_BAND)
+
+
+def strand_hydropathy_periodicity(sequence: str) -> float:
+    """The same in the extended band: alternating in and out along a strand."""
+    return band_periodicity(as_track(sequence, "hydropathy"), STRAND_BAND)
+
+
 def spacing_spectrum(positions: Sequence[int]) -> Dict[str, float]:
     """What the gaps between coordinating residues look like.
 
@@ -547,6 +573,12 @@ STATISTICS: Dict[str, Callable[[str], float]] = {
     # The dominant period's own power, which a shuffle should destroy whatever
     # the period turns out to be.
     "dominant_period_power": lambda s: dominant_charge_period(s)["power"],
+    # The hydropathy track, declared in docs/POCKET_SEQUENCE_PLAN.md before any
+    # sequence was read for study Q9. Charge is the track for a basic site;
+    # hydropathy is the track for a pocket.
+    "helix_hydropathy_periodicity": helix_hydropathy_periodicity,
+    "strand_hydropathy_periodicity": strand_hydropathy_periodicity,
+    "dominant_hydropathy_period_power": lambda s: dominant_hydropathy_period(s)["power"],
 }
 
 
