@@ -270,3 +270,117 @@ def test_a_detector_that_fails_is_recorded_not_raised(tmp_path):
         analyzer_factory=explode,
     )
     assert "fpocket" in record["error"]
+
+
+# ------------------------------------------------- the ground-truth arm
+
+class _Arrays:
+    """A two-chain structure with a ligand copy, as parallel arrays."""
+
+    def __init__(self, shared_numbering: bool = False):
+        coords, elements, resnames, chains, resseqs, icodes, polymer = [], [], [], [], [], [], []
+        for index in range(10):                       # chain A, residues 1-10
+            coords.append([float(index), 0.0, 0.0])
+            elements.append("C")
+            resnames.append("ALA")
+            chains.append("A")
+            resseqs.append(index + 1)
+            icodes.append("")
+            polymer.append(True)
+        for index in range(10):                       # chain B, far away
+            coords.append([float(index), 100.0, 0.0])
+            elements.append("C")
+            resnames.append("ALA")
+            chains.append("B")
+            resseqs.append(index + 1 if shared_numbering else index + 101)
+            icodes.append("")
+            polymer.append(True)
+        for offset in range(3):                       # the ligand, beside chain A
+            coords.append([float(offset) + 1.0, 2.0, 0.0])
+            elements.append("P")
+            resnames.append("IHP")
+            chains.append("A")
+            resseqs.append(900)
+            icodes.append("")
+            polymer.append(False)
+        self.coords = np.asarray(coords, dtype=float)
+        self.elements = np.asarray(elements)
+        self.resnames = np.asarray(resnames)
+        self.chain_ids = np.asarray(chains)
+        self.resseqs = np.asarray(resseqs)
+        self.icodes = np.asarray(icodes)
+        self.is_polymer = np.asarray(polymer)
+
+
+def test_the_annotated_site_is_the_ligand_s_contact_shell_by_chain():
+    out = script.contact_residues(_Arrays(), "A", 900, "")
+    assert out["found"] is True
+    assert set(out["by_chain"]) == {"A"}
+    # The ligand sits 2 A off chain A at x = 1, 2, 3, so every residue within
+    # sqrt(4.5^2 - 2^2) = 4.03 along x is in contact: residues 1 through 8.
+    assert out["by_chain"]["A"] == [1, 2, 3, 4, 5, 6, 7, 8]
+
+
+def test_a_ligand_copy_that_is_not_there_is_reported_not_guessed():
+    out = script.contact_residues(_Arrays(), "A", 999, "")
+    assert out["found"] is False
+
+
+def test_shared_chain_numbering_is_detected():
+    assert script.chain_numbering_is_ambiguous(_Arrays(shared_numbering=True), "A") is True
+    assert script.chain_numbering_is_ambiguous(_Arrays(), "A") is False
+
+
+def test_recall_is_coverage_of_the_site_not_a_symmetric_overlap():
+    """A pocket may legitimately be larger than a ligand's contact shell."""
+    assert script.recall(list(range(1, 101)), [1, 2, 3, 4]) == 1.0
+    assert script.jaccard(list(range(1, 101)), [1, 2, 3, 4]) < 0.05
+    assert script.recall([1, 2], [1, 2, 3, 4]) == 0.5
+
+
+def test_each_arm_matches_with_its_own_rule_and_floor():
+    assert script.MATCH_RULES["jaccard"][1] == script.MIN_JACCARD
+    assert script.MATCH_RULES["recall"][1] == script.MIN_RECALL
+    assert set(script.ARMS) == {"candidate", "site"}
+
+
+def test_an_unknown_rule_is_refused():
+    pockets, table = _synthetic(n_proteins=1, n_siblings=10)
+    with pytest.raises(SystemExit):
+        script.measure(pockets, table, n_draws=60, n_bootstrap=50, rule="whatever")
+
+
+def test_the_site_arm_reads_its_own_column_names():
+    frame = pd.DataFrame([{"copy": "1ZY7_A_901", "residues": "3,7,11",
+                           "group": "G:1ZY7", "burial_class": "cryptic"}])
+    out = script.as_table(frame, "site")
+    assert list(out.columns)[:3] == ["uniprot_id", "top_pocket_residues", "cluster"]
+    assert out.iloc[0]["cluster"] == "G:1ZY7"
+
+
+def test_the_recall_rule_keeps_a_pocket_the_jaccard_rule_would_reject():
+    """The arms differ only here, and this is why."""
+    site = [10, 11, 12, 13]
+    lining = list(range(10, 40, 2))            # covers the site, much larger
+    pockets = pd.DataFrame([{"uniprot_id": "c1", "pocket_id": 1,
+                             "residues": ",".join(str(r) for r in lining)}])
+    table = pd.DataFrame([{"uniprot_id": "c1", "cluster": "g1",
+                           "top_pocket_residues": ",".join(str(r) for r in site)}])
+    by_jaccard = script.measure(pockets, table, n_draws=60, n_bootstrap=50, rule="jaccard")
+    by_recall = script.measure(pockets, table, n_draws=60, n_bootstrap=50, rule="recall")
+    assert any("not re-identified" in r for r in by_jaccard["excluded"])
+    assert not any("not re-identified" in r for r in by_recall["excluded"])
+
+
+def test_the_site_arm_runs_the_same_statistic_as_the_candidate_arm():
+    pockets, table = _synthetic(n_proteins=5, n_siblings=12)
+    as_site = table.rename(columns={"uniprot_id": "copy",
+                                    "top_pocket_residues": "residues",
+                                    "cluster": "group"})
+    candidate = script.measure(pockets, table, n_draws=120, n_bootstrap=200)
+    site = script.measure(pockets, script.as_table(as_site, "site"),
+                          n_draws=120, n_bootstrap=200, rule="recall")
+    assert candidate["n_measured"] == site["n_measured"]
+    for left, right in zip(candidate["tests"], site["tests"]):
+        if left.get("runnable") and right.get("runnable"):
+            assert left["mean_quantile"] == pytest.approx(right["mean_quantile"])

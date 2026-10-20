@@ -183,6 +183,120 @@ def cmd_pockets(args: argparse.Namespace) -> int:
     return 0
 
 
+# ------------------------------------------------- the ground-truth arm
+
+#: A protein residue is in contact with the ligand when any heavy atom comes
+#: this close to any of the ligand's. The census already uses it for protein
+#: contacts; it is not tuned here.
+CONTACT_ANGSTROMS = 4.5
+
+#: The site pocket must cover at least this much of the annotated contact
+#: shell. Recall rather than Jaccard, because a pocket may legitimately be
+#: larger than a ligand's contact shell.
+MIN_RECALL = 0.3
+
+
+def contact_residues(arrays, chain: str, resseq: int, icode: str,
+                     comp_id: str = "IHP",
+                     cutoff: float = CONTACT_ANGSTROMS) -> Dict[str, object]:
+    """The annotated site: polymer residues near one ligand copy, by chain.
+
+    Returns the contacting residue numbers per chain, so the caller can apply
+    the one-chain rule rather than pooling positions from several chains into a
+    lining that is not a lining.
+    """
+    from scipy.spatial import cKDTree
+
+    elements = np.asarray(arrays.elements)
+    heavy = elements != "H"
+    icodes = np.asarray([str(c).strip() for c in arrays.icodes])
+    ligand = (np.asarray(arrays.resnames) == comp_id.upper()) & heavy \
+        & (np.asarray(arrays.chain_ids) == chain) \
+        & (np.asarray(arrays.resseqs).astype(int) == int(resseq)) \
+        & (icodes == str(icode or "").strip())
+    polymer = np.asarray(arrays.is_polymer) & heavy
+    if not ligand.any() or not polymer.any():
+        return {"found": False, "by_chain": {}}
+    tree = cKDTree(np.asarray(arrays.coords)[polymer])
+    hits: Set[int] = set()
+    for index in tree.query_ball_point(np.asarray(arrays.coords)[ligand], r=float(cutoff)):
+        hits.update(int(i) for i in index)
+    if not hits:
+        return {"found": True, "by_chain": {}}
+    chains = np.asarray(arrays.chain_ids)[polymer]
+    numbers = np.asarray(arrays.resseqs)[polymer].astype(int)
+    by_chain: Dict[str, Set[int]] = {}
+    for index in sorted(hits):
+        by_chain.setdefault(str(chains[index]), set()).add(int(numbers[index]))
+    return {"found": True, "by_chain": {k: sorted(v) for k, v in by_chain.items()}}
+
+
+def chain_numbering_is_ambiguous(arrays, chain: str) -> bool:
+    """Whether another polymer chain shares any residue number with this one.
+
+    The detector's pocket residue lists are chain-blind numbers, so when two
+    chains share numbering a pocket's residues cannot be assigned to a chain
+    and the copy is excluded. Conservative, and it discards homodimers.
+    """
+    polymer = np.asarray(arrays.is_polymer)
+    chains = np.asarray(arrays.chain_ids)[polymer]
+    numbers = np.asarray(arrays.resseqs)[polymer].astype(int)
+    mine = set(int(n) for n in numbers[chains == chain])
+    others = set(int(n) for n in numbers[chains != chain])
+    return bool(mine & others)
+
+
+def recall(pocket: Sequence[int], site: Sequence[int]) -> float:
+    """How much of the annotated site a pocket's lining covers."""
+    a, b = set(int(x) for x in pocket), set(int(x) for x in site)
+    if not b:
+        return 0.0
+    return len(a & b) / len(b)
+
+
+def site_one(structure_path: Path, chain: str, resseq: int, icode: str, work: Path,
+             comp_id: str = "IHP", timeout_s: float = 900.0,
+             analyzer_factory=None) -> Dict[str, object]:
+    """One deposited copy: its annotated site, and every pocket in the structure."""
+    from cryptic_ip.analysis.structure_arrays import load_structure_arrays
+
+    factory = analyzer_factory or _analyzer
+    record: Dict[str, object] = {"site": [], "pockets": [], "error": "",
+                                 "chain": chain, "n_chains_in_contact": 0}
+    try:
+        arrays = load_structure_arrays(structure_path)
+        contacts = contact_residues(arrays, chain, resseq, icode, comp_id=comp_id)
+        if not contacts["found"]:
+            record["error"] = "ligand copy not present in the structure"
+            return record
+        by_chain = contacts["by_chain"]  # type: ignore[assignment]
+        record["n_chains_in_contact"] = len(by_chain)
+        if chain not in by_chain:
+            record["error"] = "no contact with the ligand's own chain"
+            return record
+        if chain_numbering_is_ambiguous(arrays, chain):
+            record["error"] = "another chain shares this chain's residue numbering"
+            return record
+        record["site"] = list(by_chain[chain])
+        analyzer = factory(structure_path, work, timeout_s)
+        pockets = analyzer.detect_pockets()
+        rows = []
+        for pocket_id in pockets["pocket_id"]:
+            try:
+                residues = analyzer.get_pocket_residues(int(pocket_id))
+            except Exception as error:  # noqa: BLE001
+                rows.append({"pocket_id": int(pocket_id), "residues": "",
+                             "error": f"{type(error).__name__}: {error}"[:200]})
+                continue
+            rows.append({"pocket_id": int(pocket_id),
+                         "residues": ",".join(str(int(r)) for r in sorted(set(residues))),
+                         "error": ""})
+        record["pockets"] = rows
+    except Exception as error:  # noqa: BLE001
+        record["error"] = f"{type(error).__name__}: {error}"[:300]
+    return record
+
+
 # --------------------------------------------------------------- analysis
 
 def architecture_p(positions: Sequence[int], *, n_draws: int, seed: int) -> Dict[str, object]:
@@ -230,9 +344,25 @@ def match_siblings(candidate_size: int, siblings: Sequence[Dict[str, object]],
     return matched
 
 
+#: How the committed lining is matched to a re-detected pocket, per arm. The
+#: candidate arm matches a pocket to a pocket, so overlap is symmetric and
+#: Jaccard is right; the ground-truth arm matches a pocket to a ligand's
+#: contact shell, which a pocket may legitimately exceed, so it is recall.
+MATCH_RULES = {"jaccard": (jaccard, MIN_JACCARD), "recall": (recall, MIN_RECALL)}
+
+
 def measure(pockets: pd.DataFrame, table: pd.DataFrame, *, n_draws: int,
-            n_bootstrap: int) -> Dict[str, object]:
-    """Candidate against its own protein's same-size pockets, protein by protein."""
+            n_bootstrap: int, rule: str = "jaccard") -> Dict[str, object]:
+    """The selected lining against its own structure's same-size pockets.
+
+    One function for both arms, because the arms' comparison means nothing
+    unless they compute the same statistic. Only the rule that re-identifies
+    the selected pocket differs, and it differs because the two arms match
+    different kinds of object.
+    """
+    if rule not in MATCH_RULES:
+        raise SystemExit(f"rule must be one of {sorted(MATCH_RULES)}, got {rule!r}")
+    overlap_of, floor = MATCH_RULES[rule]
     rng = np.random.default_rng(SEED)
     per_protein: List[Dict[str, object]] = []
     excluded: Dict[str, int] = {}
@@ -253,11 +383,11 @@ def measure(pockets: pd.DataFrame, table: pd.DataFrame, *, n_draws: int,
         if not linings:
             exclude("every re-detected pocket has an empty lining")
             continue
-        overlaps = [(jaccard(committed, lining), pocket_id, lining)
+        overlaps = [(overlap_of(lining, committed), pocket_id, lining)
                     for pocket_id, lining in linings]
         best_overlap, best_id, candidate_lining = max(overlaps, key=lambda t: (t[0], -t[1]))
-        if best_overlap < MIN_JACCARD:
-            exclude(f"candidate not re-identified (best overlap below {MIN_JACCARD})")
+        if best_overlap < floor:
+            exclude(f"selected pocket not re-identified ({rule} below {floor})")
             continue
 
         candidate = architecture_p(candidate_lining, n_draws=n_draws, seed=SEED)
@@ -336,6 +466,8 @@ def measure(pockets: pd.DataFrame, table: pd.DataFrame, *, n_draws: int,
     faces = [r for r in per_protein if r.get("candidate_element")]
     return {
         "seed": SEED,
+        "rule": rule,
+        "overlap_floor": float(floor),
         "min_jaccard": MIN_JACCARD,
         "size_tolerance": SIZE_TOLERANCE,
         "min_siblings": MIN_SIBLINGS,
@@ -473,14 +605,103 @@ def markdown(report: Dict[str, object]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def cmd_sites(args: argparse.Namespace) -> int:
+    """The ground-truth arm's data step: annotated sites and their structures' pockets.
+
+    Writes the same two-column shape the candidate arm's `pockets` command
+    writes, plus a table of annotated site linings, so that `analyse` runs the
+    identical statistic on both arms.
+    """
+    census = pd.read_csv(args.census)
+    wanted = (census["comp_id"].astype(str).str.upper() == args.comp_id.upper())
+    for column, value in (("status", "eligible"), ("complete", True),
+                          ("selected", True)):
+        if column in census.columns:
+            wanted &= (census[column] == value)
+    if "symmetry_contact" in census.columns:
+        wanted &= (census["symmetry_contact"] != True)  # noqa: E712 - NaN must survive
+    copies = census[wanted]
+    if args.limit:
+        copies = copies.head(int(args.limit))
+    rows, sites, status = [], [], []
+    for index, row in enumerate(copies.itertuples(), start=1):
+        pdb_id = str(row.pdb_id).lower()
+        candidates = sorted(args.structures.glob(f"{pdb_id}.*")) + \
+            sorted(args.structures.glob(f"{pdb_id.upper()}.*"))
+        key = f"{row.pdb_id}_{row.chain}_{row.resseq}"
+        if not candidates:
+            status.append({"copy": key, "error": "structure not downloaded"})
+            continue
+        work = Path(tempfile.mkdtemp(prefix=f"q8site_{pdb_id}_"))
+        try:
+            local = work / candidates[0].name
+            shutil.copy(candidates[0], local)
+            icode = "" if pd.isna(getattr(row, "icode", "")) else str(getattr(row, "icode", ""))
+            record = site_one(local, str(row.chain), int(row.resseq), icode, work,
+                              comp_id=args.comp_id, timeout_s=args.fpocket_timeout)
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+        status.append({"copy": key, "error": record["error"],
+                       "n_pockets": len(record["pockets"]),  # type: ignore[arg-type]
+                       "n_site_residues": len(record["site"])})  # type: ignore[arg-type]
+        if record["error"]:
+            print(f"[{index}/{len(copies)}] {key}: {record['error']}", flush=True)
+            continue
+        sites.append({"copy": key, "pdb_id": row.pdb_id, "chain": row.chain,
+                      "group": getattr(row, "homology_group_strict", row.pdb_id),
+                      "burial_class": getattr(row, "burial_class", ""),
+                      "residues": ",".join(str(r) for r in record["site"])})  # type: ignore[arg-type]
+        for pocket in record["pockets"]:  # type: ignore[union-attr]
+            rows.append({"uniprot_id": key, "model": candidates[0].name, **pocket})
+        print(f"[{index}/{len(copies)}] {key}: {len(record['pockets'])} pockets, "
+              f"{len(record['site'])} site residues", flush=True)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_csv(args.out, index=False)
+    pd.DataFrame(sites).to_csv(args.sites, index=False)
+    report = {"n_copies": int(len(copies)), "n_measured": len(sites),
+              "n_pockets": len(rows),
+              "excluded": {},
+              "status": status}
+    for entry in status:
+        if entry.get("error"):
+            report["excluded"][entry["error"]] = report["excluded"].get(entry["error"], 0) + 1
+    if args.report:
+        args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    print(json.dumps({k: v for k, v in report.items() if k != "status"}, indent=2))
+    return 0
+
+
+#: What each arm's committed table calls the three columns `measure` needs.
+ARMS = {
+    "candidate": {"rule": "jaccard",
+                  "columns": {"uniprot_id": "uniprot_id",
+                              "top_pocket_residues": "top_pocket_residues",
+                              "cluster": "cluster"}},
+    "site": {"rule": "recall",
+             "columns": {"uniprot_id": "copy", "top_pocket_residues": "residues",
+                         "cluster": "group"}},
+}
+
+
+def as_table(frame: pd.DataFrame, arm: str) -> pd.DataFrame:
+    """One arm's table in the column names `measure` reads."""
+    columns = ARMS[arm]["columns"]
+    missing = [source for source in columns.values() if source not in frame.columns]
+    if missing:
+        raise SystemExit(f"the {arm} table is missing {missing}")
+    out = frame.rename(columns={source: target for target, source in columns.items()})
+    keep = [c for c in out.columns if c not in set(columns.values()) - set(columns)]
+    return out[keep] if keep else out
+
+
 def cmd_analyse(args: argparse.Namespace) -> int:
     pockets = pd.read_csv(args.pockets)
-    table = pd.read_csv(args.table)
-    for column, frame, name in (("uniprot_id", pockets, args.pockets),
-                                ("top_pocket_residues", table, args.table)):
-        if column not in frame.columns:
-            raise SystemExit(f"{name} is missing {column}")
-    report = measure(pockets, table, n_draws=args.draws, n_bootstrap=args.bootstrap)
+    if "uniprot_id" not in pockets.columns:
+        raise SystemExit(f"{args.pockets} is missing uniprot_id")
+    table = as_table(pd.read_csv(args.table), args.arm)
+    report = measure(pockets, table, n_draws=args.draws, n_bootstrap=args.bootstrap,
+                     rule=str(ARMS[args.arm]["rule"]))
+    report["arm"] = args.arm
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2, sort_keys=True, default=float) + "\n")
     text = markdown(report)
@@ -509,11 +730,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                          default=Path("results/specificity/candidates.csv"))
     analyse.add_argument("--out", type=Path, required=True)
     analyse.add_argument("--markdown", type=Path, default=None)
+    analyse.add_argument("--arm", choices=sorted(ARMS), default="candidate")
     analyse.add_argument("--draws", type=int, default=800)
     analyse.add_argument("--bootstrap", type=int, default=2000)
 
+    sites = sub.add_parser("sites", help="annotated sites and their structures' pockets")
+    sites.add_argument("--census", type=Path, default=Path("results/redocking/census.csv"))
+    sites.add_argument("--structures", type=Path, required=True)
+    sites.add_argument("--comp-id", default="IHP")
+    sites.add_argument("--out", type=Path, required=True)
+    sites.add_argument("--sites", type=Path, required=True)
+    sites.add_argument("--report", type=Path, default=None)
+    sites.add_argument("--fpocket-timeout", type=float, default=900.0)
+    sites.add_argument("--limit", type=int, default=0)
+
     args = parser.parse_args(argv)
-    return cmd_pockets(args) if args.command == "pockets" else cmd_analyse(args)
+    commands = {"pockets": cmd_pockets, "sites": cmd_sites, "analyse": cmd_analyse}
+    return commands[args.command](args)
 
 
 if __name__ == "__main__":
