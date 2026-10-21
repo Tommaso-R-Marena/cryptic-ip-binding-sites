@@ -1,0 +1,143 @@
+name: Sequence signature
+
+# docs/SEQUENCE_PLAN.md (study Q6).
+#
+# Two jobs, and they are deliberately not the same thing:
+#
+#   validate  method validation on synthetic pools. Touches no study data, runs on
+#             every push to this branch, and fails the run if the machinery stops
+#             finding a planted ordering signature or starts reporting one for a
+#             composition-matched control. This is a test of the method, not a result.
+#   study     the pre-registered analysis, which runs only when it is handed an
+#             inputs artifact. It emits the power block before the differences.
+#
+# Why the study job needs an artifact rather than building its own inputs: the
+# inputs file carries, per pocket, a chain sequence and the lining residues as
+# (chain, number) pairs. The repo's lining residue numbers are chain-blind
+# (PocketAnalyzer.get_pocket_residues says so in its own docstring), so the pairs
+# have to come from a chain-aware pass over the structures. That pass is a separate
+# piece of work against the benchmark table's actual columns, and guessing those
+# column names here would produce a workflow that goes green on an empty analysis.
+# Until it exists, this workflow runs the validation and the study on demand.
+
+on:
+  push:
+    # An analysis, not a test: on main it runs on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/SEQUENCE_PLAN.md'
+      - 'scripts/sequence_signature.py'
+      - 'cryptic_ip/detect/sequence.py'
+      - 'cryptic_ip/detect/signature.py'
+      - '.github/workflows/sequence.yml'
+  workflow_dispatch:
+    inputs:
+      inputs_run:
+        description: 'run id holding a sequence-inputs artifact (empty = validation only)'
+        default: ''
+      shuffles:
+        description: 'composition-null shuffles per window'
+        default: '2000'
+      bootstrap:
+        description: 'group bootstrap resamples'
+        default: '2000'
+
+concurrency:
+  group: sequence-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  SHUFFLES: ${{ inputs.shuffles || '2000' }}
+  BOOTSTRAP: ${{ inputs.bootstrap || '2000' }}
+
+jobs:
+  validate:
+    name: Method validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Can it find a planted signature, and does it stay quiet otherwise
+        # A non-zero exit here means a check failed: either the planted pool stopped
+        # firing or a composition-matched control started to. Both are reasons to
+        # stop, not warnings.
+        run: |
+          python scripts/sequence_signature.py validate \
+            --windows 40 --length 24 --shuffles 1000 \
+            --out validation.json --markdown VALIDATION.md
+      - name: Print the validation
+        run: |
+          python scripts/extract_log_block.py emit SEQUENCE_VALIDATION_MD_B64 VALIDATION.md
+          python scripts/extract_log_block.py emit SEQUENCE_VALIDATION_JSON_B64 validation.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: sequence-validation
+          path: |
+            validation.json
+            VALIDATION.md
+          retention-days: 90
+
+  study:
+    name: Study Q6
+    needs: validate
+    if: ${{ inputs.inputs_run != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Fetch the inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "${{ inputs.inputs_run }}" --repo "$GITHUB_REPOSITORY" \
+            --name sequence-inputs --dir inputs
+          test -s inputs/inputs.jsonl
+          wc -l inputs/inputs.jsonl
+      - name: Per-pocket descriptors
+        run: |
+          python scripts/sequence_signature.py describe \
+            --inputs inputs/inputs.jsonl --shuffles "$SHUFFLES" --out sites.json
+      - name: Power first, then the six primary tests
+        run: |
+          python scripts/sequence_signature.py report \
+            --sites sites.json --bootstrap "$BOOTSTRAP" \
+            --out sequence.json --markdown SEQUENCE.md
+      - name: Print the results, markdown first and the numbers last
+        # Base64-wrapped: a plain JSON block is one enormous line and a log reader
+        # that returns the tail drops it whole.
+        run: |
+          python scripts/extract_log_block.py emit SEQUENCE_MD_B64 SEQUENCE.md
+          python scripts/extract_log_block.py emit SEQUENCE_JSON_B64 sequence.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: sequence-report
+          path: |
+            sites.json
+            sequence.json
+            SEQUENCE.md
+          retention-days: 90

@@ -1,0 +1,265 @@
+name: Flexible receptor
+
+# docs/FLEXIBLE_PLAN.md (study J), as amended by docs/FLEXIBLE_PLAN_AMENDMENT_1.md and
+# docs/FLEXIBLE_PLAN_AMENDMENT_2.md and docs/FLEXIBLE_PLAN_AMENDMENT_3.md.
+#
+# Every docking run in studies A, F and G held the receptor rigid. This asks whether
+# rotamer freedom in the pocket recovers study F's failures, and it is the last structural
+# explanation left before the scoring function stands alone as the suspect.
+#
+#   plan    shard list
+#   dock    both arms per copy, 30 shards; one child process per copy
+#   report  J1, J2, J3; printed between markers
+#
+# Amendment 1: both arms are docked fresh through the same Meeko-prepared receptor rather
+# than reusing study G's rigid arm, because Meeko is what builds correct side-chain torsion
+# trees and its rigid output is not atom-identical to the project-prepared one. Reusing the
+# old arm would confound receptor preparation with side-chain freedom. The rigid arm's
+# success under this receptor is reported next to study F's 0.110 so the change is audited.
+
+on:
+  push:
+    # Analyses, not tests: on main they run on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/FLEXIBLE_PLAN.md'
+      - 'docs/FLEXIBLE_PLAN_AMENDMENT_1.md'
+      - 'docs/FLEXIBLE_PLAN_AMENDMENT_2.md'
+      - 'docs/FLEXIBLE_PLAN_AMENDMENT_3.md'
+      - 'scripts/flexible.py'
+      - '.github/workflows/flexible.yml'
+  workflow_dispatch:
+    inputs:
+      census_run:
+        description: 'redocking run holding the redocking-census and redocking-inputs artifacts'
+        default: '36020459246'
+      dock_run:
+        description: 'reuse the docking outputs of this run (empty = dock them)'
+        default: ''
+
+concurrency:
+  group: flexible-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  CENSUS_RUN: ${{ inputs.census_run || '36020459246' }}
+  PY_DOCKING: 'rdkit==2026.3.6 vina==1.2.7 meeko==0.8.0 gemmi==0.7.5 pdb2pqr==3.6.1 propka==3.5.1'
+  # One copy a shard, 272 shards. Three a shard at a 90-minute per-copy cap censored 5 of
+  # the 12 copies readable in run 36850024210 - and the copies it cut are the slow ones,
+  # which are the larger receptors, so the cap was choosing the analysed set. Successful
+  # copies there took 30 to 86 minutes, so 90 minutes sat inside the body of the
+  # distribution rather than beyond its tail. See docs/FLEXIBLE_PLAN_AMENDMENT_3.md.
+  DOCK_SHARDS: '272'
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    outputs:
+      dock_a: ${{ steps.plan.outputs.dock_a }}
+      dock_b: ${{ steps.plan.outputs.dock_b }}
+    steps:
+      # A matrix generates at most 256 jobs per run. 272 shards in one matrix does not
+      # fail - the Dock job is dropped, the report runs on nothing and the run goes green
+      # (run 36883632819). The shards are split across two matrices so neither can reach
+      # the cap, and tests/test_workflows_parse.py pins that they tile the range exactly.
+      - id: plan
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          n = int(os.environ["DOCK_SHARDS"])
+          half = (n + 1) // 2
+          print("dock_a=" + json.dumps(list(range(half))))
+          print("dock_b=" + json.dumps(list(range(half, n))))
+          PY
+
+  dock_a:
+    name: Dock ${{ matrix.shard }}
+    needs: plan
+    if: ${{ !inputs.dock_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.dock_a) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+          which pdb2pqr
+      - name: Census and inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-census --dir census
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-inputs --dir bench
+      - name: Restore structures
+        uses: actions/cache/restore@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch anything the cache lacks
+        run: python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file bench/table_ids.txt
+      - name: Which side chains move
+        run: |
+          python scripts/flexible.py residues --census census/census.csv \
+            --structures data/redock/structures --out "residues-${{ matrix.shard }}.json"
+      - name: Dock both arms
+        env:
+          OMP_NUM_THREADS: '1'
+        run: |
+          python scripts/flexible.py dock --census census/census.csv \
+            --structures-dir data/redock/structures --ccd-dir census/ccd --work-dir work \
+            --shard "${{ matrix.shard }}" --shards "$DOCK_SHARDS" \
+            --per-copy-timeout 18000 --shard-budget 19800 \
+            --out "flexible-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: flexible-arms-${{ matrix.shard }}
+          path: |
+            flexible-${{ matrix.shard }}.json
+            residues-${{ matrix.shard }}.json
+          retention-days: 90
+
+  dock_b:
+    name: Dock ${{ matrix.shard }}
+    needs: plan
+    if: ${{ !inputs.dock_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.dock_b) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt $PY_DOCKING
+          python -m pip install -e .
+          which pdb2pqr
+      - name: Census and inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-census --dir census
+          gh run download "$CENSUS_RUN" --repo "$GITHUB_REPOSITORY" --name redocking-inputs --dir bench
+      - name: Restore structures
+        uses: actions/cache/restore@v5
+        with:
+          path: data/redock/structures
+          key: redock-structures-${{ hashFiles('bench/table_ids.txt') }}
+      - name: Fetch anything the cache lacks
+        run: python scripts/fetch_structures.py rcsb --out data/redock/structures --ids-file bench/table_ids.txt
+      - name: Which side chains move
+        run: |
+          python scripts/flexible.py residues --census census/census.csv \
+            --structures data/redock/structures --out "residues-${{ matrix.shard }}.json"
+      - name: Dock both arms
+        env:
+          OMP_NUM_THREADS: '1'
+        run: |
+          python scripts/flexible.py dock --census census/census.csv \
+            --structures-dir data/redock/structures --ccd-dir census/ccd --work-dir work \
+            --shard "${{ matrix.shard }}" --shards "$DOCK_SHARDS" \
+            --per-copy-timeout 18000 --shard-budget 19800 \
+            --out "flexible-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: flexible-arms-${{ matrix.shard }}
+          path: |
+            flexible-${{ matrix.shard }}.json
+            residues-${{ matrix.shard }}.json
+          retention-days: 90
+
+  report:
+    name: Report
+    needs: [dock_a, dock_b]
+    # always(), not !cancelled(): a shard killed by timeout-minutes is marked CANCELLED,
+    # and the report matters most when a shard ran out of budget.
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Docking outputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -n "${{ inputs.dock_run }}" ]; then
+            gh run download "${{ inputs.dock_run }}" --repo "$GITHUB_REPOSITORY" --dir parts
+          fi
+      - uses: actions/download-artifact@v7
+        if: ${{ !inputs.dock_run }}
+        with:
+          pattern: flexible-arms-*
+          path: parts
+      - name: Merge the shards
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          records = []
+          parts = sorted(Path("parts").rglob("flexible-*.json"))
+          for path in parts:
+              payload = json.loads(path.read_text())
+              if isinstance(payload, list):
+                  records.extend(payload)
+          Path("records.json").write_text(json.dumps(records))
+          print(len(parts), "shard files,", len(records), "copy records merged")
+          # No shard file at all is a structural failure, not a degenerate result: it is
+          # what a dropped matrix looks like. A run where shards ran and every copy failed
+          # still has files, and still reports. Failing here stops that going green.
+          if not parts:
+              raise SystemExit("no shard produced an output file - did the matrix run?")
+          PY
+      - name: J1, J2 and J3
+        run: |
+          python scripts/flexible.py report --records records.json --out flexible.json \
+            --markdown FLEXIBLE.md
+      - name: Print the results, markdown first and the numbers last
+        # Both blocks go out base64-wrapped. A plain JSON block is one enormous line, and
+        # a log-fetching tool that returns the tail drops it whole: run 36847445067 printed
+        # the per-copy tracebacks and none of them could be read back. The wrapped form is
+        # many short lines, so the tail keeps it.
+        run: |
+          python scripts/extract_log_block.py emit FLEXIBLE_MD_B64 FLEXIBLE.md
+          python scripts/extract_log_block.py emit FLEXIBLE_JSON_B64 flexible.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: flexible-report
+          path: |
+            records.json
+            flexible.json
+            FLEXIBLE.md
+          retention-days: 90

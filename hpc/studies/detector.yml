@@ -1,0 +1,134 @@
+# Studies Q1-Q5: the next-generation detector, on the cluster.
+#
+# Gated on docs/DETECTOR_PLAN.md, which exists - so unlike the co-folding and
+# MD manifests this one will submit. What it runs is the detector over the
+# structure sets the plan names, sharded; the five questions are answered by
+# the report stage from the merged records.
+#
+# Cost, from a measured single-structure run: the full detector including the
+# 13-conformer ensemble took 4.0 s on a 1,202-atom synthetic structure at 384
+# quadrature points. The candidates are far larger - median 436 residues,
+# maximum 2,352 - and the cavity grid grows with the bounding box, so the
+# per-structure cost is expected to be one to two orders of magnitude higher
+# on the long tail. That expectation is not a measurement, which is why the
+# first stage is a timing probe on real structures rather than a production
+# sweep.
+
+study: Q
+title: Next-generation detector - crypticity, field shape, specificity and power
+description: >
+  Cavity detection across an elastic-network conformer ensemble, with
+  rotation-invariant electrostatic complementarity, a competitor specificity
+  margin, a monotone abstaining score, and positive-unlabelled calibration.
+
+plan:
+  - docs/DETECTOR_PLAN.md
+
+stages:
+  # Measure before committing a sweep. The CPU co-folding probe cost 90
+  # minutes and killed a study that would have wasted far more; the same
+  # discipline applies here.
+  - name: timing_probe
+    description: per-structure cost on real structures across the length distribution
+    shards: 8
+    throttle: 8
+    output: timing-{shard}.json
+    resources:
+      partition: shared
+      cpus: 2
+      mem_gb: 16
+      walltime: "02:00:00"
+    command:
+      - python
+      - scripts/detect.py
+      - shard
+      - --structures
+      - "{work_dir}/probe_structures"
+      - --shard
+      - "{shard}"
+      - --shards
+      - "{shards}"
+      - --max-pockets
+      - "3"
+      - --out
+      - "{stage_dir}/timing-{shard}.json"
+
+  # The annotated binders and their matched competitor-binder controls: Q2's
+  # matching is run and published before any margin is computed.
+  - name: matching
+    description: match competitor-binder controls on volume, basic count and net pocket charge
+    depends_on: [timing_probe]
+    output: matching.json
+    resources:
+      partition: shared
+      cpus: 4
+      mem_gb: 32
+      walltime: "04:00:00"
+    command:
+      - python
+      - scripts/detect.py
+      - spec
+      - --json
+    env:
+      DETECTOR_STAGE: matching
+
+  - name: describe
+    description: the whole detector over every structure in the study set
+    depends_on: [matching]
+    shards: 272
+    throttle: 40
+    output: detect-{shard}.json
+    resources:
+      partition: shared
+      cpus: 4
+      mem_gb: 32
+      walltime: "08:00:00"
+    command:
+      - python
+      - scripts/detect.py
+      - shard
+      - --structures
+      - "{work_dir}/structures"
+      - --shard
+      - "{shard}"
+      - --shards
+      - "{shards}"
+      - --spacing
+      - "0.8"
+      - --min-enclosure
+      - "5"
+      - --modes
+      - "20"
+      - --max-pockets
+      - "5"
+      - --out
+      - "{stage_dir}/detect-{shard}.json"
+
+  # The power calculation runs first inside the report and is printed before
+  # any AUC, because Q4's decision rule turns on it.
+  - name: report
+    description: Q1 to Q5, with the minimum detectable effect printed first
+    depends_on: [describe]
+    after: any
+    output: detector.json
+    resources:
+      partition: shared
+      cpus: 8
+      mem_gb: 64
+      walltime: "04:00:00"
+    command:
+      - python
+      - scripts/rockfish.py
+      - collect
+      - --manifest
+      - hpc/studies/detector.yml
+      - --stage
+      - describe
+      - --work-dir
+      - "{work_dir}"
+      - --records
+      - "{stage_dir}/records.json"
+      - --census-out
+      - "{stage_dir}/census.json"
+      - --provenance
+      - "{stage_dir}/PROVENANCE.md"
