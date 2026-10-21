@@ -24,6 +24,7 @@ SOURCES = {
     "paired": Path("results/architecture/real/basic_face.json"),
     "within": Path("results/within_protein/within_protein.json"),
     "sites": Path("results/within_protein/within_protein_sites.json"),
+    "letters": Path("results/pocket_sequence/pocket_sequence.json"),
 }
 
 #: Commands that produce them, quoted on the page so a reader can regenerate.
@@ -34,6 +35,7 @@ COMMANDS = {
     "paired": "scripts/basic_face.py run",
     "within": "scripts/within_protein.py analyse --arm candidate",
     "sites": "scripts/within_protein.py analyse --arm site",
+    "letters": "scripts/pocket_sequence.py analyse",
 }
 
 
@@ -483,6 +485,126 @@ def built_control(data: Mapping[str, Any]) -> list:
     return lines
 
 
+def letters(data: Mapping[str, Any]) -> list:
+    """Study Q9: the same decomposition taken on letters instead of positions."""
+    report = data["letters"]
+    tests = pick(report, "tests")
+    by_key = {(t["arm"], t["statistic"]): t for t in tests if t.get("runnable")}
+    primary = [t for t in tests if t.get("runnable") and t.get("family") == "primary"]
+    findings = [t for t in primary if t.get("is_finding")]
+    if findings:
+        raise MissingFigure(
+            "a study Q9 test is now a finding; this section states that none is and "
+            "must be rewritten from the artefact rather than patched")
+    check = pick(report, "look_reproduction")
+    if not check.get("selection_reproduced") or check.get("verdict") != "reproduced":
+        raise MissingFigure(
+            "the committed Q9 run no longer reproduces the look its amendment "
+            "discloses, so the held-out arm below is not held out; regenerate from a "
+            "run that does rather than printing this section")
+
+    lines = [
+        "",
+        "## 5b. The same decomposition on letters — and the signal that did not survive power",
+        "",
+        "A window of sequence factorises the way a lining of positions does: **composition** "
+        "(which letters) **⊕ order** (in what arrangement), with permutation of the window's "
+        "own letters as the null for order. That is the same quotient this line takes on "
+        "positions, which is why every primary test of `docs/POCKET_SEQUENCE_PLAN.md` is on "
+        "`composition_z` and never on a raw measure — these sites are basic and pocket "
+        "linings are hydrophobic, so a raw difference is already explained.",
+        "",
+        "The arm worth the page is pocket **formation**: do better-ranked pockets sit in "
+        "windows whose arrangement is more helically periodic than their own letters imply? "
+        "The pre-registered rule could only run on ten windows, and reported this.",
+        "",
+        "| form of the contrast | windows | groups | difference | could have detected | status |",
+        "|---|---|---|---|---|---|",
+    ]
+    forms = (
+        ("`formation`, as pre-registered", "formation"),
+        ("`formation_matched`", "formation_matched"),
+        ("`formation_dense`", "formation_dense"),
+        ("`formation_matched_dense`", "formation_matched_dense"),
+        ("**`formation_heldout`**, confirmatory", "formation_heldout"),
+    )
+    for label, arm in forms:
+        test = by_key[(arm, "helix_hydropathy_periodicity")]
+        lines.append(
+            f"| {label} | {pick(test, 'n_site')} | {pick(test, 'n_groups')} | "
+            f"{pick(test, 'difference'):+.3f} | "
+            f"{pick(test, 'minimum_detectable'):.3f} | {pick(test, 'family')} |"
+        )
+
+    held = by_key[("formation_heldout", "helix_hydropathy_periodicity")]
+    low, high = pick(held, "interval")
+    pre = by_key[("formation", "helix_hydropathy_periodicity")]
+    lines += [
+        "",
+        f"**The ten-window estimate of {pick(pre, 'difference'):+.2f} is noise.** Every form "
+        "of the contrast with data behind it collapses it, and the one that settles the "
+        "question is the held-out arm: `docs/POCKET_SEQUENCE_PLAN_AMENDMENT_1.md` "
+        "re-specified the rule after seeing the ten-window result, so the script runs the "
+        "new rule only on the resampling groups the **pre-registered** rule selected nothing "
+        "from — a set it computes from the plan, not from an author. On "
+        f"{pick(held, 'n_site')} windows across {pick(held, 'n_groups')} groups that arm "
+        f"gives {pick(held, 'difference'):+.3f}, interval [{low:+.3f}, {high:+.3f}], Holm "
+        f"{pick(held, 'p_holm'):.4f}, against a detectable "
+        f"{pick(held, 'minimum_detectable'):.3f}. Not a small effect — an absent one.",
+        "",
+        "**This is what the power floor is for.** The ten-window arm cleared a corrected p "
+        "and the plan refused it, because the difference observed was smaller than the "
+        "difference the design could detect. Without that rule, fixed before any sequence "
+        "was read, this project would have reported a sequence predictor of pocket formation "
+        "that does not exist.",
+        "",
+        "The audit that makes the held-out claim checkable is printed with its arithmetic: "
+        f"the pre-registered arm reselected the same {check['n_site']} windows in the same "
+        f"{check['n_groups']} groups, and its difference moved by "
+        f"{check['difference_gap']:.5f} against the {check['expected_spread']:.5f} a redrawn "
+        f"null implies — {check['gap_in_spreads']:.2f} of one standard error, because "
+        "amendment 1 re-seeded each window's null from its own letters.",
+        "",
+        "The other two arms, both on the exploratory fixed-width window, because the plan's "
+        "contiguous-span window cannot carry them:",
+        "",
+        "| arm | statistic | windows | groups | difference | could have detected |",
+        "|---|---|---|---|---|---|",
+    ]
+    for arm in ("type_dense", "function_dense"):
+        for statistic in ("helix_charge_periodicity", "helix_hydropathy_periodicity"):
+            test = by_key[(arm, statistic)]
+            lines.append(
+                f"| {arm} | `{statistic}` | {pick(test, 'n_site')} | "
+                f"{pick(test, 'n_groups')} | {pick(test, 'difference'):+.3f} | "
+                f"{pick(test, 'minimum_detectable'):.3f} |"
+            )
+
+    yields = pick(report, "window_yield")
+    shells = yields.get("sites/local", {})
+    lines += [
+        "",
+        "**Type is null and powered enough to say so.** The architecture class a lining's "
+        "*positions* earn is not anticipated by the arrangement of its letters — the one "
+        "place this project's two lines could have met, and they do not.",
+        "",
+        "**Function is null and not resolved**, and the reason is the object rather than the "
+        "sample. An inositol-phosphate contact shell is a shell, so its residues come from "
+        "several helices and strands at once and its sequence span usually exceeds the "
+        f"plan's forty-residue cap: {shells.get('span over the cap', 0)} of "
+        f"{pick(report, 'n_site_windows_dense')} shells are refused for exactly that, "
+        f"leaving {pick(report, 'n_site_windows')} for the pre-registered arm. No sample "
+        "size fixes that; a window pre-registered for shells would, on data disjoint from "
+        "this run, and `docs/POCKET_SEQUENCE_PLAN_AMENDMENT_2.md` says why that study is "
+        "not begun on the strength of an unresolved arm.",
+        "",
+        f"{len(primary)} primary tests ran and **none of them is a finding**. Everything "
+        "named `*_dense`, and `formation_matched`, is exploratory by declaration and in no "
+        "Holm family, so no outcome could have promoted it.",
+    ]
+    return lines
+
+
 def paired(data: Mapping[str, Any]) -> list:
     """The one design here whose control is not nearly tautological."""
     report = data["paired"]
@@ -589,6 +711,7 @@ def render(data: Mapping[str, Any]) -> str:
     lines += folds(data)
     lines += real(data)
     lines += built_control(data)
+    lines += letters(data)
     lines += paired(data)
     lines += closing()
     return "\n".join(lines) + "\n"

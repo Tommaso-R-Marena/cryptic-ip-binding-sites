@@ -10,6 +10,7 @@ This page is **generated** by `scripts/architecture_findings.py` from the commit
 | paired | `results/architecture/real/basic_face.json` | `scripts/basic_face.py run` |
 | within | `results/within_protein/within_protein.json` | `scripts/within_protein.py analyse --arm candidate` |
 | sites | `results/within_protein/within_protein_sites.json` | `scripts/within_protein.py analyse --arm site` |
+| letters | `results/pocket_sequence/pocket_sequence.json` | `scripts/pocket_sequence.py analyse` |
 
 The pre-registered plans are `docs/ARCHITECTURE_PLAN.md` and its five dated amendments; the module-level account is the `architecture.py` and `homology.py` sections of `docs/DETECTOR.md`; figures are in `results/architecture/figures/`.
 
@@ -127,6 +128,41 @@ Two details of that arm are worth carrying. It is **exploratory**: an earlier, u
 One thing the arm established for free: re-detection reproduced the committed candidate linings exactly, at a median Jaccard overlap of 1.00 against the screened `top_pocket_residues`. The candidates in `results/specificity/candidates.csv` are reproducible from current AlphaFold models with current fpocket, which nothing in this project had checked.
 
 What both arms do not cover is stated by their exclusions: 36 of 75 candidate proteins and 27 of 119 annotated copies cleared the matched-sibling floor, and the survivors are the smaller-lining end, because a large lining has few pockets of its own size to be compared with.
+
+## 5b. The same decomposition on letters — and the signal that did not survive power
+
+A window of sequence factorises the way a lining of positions does: **composition** (which letters) **⊕ order** (in what arrangement), with permutation of the window's own letters as the null for order. That is the same quotient this line takes on positions, which is why every primary test of `docs/POCKET_SEQUENCE_PLAN.md` is on `composition_z` and never on a raw measure — these sites are basic and pocket linings are hydrophobic, so a raw difference is already explained.
+
+The arm worth the page is pocket **formation**: do better-ranked pockets sit in windows whose arrangement is more helically periodic than their own letters imply? The pre-registered rule could only run on ten windows, and reported this.
+
+| form of the contrast | windows | groups | difference | could have detected | status |
+|---|---|---|---|---|---|
+| `formation`, as pre-registered | 10 | 9 | +1.310 | 1.417 | primary |
+| `formation_matched` | 400 | 70 | +0.098 | 0.310 | exploratory |
+| `formation_dense` | 375 | 75 | +0.079 | 0.280 | exploratory |
+| `formation_matched_dense` | 400 | 75 | +0.081 | 0.321 | exploratory |
+| **`formation_heldout`**, confirmatory | 400 | 63 | +0.014 | 0.300 | primary |
+
+**The ten-window estimate of +1.31 is noise.** Every form of the contrast with data behind it collapses it, and the one that settles the question is the held-out arm: `docs/POCKET_SEQUENCE_PLAN_AMENDMENT_1.md` re-specified the rule after seeing the ten-window result, so the script runs the new rule only on the resampling groups the **pre-registered** rule selected nothing from — a set it computes from the plan, not from an author. On 400 windows across 63 groups that arm gives +0.014, interval [-0.198, +0.215], Holm 1.0000, against a detectable 0.300. Not a small effect — an absent one.
+
+**This is what the power floor is for.** The ten-window arm cleared a corrected p and the plan refused it, because the difference observed was smaller than the difference the design could detect. Without that rule, fixed before any sequence was read, this project would have reported a sequence predictor of pocket formation that does not exist.
+
+The audit that makes the held-out claim checkable is printed with its arithmetic: the pre-registered arm reselected the same 10 windows in the same 9 groups, and its difference moved by 0.00714 against the 0.01732 a redrawn null implies — 0.41 of one standard error, because amendment 1 re-seeded each window's null from its own letters.
+
+The other two arms, both on the exploratory fixed-width window, because the plan's contiguous-span window cannot carry them:
+
+| arm | statistic | windows | groups | difference | could have detected |
+|---|---|---|---|---|---|
+| type_dense | `helix_charge_periodicity` | 400 | 56 | +0.032 | 0.356 |
+| type_dense | `helix_hydropathy_periodicity` | 400 | 56 | -0.064 | 0.428 |
+| function_dense | `helix_charge_periodicity` | 129 | 16 | +0.061 | 0.596 |
+| function_dense | `helix_hydropathy_periodicity` | 129 | 16 | +0.191 | 0.934 |
+
+**Type is null and powered enough to say so.** The architecture class a lining's *positions* earn is not anticipated by the arrangement of its letters — the one place this project's two lines could have met, and they do not.
+
+**Function is null and not resolved**, and the reason is the object rather than the sample. An inositol-phosphate contact shell is a shell, so its residues come from several helices and strands at once and its sequence span usually exceeds the plan's forty-residue cap: 114 of 129 shells are refused for exactly that, leaving 9 for the pre-registered arm. No sample size fixes that; a window pre-registered for shells would, on data disjoint from this run, and `docs/POCKET_SEQUENCE_PLAN_AMENDMENT_2.md` says why that study is not begun on the strength of an unresolved arm.
+
+8 primary tests ran and **none of them is a finding**. Everything named `*_dense`, and `formation_matched`, is exploratory by declaration and in no Holm family, so no outcome could have promoted it.
 
 ## 6. The design whose control is not tautological
 
