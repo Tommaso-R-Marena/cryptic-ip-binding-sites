@@ -629,3 +629,20 @@ def test_every_exploratory_arm_in_the_committed_run_is_marked_exploratory():
         assert test.get("family") == "exploratory", test["arm"]
         assert test.get("p_holm") is None
         assert test["is_finding"] is False
+
+
+def test_the_committed_report_is_what_the_committed_numbers_render_to():
+    """Nothing in the report was written by hand, and nothing has drifted from it."""
+    report = _committed()
+    committed = (ROOT / "results" / "pocket_sequence" / "POCKET_SEQUENCE.md").read_text()
+    assert script.markdown(report) == committed
+
+
+def test_the_committed_run_reproduced_the_disclosed_look():
+    """Amendment 2 section 2: the held-out arm is held out from what it claims."""
+    check = _committed()["look_reproduction"]
+    assert check["selection_reproduced"] is True
+    assert check["verdict"] == "reproduced"
+    assert check["gap_in_spreads"] < 1.0
+    assert check["n_site"] == script.RECORDED_LOOK["n_site"]
+    assert check["n_groups"] == script.RECORDED_LOOK["n_groups"]

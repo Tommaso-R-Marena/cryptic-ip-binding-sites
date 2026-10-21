@@ -115,7 +115,7 @@ Amendment 1 section 6. A refused lining is not a pocket without sequence signal;
 
 The pre-registered rule selected windows from 9 resampling groups, and those are exactly the groups whose values were read before amendment 1 was written. `formation_heldout` runs the amendment's rule with all of them removed, so it is a confirmatory test on data no decision in the amendment could have been tuned to. Its Holm family is its own two primary statistics, and the plan's five decision rules apply to it unchanged.
 
-**The held-out claim is only as good as that reproduction.** **The pre-registered arm did not reproduce the disclosed look** (not reproduced): amendment 1 section 1 records 10 windows across 9 groups at a difference of 1.317, and this run gives 10 across 9 at 1.3098553290247468. The pocket table is therefore not the one that was looked at, so the held-out arm cannot be assumed held out from anything and **must be read as exploratory** until the difference is explained.
+**The held-out claim is only as good as that reproduction.** The pre-registered arm reproduced the disclosed look: the selection is identical, and the difference moved only as far as a redrawn null explains. Amendment 1 section 1 records 10 windows across 9 groups at a difference of 1.317; this run selected 10 across 9 and gives 1.309855, a gap of 0.00714 against an expected redraw spread of 0.01732 (0.41 of it, bound 3.0). So this is the same pocket table that was looked at, and the exclusion above is the set of groups that look covered.
 
 ## What this cannot conclude
 
