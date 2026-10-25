@@ -55,6 +55,41 @@ def _logistic(x: float, midpoint: float, slope: float) -> float:
     return float(1.0 / (1.0 + np.exp(exponent)))
 
 
+class ScoringInputError(ValueError):
+    """A scoring input that cannot be the quantity its name claims.
+
+    Raised rather than scored, because this project has already lost a candidate
+    to the alternative. The yeast pilot's single hit scored 0.955 on a `depth`
+    term that was reading fpocket's *mean local hydrophobic density* (32.1) as a
+    distance in angstroms; the true burial depth of that pocket was 2.84 A, and
+    on the corrected input it falls below the screening threshold. The
+    withdrawal is recorded in the revision note of `manuscript/RESULTS_DRAFT.md`.
+    Nothing in the scorer objected at the time, so `check_burial_depth` does now.
+    """
+
+
+#: The largest value this scorer accepts as a distance from a pocket centre to
+#: the nearest solvent-exposed atom. Not a tuning parameter: the logistic has
+#: saturated long before here, so no plausible score changes, and the ceiling
+#: exists only to catch a different quantity arriving under this name. For
+#: scale, the committed control benchmark's largest burial depth is 10.14 A and
+#: the term's own midpoint is 12.0 A. ADAR2's site, the deepest this project
+#: has, reads only 3-4.5 A on a ligand-free structure, because the walls of the
+#: vacated cavity are themselves exposed - so even the paradigm case is nowhere
+#: near this ceiling, and nothing legitimate should be.
+MAX_PLAUSIBLE_BURIAL_DEPTH = 25.0
+
+# There is deliberately no check relating `burial_depth` to `hull_depth`. It
+# looks like there should be one - the nearest solvent-exposed atom lies inside
+# the convex hull, so surely the distance to it cannot exceed the distance to
+# the hull - and that argument is wrong. Distance to the hull is a minimum over
+# *directions* and the hull surface is dense, so it is small; distance to the
+# nearest exposed atom is a minimum over a *sparse set of atoms*, so it can be
+# larger. Neither bounds the other. Real pockets in this repository's own
+# fixtures sit at burial depth 2.39 against hull depth 0.205, and 1.119 against
+# -1.032, both legitimate.
+
+
 @dataclass
 class ScoringParameters:
     """Tunable parameters of the rule-based score.
@@ -145,6 +180,23 @@ class ScoringParameters:
     def to_dict(self) -> Dict[str, Any]:
         """Return a JSON-serialisable representation."""
         return asdict(self)
+
+
+def check_burial_depth(depth: float) -> None:
+    """Refuse a burial depth that cannot be one, naming what it looks like instead.
+
+    One check, about the quantity rather than about the score. A value past
+    `MAX_PLAUSIBLE_BURIAL_DEPTH` is not a distance from a pocket centre to the
+    nearest solvent-exposed atom, and is far more likely to be a pocket
+    descriptor that arrived under the wrong name.
+    """
+    if depth > MAX_PLAUSIBLE_BURIAL_DEPTH:
+        raise ScoringInputError(
+            f"burial depth {depth:.3f} exceeds {MAX_PLAUSIBLE_BURIAL_DEPTH} "
+            "angstroms, so it is not a distance from a pocket centre to the "
+            "nearest solvent-exposed atom; check that a pocket descriptor such "
+            "as fpocket's own 'depth' has not been passed under this name"
+        )
 
 
 class PocketScorer:
@@ -250,6 +302,7 @@ class PocketScorer:
             return _logistic(float(hull_depth), params.hull_depth_midpoint, params.hull_depth_slope)
         if depth is None or not np.isfinite(depth):
             return params.missing_component_score
+        check_burial_depth(float(depth))
         return _logistic(float(depth), params.depth_midpoint, params.depth_slope)
 
     def score_sasa(self, sasa: Optional[float]) -> float:
@@ -423,7 +476,10 @@ class PocketScorer:
             scores.append(
                 self.calculate_composite_score(
                     volume=pick(row, "pocket_volume", "volume", "hull_volume"),
-                    depth=pick(row, "burial_depth", "pocket_depth", "depth"),
+                    # No bare "depth" alias: that is fpocket's own descriptor
+                    # name for a different quantity, and reading it as a burial
+                    # distance is the defect that withdrew the yeast candidate.
+                    depth=pick(row, "burial_depth", "pocket_depth"),
                     sasa=pick(row, "sasa_mean", "sasa"),
                     basic_count=pick(row, "n_basic_residues", "basic_residues"),
                     potential=pick(row, "electrostatic_potential", "coulomb_potential_kt"),
