@@ -174,10 +174,11 @@ def verdict(data: Mapping[str, Any]) -> list:
         f"* **{len(candidates)} candidate proteins that are hypotheses, not findings.** "
         f"The best precision at any rank is {best:.2f}, and it is "
         f"{float(candidates['precision_at_rank'].iloc[0]):.2f} at rank 1.",
-        "* **Two structural decompositions tested and not supported.** The architecture "
-        "line (positions) and the sequence line (letters) are set out below; between them "
-        "they account for most of the project's statistical work, and neither has produced "
-        "a finding on real data.",
+        "* **Two structural decompositions that separate real linings from random ones "
+        "and not from other pockets.** The architecture line (positions) and the sequence "
+        "line (letters) account for most of the project's statistical work. Against "
+        "random position sets the architecture contrast is large; against the protein's "
+        "own other pockets, matched on size, both lines are null. Sections 2 to 4.",
         "",
         "Nothing on this page is evidence that any candidate binds an inositol phosphate. "
         "The project has one experimentally established cryptic site, the one it was built "
@@ -232,10 +233,10 @@ def architecture(data: Mapping[str, Any]) -> list:
         "lining into **topology** (the gap multiset) and **register** (the arrangement "
         "within it), and tests each against its own permutation null.",
         "",
-        f"On {pick(real, 'n_linings')} real candidate linings, "
-        f"{pick(real, 'n_measurable')} were measurable. The method properties are real "
-        "and calibrated — the detailed page carries them — and the headline for this "
-        "page is what they amount to on real data:",
+        f"{pick(real, 'n_measurable')} of {pick(real, 'n_linings')} real candidate "
+        "linings were measurable. The method properties are real and calibrated, and the "
+        "detailed page carries them. What they amount to on real data is a per-lining "
+        "verdict:",
         "",
         "| verdict | linings |",
         "|---|---|",
@@ -244,6 +245,20 @@ def architecture(data: Mapping[str, Any]) -> list:
         for name, count in sorted(pick(real, "verdicts").items(),
                                   key=lambda kv: (-int(kv[1]), str(kv[0])))
     ] + [
+        "",
+        f"Against size- and span-matched **decoy** position sets the contrast is large: "
+        f"{pick(real, 'rates', 'real_either'):.1%} of real linings resolve on one half or "
+        f"the other against {pick(real, 'rates', 'decoy_either'):.1%} of "
+        f"{pick(real, 'rates', 'n_decoys')} decoys. That is the architecture line's "
+        "strongest real-data number, and the line says in its own plan why it is weaker "
+        "than it looks: **a random position set is not a protein**, so the comparison is "
+        "close to tautological — a real lining is contiguous, secondary-structure-bound "
+        "and solvent-excluded, and a random set of positions is none of those.",
+        "",
+        "**That is exactly why section 3 exists**: it replaces the decoy with the "
+        "protein's own other pockets, matched on lining size, so protein, fold, model, "
+        "detector and size are all fixed and only the choice of pocket varies. On that "
+        "comparison the line is null.",
         "",
         f"Rates are in the artefact (`{SOURCES['architecture']}`) and on the detailed "
         "page. The transfer ceiling stated there — the method's agreement with ideal "

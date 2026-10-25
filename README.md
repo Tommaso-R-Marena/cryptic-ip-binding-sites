@@ -60,8 +60,10 @@ what this project establishes and what it does not. The short version:
   is hard to crystallise.
 - The combined score ranks annotated binders well above chance and **does not beat its
   own same-protein baseline**.
-- Two pre-registered structural lines — lining architecture and sequence — are null or
-  unresolved on real data.
+- Two pre-registered structural lines — lining architecture and sequence — separate real
+  pocket linings from **random position sets** (33.3% vs 4.3%) but not from **the same
+  protein's other pockets of the same size**, which is the comparison that controls for
+  fold, model and detector. On that comparison both are null.
 
 `results/publication/RESULTS_SUMMARY.md` covers only the control benchmark, validation
 dataset, ML benchmark and yeast pilot, and predates most of the work. Where the two

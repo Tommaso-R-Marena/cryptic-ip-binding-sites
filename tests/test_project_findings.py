@@ -210,3 +210,24 @@ def test_the_older_summary_no_longer_overclaims():
         assert gone not in source, gone
     assert "_burial_caveat" in source
     assert "PROJECT_FINDINGS.md" in source
+
+
+def test_the_decoy_contrast_is_reported_and_not_called_a_finding(artefacts):
+    """Section 2's strongest number, with the reason it is weaker than it looks."""
+    text = script.render(artefacts)
+    rates = artefacts["architecture"]["rates"]
+    assert f"{rates['real_either']:.1%}" in text
+    assert f"{rates['decoy_either']:.1%}" in text
+    assert str(rates["n_decoys"]) in text
+    assert "a random position set is not a protein" in text
+    assert "close to tautological" in text
+
+
+def test_a_per_lining_verdict_is_not_presented_as_a_contrast(artefacts):
+    """The page must point at the within-protein control as the test."""
+    text = script.render(artefacts)
+    two = text.index("## 2.")
+    three = text.index("## 3.")
+    section = text[two:three]
+    assert "why section 3 exists" in section
+    assert "null" in section
