@@ -59,14 +59,28 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install -e .
 
-      - name: Cache AlphaFold models
-        uses: actions/cache@v5
+      # Restore and save are separate on purpose. `actions/cache` saves in a
+      # post step only when the job SUCCEEDED, and the download step below
+      # exits non-zero if any model failed - so with a single cache action the
+      # partial download was never saved, every run re-fetched all 499 from
+      # scratch, and the endpoint's cumulative per-address quota drained
+      # further each time (200 of 499 on the first run, then 100). Saving the
+      # partial set makes successive runs resume instead of restart, so the
+      # directory fills over a few runs without asking the endpoint for the
+      # same files again.
+      - name: Restore AlphaFold models
+        uses: actions/cache/restore@v5
         with:
           path: data/structures/yeast_rescreen
-          key: yeast-rescreen-af-models-v1
+          key: yeast-rescreen-af-models-v2-${{ github.run_id }}
+          restore-keys: |
+            yeast-rescreen-af-models-v2-
 
       - name: Download the pilot's 499 AlphaFold models
         shell: bash -l {0}
+        # Partial downloads are kept rather than discarded: the gate two steps
+        # below is what fails the job, after the cache has been saved.
+        continue-on-error: true
         # The model URL comes from the AlphaFold API rather than a hard-coded
         # version suffix, so the current model is fetched whichever version it
         # is; downloads run concurrently and are checked before being kept.
@@ -74,6 +88,39 @@ jobs:
           python scripts/fetch_structures.py alphafold \
             --out data/structures/yeast_rescreen \
             --ids-json results/yeast_pilot/screen_checkpoint.json --json-key processed
+
+      - name: Save whatever was downloaded
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: data/structures/yeast_rescreen
+          key: yeast-rescreen-af-models-v2-${{ github.run_id }}
+
+      - name: Every model must be present before the screen means anything
+        shell: bash -l {0}
+        # A screen of 200 of 499 proteins is not the re-screen this workflow
+        # exists to run, so an incomplete set fails here instead of producing a
+        # number. The cache above has already kept the partial set, so the next
+        # run starts closer.
+        run: |
+          python - <<'PY'
+          import json, sys
+          from pathlib import Path
+          manifest = Path("data/structures/yeast_rescreen/alphafold_manifest.json")
+          if not manifest.exists():
+              sys.exit("no manifest: the download step produced nothing")
+          entries = json.loads(manifest.read_text())
+          rows = entries if isinstance(entries, list) else entries.get("results", [])
+          total = len(rows)
+          missing = [r for r in rows if not (r.get("ok") or r.get("path"))]
+          print(json.dumps({"in_manifest": total, "missing": len(missing)}))
+          if missing or total == 0:
+              sys.exit(
+                  f"{len(missing)} of {total} models are still missing; the partial "
+                  "set is cached, so re-run this workflow to resume rather than "
+                  "re-fetching what is already here")
+          print("every model is present")
+          PY
 
       - name: Run the strict screen
         shell: bash -l {0}
