@@ -134,7 +134,7 @@ Pre-registered in `docs/COMPOSITION_PLAN.md`. Sections 3 and 4 return nulls, and
 
 So this study takes the other half of the decomposition — composition, which the order null holds fixed and cannot see — and puts a known-true signal through the same machinery. An inositol-phosphate contact shell being arginine-rich is textbook and is **not offered as a finding**; it is offered as the check.
 
-The gate is calibrated before any real lining reaches it: a planted basic patch gives mean z **+5.99** (p 0.001664) and opens it, while 12 composition-matched noise pools average +0.0470 against an expected zero and **0** of them open it. All 5 checks pass.
+The gate is calibrated before any real lining reaches it: a planted basic patch gives mean z **+5.99** (p 0.008319) and opens it, while 12 composition-matched noise pools average +0.0470 against an expected zero and **0** of them open it. All 5 checks pass.
 
 **What the gate decides.** If the positive control fails on real shells, every arm of that study reads *instrument not demonstrated* and **the sequence line's nulls above cannot be read as null results either**. That is fixed in code, not promised in prose.
 

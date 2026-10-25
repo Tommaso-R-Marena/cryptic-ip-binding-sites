@@ -27,6 +27,7 @@ SPEC.loader.exec_module(script)
 
 cp = script.cp
 ps = script.ps
+sq = script.sq
 ALPHABET = list(cp.ALPHABET)
 
 
@@ -313,3 +314,82 @@ def test_the_plan_is_committed_and_the_driver_points_at_it():
     assert "instrument not demonstrated" in text
     source = (ROOT / "scripts" / "pocket_composition.py").read_text()
     assert "docs/COMPOSITION_PLAN.md" in source
+
+
+# ------------------------------------------- the gate's p-value is calibrated
+
+def test_the_sign_flip_p_matches_exhaustive_enumeration():
+    """With few groups the randomisation null can be enumerated exactly."""
+    import itertools
+    sample = np.array([0.8, -0.2, 0.5, 0.1, 0.4])
+    observed = abs(sample.mean())
+    exact = sum(
+        1 for signs in itertools.product((-1.0, 1.0), repeat=sample.size)
+        if abs(float((np.array(signs) * sample).mean())) >= observed
+    ) / 2 ** sample.size
+    estimate = script.sign_flip_p(sample, draws=40000, seed=1)
+    assert estimate == pytest.approx(exact, abs=0.01)
+
+
+def test_the_sign_flip_p_is_one_for_a_mean_of_zero():
+    """Every flip is at least as extreme as no difference at all."""
+    assert script.sign_flip_p([1.0, -1.0, 2.0, -2.0], draws=500, seed=1) == pytest.approx(1.0)
+
+
+def test_the_sign_flip_p_is_small_for_a_consistent_shift():
+    assert script.sign_flip_p([2.0] * 10, draws=2000, seed=1) < 0.005
+
+
+def test_a_single_group_cannot_produce_a_p_value():
+    assert script.sign_flip_p([1.5], draws=100, seed=1) == 1.0
+
+
+def test_the_one_sample_arm_reports_both_p_values_and_which_rule_it_used():
+    """The substitution must be visible in the artefact, not silent."""
+    rows = [{"group": f"G{g}", "length": 14, "z_basic_fraction": 0.4 + 0.1 * g}
+            for g in range(8)]
+    entry = script.one_sample(script.CONTROL_ARM, rows, "basic_fraction", n_bootstrap=400)
+    assert entry["p_rule"] == "sign-flip randomisation over group means"
+    assert "p_value_label_permutation" in entry
+    assert entry["p_value"] != entry["p_value_label_permutation"]
+
+
+@pytest.mark.slow
+def test_the_gate_s_p_value_rejects_at_its_nominal_rate_under_the_null():
+    """The defect this replaced: label permutation rejected at 7.25% of a nominal 5%.
+
+    `compare_feature`'s permutation shuffles which groups are site and which are
+    control. The control arm here is a constant zero, so the arms are not
+    exchangeable under the hypothesis - one has no variance - and the null is
+    too narrow in the tail a gate reads.
+    """
+    rng = np.random.default_rng(7)
+    pools, groups = 200, 9
+    fresh, stale = [], []
+    for _ in range(pools):
+        rows = [{"group": f"G{g}", "length": 14, "z_basic_fraction": float(rng.normal())}
+                for g in range(groups) for _ in range(2)]
+        entry = script.one_sample(script.CONTROL_ARM, rows, "basic_fraction",
+                                  n_bootstrap=400)
+        fresh.append(entry["p_value"])
+        stale.append(entry["p_value_label_permutation"])
+    fresh, stale = np.array(fresh), np.array(stale)
+    # Three standard errors at 200 pools is about 0.046, so this is a loose
+    # bound that still fails on the 0.0725 the old rule produced.
+    assert (fresh <= 0.05).mean() < 0.09
+    assert (fresh <= 0.50).mean() == pytest.approx(0.50, abs=0.08)
+    # And the rule that was replaced is still measurably worse in that tail.
+    assert (stale <= 0.05).mean() > (fresh <= 0.05).mean()
+
+
+@pytest.mark.slow
+def test_the_two_arm_test_every_other_study_uses_is_calibrated():
+    """Scoped to the one-sample construction: compare_feature itself is sound."""
+    rng = np.random.default_rng(11)
+    ps = []
+    for k in range(200):
+        site = {f"G{g}": float(rng.normal()) for g in range(9)}
+        control = {f"H{g}": float(rng.normal()) for g in range(9)}
+        ps.append(sq.compare_feature("f", site, control, n_bootstrap=400,
+                                     seed=1000 + k).p_value)
+    assert (np.array(ps) <= 0.05).mean() < 0.09

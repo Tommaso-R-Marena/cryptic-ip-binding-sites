@@ -8,19 +8,19 @@ Pools: 18 copies, chains of 400 residues, linings of 14, and in the planted pool
 
 | pool | mean z | p | 95% interval | gate |
 |---|---|---|---|---|
-| planted basic patch | **+5.99** | 0.001664 | [+5.700, +6.333] | **opens** |
-| matched noise, seed 20261125 | +0.05 | 0.9018 | [-0.403, +0.491] | stays shut |
-| matched noise, seed 20261126 | +0.07 | 0.7837 | [-0.314, +0.476] | stays shut |
-| matched noise, seed 20261127 | +0.09 | 0.6722 | [-0.285, +0.476] | stays shut |
-| matched noise, seed 20261128 | +0.36 | 0.2063 | [-0.160, +0.933] | stays shut |
-| matched noise, seed 20261129 | +0.21 | 0.3744 | [-0.130, +0.577] | stays shut |
-| matched noise, seed 20261130 | -0.14 | 0.5724 | [-0.523, +0.245] | stays shut |
-| matched noise, seed 20261131 | -0.07 | 0.6972 | [-0.408, +0.255] | stays shut |
-| matched noise, seed 20261132 | -0.17 | 0.4958 | [-0.607, +0.300] | stays shut |
-| matched noise, seed 20261133 | +0.18 | 0.6323 | [-0.515, +0.876] | stays shut |
-| matched noise, seed 20261134 | -0.22 | 0.2862 | [-0.589, +0.139] | stays shut |
-| matched noise, seed 20261135 | -0.05 | 0.8253 | [-0.482, +0.323] | stays shut |
-| matched noise, seed 20261136 | +0.27 | 0.2063 | [-0.075, +0.618] | stays shut |
+| planted basic patch | **+5.99** | 0.008319 | [+5.700, +6.333] | **opens** |
+| matched noise, seed 20261125 | +0.05 | 0.8769 | [-0.403, +0.491] | stays shut |
+| matched noise, seed 20261126 | +0.07 | 0.7687 | [-0.314, +0.476] | stays shut |
+| matched noise, seed 20261127 | +0.09 | 0.6689 | [-0.285, +0.476] | stays shut |
+| matched noise, seed 20261128 | +0.36 | 0.2479 | [-0.160, +0.933] | stays shut |
+| matched noise, seed 20261129 | +0.21 | 0.3877 | [-0.130, +0.577] | stays shut |
+| matched noise, seed 20261130 | -0.14 | 0.5258 | [-0.523, +0.245] | stays shut |
+| matched noise, seed 20261131 | -0.07 | 0.7421 | [-0.408, +0.255] | stays shut |
+| matched noise, seed 20261132 | -0.17 | 0.5141 | [-0.607, +0.300] | stays shut |
+| matched noise, seed 20261133 | +0.18 | 0.5973 | [-0.515, +0.876] | stays shut |
+| matched noise, seed 20261134 | -0.22 | 0.3161 | [-0.589, +0.139] | stays shut |
+| matched noise, seed 20261135 | -0.05 | 0.8586 | [-0.482, +0.323] | stays shut |
+| matched noise, seed 20261136 | +0.27 | 0.2113 | [-0.075, +0.618] | stays shut |
 
 Across the 12 noise pools the mean of the mean-z values is **+0.0470**, against an expected zero, with a spread of 0.1846; **0** of them opened the gate.
 
