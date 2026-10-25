@@ -26,6 +26,11 @@ on:
       - 'cryptic_ip/analysis/features.py'
       - 'cryptic_ip/analysis/structure_arrays.py'
       - 'cryptic_ip/analysis/filters.py'
+      # The screen cannot run without its structures, so how they are fetched
+      # is part of what decides its result. Left out of this list, a fix to the
+      # fetcher was pushed and never exercised, and the check stayed red on an
+      # untested change.
+      - 'scripts/fetch_structures.py'
       - '.github/workflows/yeast-rescreen.yml'
   workflow_dispatch:
 
