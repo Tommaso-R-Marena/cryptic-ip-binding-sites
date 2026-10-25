@@ -18,14 +18,51 @@ It exists because `results/publication/RESULTS_SUMMARY.md` is generated from the
 | gate | `results/composition/validation.json` | `scripts/pocket_composition.py validate` |
 | census | `results/redocking/census.csv` | `scripts/redocking.py census` |
 | coevolution | `results/coevolution/coevolution.json` | `scripts/coevolution.py report` |
+| revision | `manuscript/RESULTS_DRAFT.md` | `hand-written; its revision note is quoted, not re-encoded` |
 | composition *(not yet reported)* | `results/composition/composition.json` | `scripts/pocket_composition.py analyse` |
 
 Pre-registered plans are in `docs/`, each with its dated amendments. The lining-architecture line has its own detailed page at `results/architecture/FINDINGS.md`.
 
+## 0. Which artefacts are superseded, and by what
+
+`results/publication/` holds outputs from before several pipeline defects were found. The project recorded the corrections in the working draft rather than by regenerating those outputs, so **the stale numbers are still in the files** and a reader meeting them first will take them as current. Three of them are still live in committed artefacts today: `results/yeast_pilot/yeast_pilot_hits.csv` carries the withdrawn candidate, with the misread input visible beside the true one in the same row; the validation dataset's burial counts are the per-entry ones; and the control panel's separation was measured on holo structures.
+
+This is the manuscript's own revision note, quoted and not re-encoded, from `manuscript/RESULTS_DRAFT.md`:
+
+> **Revision note (reconciliation with PR #41).** This draft was written from
+> outputs of the pipeline before several defects in it were corrected. Each
+> claim below was re-checked against a measurement, and five were changed:
+>
+> 1. **The yeast candidate is withdrawn.** LEU1's composite of 0.955 depended on
+>    a mislabelled input: the scorer's "depth" term was reading fpocket's *mean
+>    local hydrophobic density* (32.1 for this pocket) as a distance, and awarding
+>    full credit for anything over 15. Re-running the scorer this draft used,
+>    changing only that input to the true burial depth (2.84 Å), gives **0.711** —
+>    below the 0.75 threshold. Re-screening the identical 499 proteins under the
+>    corrected scorer yields no candidates.
+> 2. **Burial depth discriminates weakly, not cleanly.** The "~3× difference"
+>    came from three structures. Across 129 deposited entries depth separates
+>    buried from exposed sites with AUROC 0.72 (95 % CI 0.58–0.84); enclosure
+>    does so with 0.99.
+> 3. **The benchmark is not 133 / 2 / 1.** Those counts came from ligand SASA
+>    summed over every copy in an entry, which scales with copy number. Measured
+>    per copy it is 89 surface, 26 semi-cryptic, 14 cryptic, 6 crystal artefacts.
+> 4. **The ROC-AUC ≈ 0.5 was an artefact of the labels**, not evidence that the
+>    task is under-powered.
+> 5. **The tier-1 separation of 0.581 was measured with the ligand bound.**
+>    Scored as a proteome target is scored - ligand removed - it is 0.081 on the
+>    crystal structures and 0.069 on the AlphaFold models (see below).
+>
+> One claim is independently confirmed: HDAC1's inositol phosphate is surface-
+> exposed. Evidence for each change is in `docs/METHODS.md`,
+> `scripts/burial_survey.py` and the `yeast-rescreen` workflow.
+
+**Everything in sections 1 onward is read from artefacts that postdate those corrections**, except where a sentence says otherwise and points back here.
+
 ## The short answer
 
-* **A detector that is not inverted on its one gold-standard case.** 1 of 3 positive controls pass. The tier-1 gate is one positive against one negative, so it shows the score is not backwards on the case it was built around, and nothing about an unseen protein.
-* **Buried examples are scarce, and two different tables say how scarce.** The control benchmark's validation set holds 1 cryptic structure in 136, which is what bounds the benchmark. The redocking census holds **15 cryptic annotated copies across 4 homology groups** among its 269 selected copies (45 cryptic rows in 662), plus 54 semi-cryptic across 14 groups — and that is what bounds the ground-truth arms of every study below. Small, but not one.
+* **The detector's own screening filter rejects the case it was built around.** Scored the way a proteome target is scored — ligand removed — ADAR2's site separates from the PH-domain negatives only narrowly, and the plan's strict filter (score ≥ 0.75, lining SASA ≤ 10 Å²) **rejects ADAR2's site on both gates**. What does separate it is depth inside the convex hull. Section 0 has the supersession; the 1 of 3 pass rate in `results/publication/validation/positive_controls.csv` was measured with the ligand bound and is not the number to quote.
+* **Buried examples are scarce, and the counts to use are the per-copy ones.** The control benchmark's validation set reads 1 cryptic of 136 when ligand accessibility is summed over every copy in an entry, which scales with copy number; the revision note in section 0 corrects that to a per-copy count. The redocking census is per copy, and holds **15 cryptic annotated copies across 4 homology groups** among its 269 selected copies (45 cryptic rows in 662), plus 54 semi-cryptic across 14 groups — and that is what bounds the ground-truth arms of every study below. Small, but not one.
 * **A learnable inositol-phosphate-versus-other-polyanion signal** at 0.828 [0.756, 0.886] ROC-AUC against 34 annotated binders among 33084 unseen proteins — which **does not beat its own same-protein baseline** (-0.015 [-0.044, 0.015], Holm 0.321, *not supported*).
 * **75 candidate proteins that are hypotheses, not findings.** The best precision at any rank is 0.25, and it is 0.00 at rank 1.
 * **Two structural decompositions that separate real linings from random ones and not from other pockets.** The architecture line (positions) and the sequence line (letters) account for most of the project's statistical work. Against random position sets the architecture contrast is large; against the protein's own other pockets, matched on size, both lines are null. Sections 2 to 4.

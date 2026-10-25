@@ -192,9 +192,41 @@ def test_both_burial_tables_are_reported_and_not_conflated(artefacts):
     assert f"{census['cryptic']} cryptic annotated" in text
     assert f"{census['cryptic_groups']} homology groups" in text
     assert f"{census['semi_cryptic']} semi-cryptic" in text
-    assert "what bounds the benchmark" in text
-    # And the old overstatement must not come back.
+    assert "corrects that to a per-copy count" in text
+    # And neither overstatement may come back.
     assert "has one experimentally established cryptic site" not in text
+    assert "which is what bounds the benchmark" not in text
+
+
+def test_the_superseded_artefacts_are_named_before_any_result(artefacts):
+    """The publication outputs predate corrections the project already made."""
+    text = script.render(artefacts)
+    assert text.index("## 0. Which artefacts are superseded") < text.index("## The short answer")
+    assert "yeast_pilot_hits.csv" in text
+    assert "withdrawn" in text
+    # The note is quoted from the draft, not paraphrased into this page.
+    assert script.revision_note(artefacts["revision"]) in text
+
+
+def test_the_screening_filter_rejecting_adar2_is_stated(artefacts):
+    """The sharpest thing in the whole project, and it was not on the page before."""
+    text = script.render(artefacts)
+    assert "rejects ADAR2's site on both" in text
+    assert "ligand bound and is not the" in text
+
+
+def test_a_draft_without_its_revision_note_fails_the_render(artefacts):
+    data = copy.deepcopy(artefacts)
+    data["revision"] = "# Results\n\nNo revision note here.\n"
+    with pytest.raises(script.Contradiction, match="revision note"):
+        script.render(data)
+
+
+def test_a_revision_note_that_stops_withdrawing_the_candidate_fails(artefacts):
+    data = copy.deepcopy(artefacts)
+    data["revision"] = "> **Revision note.** Everything was fine all along.\n"
+    with pytest.raises(script.Contradiction, match="withdraws the yeast candidate"):
+        script.render(data)
 
 
 def test_a_census_without_a_burial_column_fails_the_render(artefacts):

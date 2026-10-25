@@ -39,6 +39,7 @@ SOURCES = {
     "gate": Path("results/composition/validation.json"),
     "census": Path("results/redocking/census.csv"),
     "coevolution": Path("results/coevolution/coevolution.json"),
+    "revision": Path("manuscript/RESULTS_DRAFT.md"),
 }
 
 #: Artefacts the page reports when present and names as outstanding when not.
@@ -62,6 +63,7 @@ COMMANDS = {
     "composition": "scripts/pocket_composition.py analyse",
     "census": "scripts/redocking.py census",
     "coevolution": "scripts/coevolution.py report",
+    "revision": "hand-written; its revision note is quoted, not re-encoded",
 }
 
 
@@ -76,8 +78,12 @@ def load(sources: Mapping[str, Path] = SOURCES,
     for name, path in sources.items():
         if not path.exists():
             raise FileNotFoundError(f"{name}: {path} has not been generated")
-        out[name] = (pd.read_csv(path) if path.suffix == ".csv"
-                     else json.loads(path.read_text()))
+        if path.suffix == ".csv":
+            out[name] = pd.read_csv(path)
+        elif path.suffix == ".md":
+            out[name] = path.read_text()
+        else:
+            out[name] = json.loads(path.read_text())
     for name, path in optional.items():
         out[name] = (json.loads(path.read_text()) if path.exists() else None)
     return out
@@ -97,6 +103,37 @@ def pick(blob: Any, *keys: Any) -> Any:
 
 def interval(blob: Mapping[str, Any]) -> str:
     return f"{pick(blob, 'point'):.3f} [{pick(blob, 'low'):.3f}, {pick(blob, 'high'):.3f}]"
+
+
+def revision_note(draft: str) -> str:
+    """The manuscript's own revision note, lifted verbatim.
+
+    `results/publication/` carries outputs from before several pipeline defects
+    were corrected, and the working draft is where the project recorded the
+    corrections. Quoting that block is deliberate: re-encoding its numbers into
+    another artefact would be exactly the retyping this page refuses to do, and
+    paraphrasing it is how a correction gets quietly softened. If the block
+    moves or is renamed, the render fails rather than dropping it.
+    """
+    start = draft.find("> **Revision note")
+    if start < 0:
+        raise Contradiction(
+            "manuscript/RESULTS_DRAFT.md no longer carries a revision note; the "
+            "supersession this page reports was read from it")
+    lines = []
+    for line in draft[start:].splitlines():
+        if line.startswith(">"):
+            lines.append(line)
+        elif not line.strip() and lines:
+            lines.append(line)
+        elif lines:
+            break
+    text = "\n".join(lines).rstrip()
+    if "withdrawn" not in text or "ligand" not in text:
+        raise Contradiction(
+            "the revision note no longer withdraws the yeast candidate or mentions the "
+            "ligand-bound measurement; this page's supersession section quotes both")
+    return text
 
 
 def cryptic_census(census: pd.DataFrame) -> Dict[str, int]:
@@ -166,6 +203,31 @@ def header(data: Mapping[str, Any]) -> list:
     return lines
 
 
+def superseded(data: Mapping[str, Any]) -> list:
+    """What in `results/publication/` is known to be wrong, in the project's own words."""
+    return [
+        "## 0. Which artefacts are superseded, and by what",
+        "",
+        "`results/publication/` holds outputs from before several pipeline defects were "
+        "found. The project recorded the corrections in the working draft rather than by "
+        "regenerating those outputs, so **the stale numbers are still in the files** and "
+        "a reader meeting them first will take them as current. Three of them are still "
+        "live in committed artefacts today: `results/yeast_pilot/yeast_pilot_hits.csv` "
+        "carries the withdrawn candidate, with the misread input visible beside the true "
+        "one in the same row; the validation dataset's burial counts are the per-entry "
+        "ones; and the control panel's separation was measured on holo structures.",
+        "",
+        "This is the manuscript's own revision note, quoted and not re-encoded, from "
+        f"`{SOURCES['revision']}`:",
+        "",
+        revision_note(data["revision"]),
+        "",
+        "**Everything in sections 1 onward is read from artefacts that postdate those "
+        "corrections**, except where a sentence says otherwise and points back here.",
+        "",
+    ]
+
+
 def verdict(data: Mapping[str, Any]) -> list:
     """The top line, in the order a reader needs it."""
     positives = data["controls"]
@@ -198,15 +260,21 @@ def verdict(data: Mapping[str, Any]) -> list:
     return [
         "## The short answer",
         "",
-        f"* **A detector that is not inverted on its one gold-standard case.** "
-        f"{passed} of {len(positives)} positive controls pass. The tier-1 gate is one "
-        "positive against one negative, so it shows the score is not backwards on the "
-        "case it was built around, and nothing about an unseen protein.",
-        f"* **Buried examples are scarce, and two different tables say how scarce.** The "
-        f"control benchmark's validation set holds {cryptic} cryptic structure"
-        f"{'' if cryptic == 1 else 's'} in {len(dataset)}, which is what bounds the "
-        f"benchmark. The redocking census holds **{census['cryptic']} cryptic annotated "
-        f"copies across {census['cryptic_groups']} homology groups** among its "
+        "* **The detector's own screening filter rejects the case it was built around.** "
+        "Scored the way a proteome target is scored — ligand removed — ADAR2's site "
+        "separates from the PH-domain negatives only narrowly, and the plan's strict "
+        "filter (score ≥ 0.75, lining SASA ≤ 10 Å²) **rejects ADAR2's site on both "
+        "gates**. What does separate it is depth inside the convex hull. Section 0 has "
+        f"the supersession; the {passed} of {len(positives)} pass rate in "
+        f"`{SOURCES['controls']}` was measured with the ligand bound and is not the "
+        "number to quote.",
+        f"* **Buried examples are scarce, and the counts to use are the per-copy ones.** "
+        f"The control benchmark's validation set reads {cryptic} cryptic of "
+        f"{len(dataset)} when ligand accessibility is summed over every copy in an "
+        "entry, which scales with copy number; the revision note in section 0 "
+        "corrects that to a per-copy count. The redocking census is per copy, and "
+        f"holds **{census['cryptic']} cryptic annotated copies across "
+        f"{census['cryptic_groups']} homology groups** among its "
         f"{census['selected']} selected copies ({census['all_cryptic']} cryptic rows in "
         f"{census['rows']}), plus {census['semi_cryptic']} semi-cryptic across "
         f"{census['semi_cryptic_groups']} groups — and that is what bounds the "
@@ -566,6 +634,7 @@ def closing() -> list:
 
 def render(data: Mapping[str, Any]) -> str:
     lines = header(data)
+    lines += superseded(data)
     lines += verdict(data)
     lines += specificity(data)
     lines += architecture(data)

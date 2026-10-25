@@ -478,6 +478,19 @@ def write_results_summary(
             "",
             "See `supplementary/SUPPLEMENTARY_INDEX.md` for Table S1–S6 exports.",
             "",
+            "## These outputs are superseded in part",
+            "",
+            "**This file is generated from pipeline outputs that predate several "
+            "corrections the project has already made**, and regenerating it does not "
+            "undo them. The revision note at the top of `manuscript/RESULTS_DRAFT.md` is "
+            "the authority. In particular: the yeast candidate below is **withdrawn** (a "
+            "mislabelled input read fpocket's mean local hydrophobic density as a "
+            "distance; re-screening the same 499 proteins yields no candidates), the "
+            "validation set's burial counts are per entry rather than per copy, and the "
+            "control panel's separation was measured on **holo** structures, in which the "
+            "bound ligand occludes the residues lining its own pocket. Scored as a "
+            "proteome target is scored, the plan's strict filter rejects ADAR2's own site.",
+            "",
             "## What this document covers, and what it does not",
             "",
             "This summary is generated from the **control benchmark, the validation dataset, the "

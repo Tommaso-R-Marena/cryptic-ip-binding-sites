@@ -52,6 +52,12 @@ This project builds the first **proteome-wide computational screen** to answer t
 below.** It is generated from each study's own committed artefact and states, in order,
 what this project establishes and what it does not. The short version:
 
+- **Some committed outputs under `results/publication/` and `results/yeast_pilot/` are
+  superseded.** The yeast pilot's single hit is withdrawn (a mislabelled input), the
+  validation set's burial counts are per entry not per copy, and the control panel's
+  separation was measured with the ligand bound. Scored as a proteome target is scored,
+  the plan's own strict filter **rejects ADAR2's site** — the case the detector was built
+  around. The revision note in `manuscript/RESULTS_DRAFT.md` is the authority.
 - The screen produces a **ranked list of hypotheses**, not findings. No candidate has
   independent support.
 - Buried examples are scarce. The control benchmark's validation set holds **1 cryptic
