@@ -628,6 +628,35 @@ STATISTICS: Dict[str, Callable[[str], float]] = {
 }
 
 
+#: Names `composition_z` refuses, because they are functions of the multiset of
+#: a window's letters alone and so are invariant under its null.
+#:
+#: Such a statistic has **zero variance** under an order-permuting shuffle, so
+#: its z is 0/0. The arithmetic below returns 0.0 for a zero standard deviation,
+#: which is right for a statistic that happens to be constant on one window and
+#: badly wrong for one that is constant on every window: it reads as "no
+#: ordering signal" when the question is undefined. None of this module's own
+#: statistics is order-invariant, so nothing here ever hit it; study Q10's
+#: `composition.py` adds nine that would, and `docs/COMPOSITION_PLAN.md`
+#: section 5 fixes this guard as part of adding them.
+#:
+#: Spelled out here rather than imported so that this module keeps no
+#: dependency on `composition`, which imports *it*.
+#: `tests/test_detect_composition.py` fails if the two sets drift apart, and
+#: also if any name in this set turns out to read order after all.
+ORDER_INVARIANT_STATISTICS = frozenset({
+    "basic_fraction",
+    "acidic_fraction",
+    "aromatic_fraction",
+    "glycine_fraction",
+    "proline_fraction",
+    "mean_hydropathy",
+    "net_charge_per_residue",
+    "composition_divergence",
+    "nonbasic_divergence",
+})
+
+
 @dataclass(frozen=True)
 class NullResult:
     """A statistic beside the composition-preserving null it was compared with."""
@@ -683,6 +712,11 @@ def composition_z(
       measure is already explained. A non-zero z says the *ordering* carries
       something extra.
     """
+    if statistic in ORDER_INVARIANT_STATISTICS:
+        raise SequenceError(
+            f"{statistic!r} is a function of the window's letters alone, so it is "
+            "constant under this null and its z is undefined; measure it against a "
+            "null that moves what it reads (docs/COMPOSITION_PLAN.md)")
     function = STATISTICS.get(statistic)
     if function is None:
         raise SequenceError(f"unknown statistic {statistic!r}; known: {sorted(STATISTICS)}")
