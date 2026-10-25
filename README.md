@@ -46,6 +46,27 @@ Some proteins don't just bind inositol phosphates (IPs) for signaling—**they c
 
 This project builds the first **proteome-wide computational screen** to answer that question.
 
+### What it has and has not established
+
+**Read [`results/PROJECT_FINDINGS.md`](results/PROJECT_FINDINGS.md) before any number
+below.** It is generated from each study's own committed artefact and states, in order,
+what this project establishes and what it does not. The short version:
+
+- The screen produces a **ranked list of hypotheses**, not findings. No candidate has
+  independent support.
+- The validation set contains **one cryptic example in 136 structures** — the paradigm
+  case itself. That count, not the total, bounds every performance claim, and the
+  deposited archive cannot supply more, because a buried site with its ligand in place
+  is hard to crystallise.
+- The combined score ranks annotated binders well above chance and **does not beat its
+  own same-protein baseline**.
+- Two pre-registered structural lines — lining architecture and sequence — are null or
+  unresolved on real data.
+
+`results/publication/RESULTS_SUMMARY.md` covers only the control benchmark, validation
+dataset, ML benchmark and yeast pilot, and predates most of the work. Where the two
+disagree, the findings page is current.
+
 ---
 
 ## 📒 Interactive Notebooks (Colab-ready tutorials)

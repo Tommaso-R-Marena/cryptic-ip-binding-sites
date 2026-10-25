@@ -314,6 +314,35 @@ def build_publication_legends(
     )
 
 
+def _tier_count(frame: pd.DataFrame, tier: int) -> int:
+    """How many controls of one tier a benchmark frame carries."""
+    if frame.empty or "tier" not in frame.columns:
+        return 0
+    return int((pd.to_numeric(frame["tier"], errors="coerce") == tier).sum())
+
+
+def _burial_caveat(class_counts: dict, n_structures: int) -> str:
+    """Say what the validation set's burial composition means for the claim.
+
+    This project is about *cryptic* sites. A validation set drawn from the PDB is
+    overwhelmingly surface, because a buried site is hard to crystallise with its
+    ligand in place - so the number of genuinely cryptic examples bounds every
+    claim made from this set, and it belongs in a sentence rather than in a dict.
+    """
+    cryptic = int(class_counts.get("Cryptic", class_counts.get("cryptic", 0)))
+    semi = int(class_counts.get("Semi-cryptic", class_counts.get("semi_cryptic", 0)))
+    if not n_structures:
+        return "_No validation structures were loaded, so nothing here is measured against them._"
+    return (
+        f"_**{cryptic} of {n_structures} structures in this set are cryptic** and {semi} are "
+        "semi-cryptic. This project is about cryptic sites, so that count - not the total - is "
+        "what bounds every claim made from this set, and it is too small to support an estimate "
+        "of performance on cryptic sites. The deposited structures are overwhelmingly surface "
+        "because a buried site is hard to crystallise with its ligand in place, which is a "
+        "property of the archive and not of the biology._"
+    )
+
+
 def write_results_summary(
     output_dir: Path,
     controls_summary: dict,
@@ -358,9 +387,12 @@ def write_results_summary(
 
     if not tier2_failed.empty and "protein" in tier2_failed.columns:
         failed_names = ", ".join(tier2_failed["protein"].astype(str).tolist())
+        n_positive = len(positive)
         lines.append(
-            f"- Tier-2 positives **not passed**: {failed_names} (crystal artifacts or semi-cryptic; "
-            "do not count toward full positive-panel claims)."
+            f"- Tier-2 positives **not passed**: {failed_names}. These were reclassified as "
+            "crystal artifacts or semi-cryptic *after* they failed, so the panel's pass rate "
+            f"({n_positive - len(tier2_failed)} of {n_positive}) should be read with that "
+            "reclassification in view, not without it."
         )
 
     lines.extend(
@@ -388,6 +420,8 @@ def write_results_summary(
             f"- Burial classes: {class_counts}",
             f"- Source: `{dataset_csv}`",
             "",
+            _burial_caveat(class_counts, n_structures),
+            "",
             "## ML classifier benchmark (held-out test set)",
             "",
             _dataframe_to_markdown(ml_comparison) if not ml_comparison.empty else "_Not run_",
@@ -409,8 +443,10 @@ def write_results_summary(
         note = (
             f"_Strict-filter screen (score \u2265 {score_thr}, SASA \u2264 {ys.get('max_sasa', 'NA')} "
             f"{ANGSTROM_SQ}, \u2265 {ys.get('min_basic', 'NA')} basic, pLDDT \u2265 "
-            f"{ys.get('min_plddt', 'NA')}); hit rate is within the 0.2-0.8% range anticipated for "
-            "yeast. Scale to the full ~6,000-protein proteome before drawing enrichment conclusions._"
+            f"{ys.get('min_plddt', 'NA')}). **The hit count, not the rate, is what this pilot "
+            "measured**: a single hit gives a rate whose confidence interval spans more than an "
+            "order of magnitude, so it is consistent with almost any underlying prevalence and is "
+            "not evidence of enrichment. Scale to the full proteome before reading a rate at all._"
             if strict
             else "_Re-run with strict filters (\u2265 0.75, SASA \u2264 10, \u2265 4 basic) after the "
             "residue-detection fix; loose-threshold pilots are not publication-grade._"
@@ -442,6 +478,18 @@ def write_results_summary(
             "",
             "See `supplementary/SUPPLEMENTARY_INDEX.md` for Table S1–S6 exports.",
             "",
+            "## What this document covers, and what it does not",
+            "",
+            "This summary is generated from the **control benchmark, the validation dataset, the "
+            "ML benchmark and the yeast pilot** and from nothing else. It predates and does not "
+            "cover the lining-architecture line, the within-protein controls, the sequence and "
+            "composition studies, the openability and rotamer work, the redocking census or the "
+            "specificity re-ranking - several of which **qualify the claims above**.",
+            "",
+            "`results/PROJECT_FINDINGS.md` is the statement that covers every line, is generated "
+            "from each line's own committed artefact, and is the one to read for what this project "
+            "establishes. Where the two differ, that page is current and this one is not.",
+            "",
             "## Interpretation",
             "",
         ]
@@ -449,19 +497,26 @@ def write_results_summary(
 
     clear_sep = bool(sep.get("clear_separation", False))
     if phase1_ready:
+        n_tier1_positive = _tier_count(positive, 1)
+        n_tier1_negative = _tier_count(negative, 1)
         lines.append(
-            "Burial-aware scores reliably separate ADAR2 (cryptic IP6) from canonical surface "
-            "PH-domain negatives at tier 1. This supports proceeding to proteome-scale screening "
-            "with the strict candidate filters documented in Methods."
+            f"Burial-aware scores separate ADAR2 (cryptic IP6) from PLCδ1 at tier 1. That gate "
+            f"is **{n_tier1_positive} positive against {n_tier1_negative} negative**: a single "
+            "pairwise contrast with no interval and no resampling unit, so it establishes that the "
+            "score is not inverted on the one case it was built around, and nothing about how it "
+            "behaves on a case it has not seen."
         )
     if clear_sep:
         lines.append(
-            f"Aggregate control separation ({separation:.3f}) exceeds the 0.30 discrimination minimum."
+            f"Aggregate control separation is {separation:.3f}. The 0.30 figure this is often "
+            "compared against is a project convention and not an external benchmark, so the "
+            "comparison is reported here without being called a result."
         )
     else:
         lines.append(
-            "Aggregate control separation remains modest when tier-2 crystal artifacts are included; "
-            "manuscript claims should emphasize tier-1 gate performance."
+            "Aggregate control separation remains modest once the tier-2 failures are included, "
+            "and the tier-1 gate is a single pairwise contrast, so neither supports a claim about "
+            "unseen proteins."
         )
 
     if not ml_comparison.empty:
