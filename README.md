@@ -54,10 +54,11 @@ what this project establishes and what it does not. The short version:
 
 - The screen produces a **ranked list of hypotheses**, not findings. No candidate has
   independent support.
-- The validation set contains **one cryptic example in 136 structures** — the paradigm
-  case itself. That count, not the total, bounds every performance claim, and the
-  deposited archive cannot supply more, because a buried site with its ligand in place
-  is hard to crystallise.
+- Buried examples are scarce. The control benchmark's validation set holds **1 cryptic
+  structure in 136**, which bounds the benchmark; the redocking census holds **15 cryptic
+  annotated copies across 4 homology groups**, which bounds the ground-truth arms. Small,
+  but not one — and only ADAR2 has published evidence that the protein cannot fold
+  without the cofactor.
 - The combined score ranks annotated binders well above chance and **does not beat its
   own same-protein baseline**.
 - Two pre-registered structural lines — lining architecture and sequence — separate real

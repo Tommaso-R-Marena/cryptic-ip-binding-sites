@@ -180,7 +180,46 @@ def test_the_page_says_what_is_not_established(artefacts):
     text = script.render(artefacts)
     assert "What is not established" in text
     assert "binds an inositol phosphate" in text
-    assert "conservation, coevolution or a learned representation" in text
+    assert "three untested feature families" in text
+
+
+def test_both_burial_tables_are_reported_and_not_conflated(artefacts):
+    """The error this page was corrected for: 1 of 136 is the benchmark's bound,
+    and the census's cryptic copies are the ground-truth arms' bound."""
+    text = script.render(artefacts)
+    census = script.cryptic_census(artefacts["census"])
+    assert census["cryptic"] > 1, "fixture no longer exercises the distinction"
+    assert f"{census['cryptic']} cryptic annotated" in text
+    assert f"{census['cryptic_groups']} homology groups" in text
+    assert f"{census['semi_cryptic']} semi-cryptic" in text
+    assert "what bounds the benchmark" in text
+    # And the old overstatement must not come back.
+    assert "has one experimentally established cryptic site" not in text
+
+
+def test_a_census_without_a_burial_column_fails_the_render(artefacts):
+    data = copy.deepcopy(artefacts)
+    data["census"] = pd.DataFrame({"pdb_id": ["1ZY7"]})
+    with pytest.raises(script.Contradiction, match="burial class"):
+        script.render(data)
+
+
+def test_the_feature_table_says_which_families_were_actually_tried(artefacts):
+    """The other error: coevolution and a learned score had been tried."""
+    text = script.render(artefacts)
+    estimate = artefacts["coevolution"]["C2_matched"]["estimate"]
+    assert f"{estimate['point'] * 100:+.3f} pp" in text
+    assert "cross-organism IP-concentration coevolution" in text
+    assert "**not tested**" in text
+    for tried in ("a learned pocket score", "orthogroup-level conservation"):
+        assert tried in text
+
+
+def test_the_coevolution_test_turning_supported_fails_the_render(artefacts):
+    data = copy.deepcopy(artefacts)
+    data["coevolution"]["C2_matched"]["decision"] = "supported"
+    with pytest.raises(script.Contradiction, match="coevolution test"):
+        script.render(data)
 
 
 def test_the_page_points_at_the_older_summary_and_says_which_is_current(artefacts):

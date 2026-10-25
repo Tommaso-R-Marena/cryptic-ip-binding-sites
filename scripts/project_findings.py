@@ -37,6 +37,8 @@ SOURCES = {
     "sites": Path("results/within_protein/within_protein_sites.json"),
     "order": Path("results/pocket_sequence/pocket_sequence.json"),
     "gate": Path("results/composition/validation.json"),
+    "census": Path("results/redocking/census.csv"),
+    "coevolution": Path("results/coevolution/coevolution.json"),
 }
 
 #: Artefacts the page reports when present and names as outstanding when not.
@@ -58,6 +60,8 @@ COMMANDS = {
     "order": "scripts/pocket_sequence.py analyse",
     "gate": "scripts/pocket_composition.py validate",
     "composition": "scripts/pocket_composition.py analyse",
+    "census": "scripts/redocking.py census",
+    "coevolution": "scripts/coevolution.py report",
 }
 
 
@@ -93,6 +97,42 @@ def pick(blob: Any, *keys: Any) -> Any:
 
 def interval(blob: Mapping[str, Any]) -> str:
     return f"{pick(blob, 'point'):.3f} [{pick(blob, 'low'):.3f}, {pick(blob, 'high'):.3f}]"
+
+
+def cryptic_census(census: pd.DataFrame) -> Dict[str, int]:
+    """How many genuinely buried annotated copies the project actually holds.
+
+    Two different tables carry a burial class and they answer different
+    questions. The control benchmark's validation set bounds the *benchmark*;
+    the redocking census bounds the *ground-truth arms* of every study that uses
+    annotated sites. Conflating them understates what the project has, which is
+    a mistake this function exists to stop being made again by hand.
+    """
+    for column in ("burial_class", "classification"):
+        if column in census.columns:
+            classes = census[column].astype(str).str.lower()
+            break
+    else:
+        raise Contradiction("the census has no burial class column")
+    selected = census
+    for flag in ("selected", "primary_set"):
+        if flag in census.columns:
+            selected = selected[selected[flag].astype(str).str.lower().isin(
+                ("true", "1", "yes"))]
+    picked = classes.loc[selected.index]
+    group = ("homology_group_strict" if "homology_group_strict" in census.columns
+             else "pdb_id")
+    cryptic = selected[picked == "cryptic"]
+    semi = selected[picked.isin(("semi_cryptic", "semi-cryptic"))]
+    return {
+        "rows": int(len(census)),
+        "all_cryptic": int((classes == "cryptic").sum()),
+        "selected": int(len(selected)),
+        "cryptic": int(len(cryptic)),
+        "cryptic_groups": int(cryptic[group].nunique()),
+        "semi_cryptic": int(len(semi)),
+        "semi_cryptic_groups": int(semi[group].nunique()),
+    }
 
 
 # ------------------------------------------------------------------ sections
@@ -140,6 +180,7 @@ def verdict(data: Mapping[str, Any]) -> list:
     rerank = pick(data["specificity"], "rerank")
     candidates = data["candidates"]
     best = float(candidates["precision_at_rank"].max()) if len(candidates) else 0.0
+    census = cryptic_census(data["census"])
 
     # The page's spine. If any of these inverts, the summary below is wrong.
     if cryptic > 5:
@@ -161,9 +202,15 @@ def verdict(data: Mapping[str, Any]) -> list:
         f"{passed} of {len(positives)} positive controls pass. The tier-1 gate is one "
         "positive against one negative, so it shows the score is not backwards on the "
         "case it was built around, and nothing about an unseen protein.",
-        f"* **A validation set with {cryptic} cryptic example{'' if cryptic == 1 else 's'} "
-        f"in {len(dataset)} structures.** This project is about cryptic sites. That count "
-        "bounds every performance claim made here, and no amount of surface data lifts it.",
+        f"* **Buried examples are scarce, and two different tables say how scarce.** The "
+        f"control benchmark's validation set holds {cryptic} cryptic structure"
+        f"{'' if cryptic == 1 else 's'} in {len(dataset)}, which is what bounds the "
+        f"benchmark. The redocking census holds **{census['cryptic']} cryptic annotated "
+        f"copies across {census['cryptic_groups']} homology groups** among its "
+        f"{census['selected']} selected copies ({census['all_cryptic']} cryptic rows in "
+        f"{census['rows']}), plus {census['semi_cryptic']} semi-cryptic across "
+        f"{census['semi_cryptic_groups']} groups — and that is what bounds the "
+        "ground-truth arms of every study below. Small, but not one.",
         f"* **A learnable inositol-phosphate-versus-other-polyanion signal** at "
         f"{interval(pick(rerank, 'L3a_combined'))} ROC-AUC against "
         f"{pick(rerank, 'annotated_unseen')} annotated binders among "
@@ -181,8 +228,10 @@ def verdict(data: Mapping[str, Any]) -> list:
         "own other pockets, matched on size, both lines are null. Sections 2 to 4.",
         "",
         "Nothing on this page is evidence that any candidate binds an inositol phosphate. "
-        "The project has one experimentally established cryptic site, the one it was built "
-        "from.",
+        "The deposited cryptic copies above are structures with a buried inositol "
+        "phosphate, classified by this project's own burial metric; **one of them, ADAR2, "
+        "is the case with published evidence that the protein cannot fold without the "
+        "cofactor**, and it is the case the detector was built around.",
         "",
     ]
 
@@ -445,6 +494,48 @@ def composition(data: Mapping[str, Any]) -> list:
     return lines
 
 
+def untested(data: Mapping[str, Any]) -> list:
+    """Which feature families have been tried, so the closing cannot overstate."""
+    c2 = pick(data["coevolution"], "C2_matched")
+    estimate = pick(c2, "estimate")
+    if pick(c2, "decision") == "supported":
+        raise Contradiction(
+            "the comparative coevolution test now reads supported; the sentence below "
+            "calls it inconclusive")
+    return [
+        "## 6. Feature families, and which have actually been tried",
+        "",
+        "The two decompositions above cover a lining's **positions** and a window's "
+        "**letters**. It is easy to read their nulls as though nothing about a sequence or "
+        "a structure could predict an IP site, so here is what has and has not been put "
+        "to a test.",
+        "",
+        "| family | status |",
+        "|---|---|",
+        "| lining topology and register | tested, null against the control that matters "
+        "(section 3) |",
+        "| sequence order | tested, null; binding arm unresolved (section 4) |",
+        "| sequence composition | instrument check calibrated, study in flight (section 5) |",
+        f"| cross-organism IP-concentration coevolution | tested, **inconclusive** — "
+        f"{pick(estimate, 'point') * 100:+.3f} pp "
+        f"[{pick(estimate, 'low') * 100:+.3f}, {pick(estimate, 'high') * 100:+.3f}] over "
+        f"{pick(c2, 'bins')} matched bins and {pick(c2, 'clusters')} clusters "
+        f"(`docs/COEVOLUTION_PLAN.md`) |",
+        "| a learned pocket score | exists, and is a component of the combined score; the "
+        "protein-level classifier benchmarked at chance |",
+        "| orthogroup-level conservation of hits | computed in the comparative analysis |",
+        "| **per-residue conservation from an alignment** | **not tested** |",
+        "| **residue-residue coevolution as a site feature** | **not tested** |",
+        "| **a learned representation of the site itself** | **not tested** |",
+        "",
+        "The last three are where a signal could still live, and the nulls above say "
+        "nothing about them. Note that the coevolution row is a different question from "
+        "the last two: it asks whether an organism richer in inositol phosphate buries "
+        "more of them, not whether a particular site's residues covary.",
+        "",
+    ]
+
+
 def closing() -> list:
     return [
         "## What is not established, and what would change it",
@@ -463,10 +554,10 @@ def closing() -> list:
         "those nulls mean anything.",
         "",
         "What would change the picture, in the order it would be worth doing: an "
-        "experimentally tested candidate; a second cryptic example that was not used to "
-        "build the detector; and a feature family neither decomposition covers — "
-        "conservation, coevolution or a learned representation — which this project has "
-        "not tested and about which its nulls say nothing.",
+        "experimentally tested candidate; published functional evidence for one of the "
+        "deposited cryptic copies other than ADAR2, which would turn the ground-truth "
+        "arms from structural classification into established biology; and one of the "
+        "three untested feature families in section 6.",
         "",
         "Every claim above is read from the artefact beside it. Where a number here and a "
         "number in `results/publication/RESULTS_SUMMARY.md` disagree, that file is older.",
@@ -481,6 +572,7 @@ def render(data: Mapping[str, Any]) -> str:
     lines += within_protein(data)
     lines += order(data)
     lines += composition(data)
+    lines += untested(data)
     lines += closing()
     return "\n".join(lines) + "\n"
 

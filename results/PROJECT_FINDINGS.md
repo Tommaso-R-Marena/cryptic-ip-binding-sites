@@ -16,6 +16,8 @@ It exists because `results/publication/RESULTS_SUMMARY.md` is generated from the
 | sites | `results/within_protein/within_protein_sites.json` | `scripts/within_protein.py analyse --arm site` |
 | order | `results/pocket_sequence/pocket_sequence.json` | `scripts/pocket_sequence.py analyse` |
 | gate | `results/composition/validation.json` | `scripts/pocket_composition.py validate` |
+| census | `results/redocking/census.csv` | `scripts/redocking.py census` |
+| coevolution | `results/coevolution/coevolution.json` | `scripts/coevolution.py report` |
 | composition *(not yet reported)* | `results/composition/composition.json` | `scripts/pocket_composition.py analyse` |
 
 Pre-registered plans are in `docs/`, each with its dated amendments. The lining-architecture line has its own detailed page at `results/architecture/FINDINGS.md`.
@@ -23,12 +25,12 @@ Pre-registered plans are in `docs/`, each with its dated amendments. The lining-
 ## The short answer
 
 * **A detector that is not inverted on its one gold-standard case.** 1 of 3 positive controls pass. The tier-1 gate is one positive against one negative, so it shows the score is not backwards on the case it was built around, and nothing about an unseen protein.
-* **A validation set with 1 cryptic example in 136 structures.** This project is about cryptic sites. That count bounds every performance claim made here, and no amount of surface data lifts it.
+* **Buried examples are scarce, and two different tables say how scarce.** The control benchmark's validation set holds 1 cryptic structure in 136, which is what bounds the benchmark. The redocking census holds **15 cryptic annotated copies across 4 homology groups** among its 269 selected copies (45 cryptic rows in 662), plus 54 semi-cryptic across 14 groups — and that is what bounds the ground-truth arms of every study below. Small, but not one.
 * **A learnable inositol-phosphate-versus-other-polyanion signal** at 0.828 [0.756, 0.886] ROC-AUC against 34 annotated binders among 33084 unseen proteins — which **does not beat its own same-protein baseline** (-0.015 [-0.044, 0.015], Holm 0.321, *not supported*).
 * **75 candidate proteins that are hypotheses, not findings.** The best precision at any rank is 0.25, and it is 0.00 at rank 1.
 * **Two structural decompositions that separate real linings from random ones and not from other pockets.** The architecture line (positions) and the sequence line (letters) account for most of the project's statistical work. Against random position sets the architecture contrast is large; against the protein's own other pockets, matched on size, both lines are null. Sections 2 to 4.
 
-Nothing on this page is evidence that any candidate binds an inositol phosphate. The project has one experimentally established cryptic site, the one it was built from.
+Nothing on this page is evidence that any candidate binds an inositol phosphate. The deposited cryptic copies above are structures with a buried inositol phosphate, classified by this project's own burial metric; **one of them, ADAR2, is the case with published evidence that the protein cannot fold without the cofactor**, and it is the case the detector was built around.
 
 ## 1. Can the score tell an IP site from another polyanion site?
 
@@ -101,6 +103,24 @@ The gate is calibrated before any real lining reaches it: a planted basic patch 
 
 **The study itself has not reported yet.** When it does, this section gains its result and section 4's nulls either firm up into statements about order or become uninterpretable. Until then the question is open, and this page says so rather than leaving the line out.
 
+## 6. Feature families, and which have actually been tried
+
+The two decompositions above cover a lining's **positions** and a window's **letters**. It is easy to read their nulls as though nothing about a sequence or a structure could predict an IP site, so here is what has and has not been put to a test.
+
+| family | status |
+|---|---|
+| lining topology and register | tested, null against the control that matters (section 3) |
+| sequence order | tested, null; binding arm unresolved (section 4) |
+| sequence composition | instrument check calibrated, study in flight (section 5) |
+| cross-organism IP-concentration coevolution | tested, **inconclusive** — -0.017 pp [-0.341, +0.269] over 722 matched bins and 20080 clusters (`docs/COEVOLUTION_PLAN.md`) |
+| a learned pocket score | exists, and is a component of the combined score; the protein-level classifier benchmarked at chance |
+| orthogroup-level conservation of hits | computed in the comparative analysis |
+| **per-residue conservation from an alignment** | **not tested** |
+| **residue-residue coevolution as a site feature** | **not tested** |
+| **a learned representation of the site itself** | **not tested** |
+
+The last three are where a signal could still live, and the nulls above say nothing about them. Note that the coevolution row is a different question from the last two: it asks whether an organism richer in inositol phosphate buries more of them, not whether a particular site's residues covary.
+
 ## What is not established, and what would change it
 
 * **That any candidate binds an inositol phosphate.** No candidate has independent support. The honest description is a ranked list of hypotheses.
@@ -108,6 +128,6 @@ The gate is calibrated before any real lining reaches it: a planted basic patch 
 * **That the machinery adds anything beyond the same-protein baseline.** Section 1's third row says it does not, at the power available.
 * **That structure or sequence carries a detectable signature of an IP site.** Sections 2 to 4 are null or unresolved, and section 5 is what decides whether those nulls mean anything.
 
-What would change the picture, in the order it would be worth doing: an experimentally tested candidate; a second cryptic example that was not used to build the detector; and a feature family neither decomposition covers — conservation, coevolution or a learned representation — which this project has not tested and about which its nulls say nothing.
+What would change the picture, in the order it would be worth doing: an experimentally tested candidate; published functional evidence for one of the deposited cryptic copies other than ADAR2, which would turn the ground-truth arms from structural classification into established biology; and one of the three untested feature families in section 6.
 
 Every claim above is read from the artefact beside it. Where a number here and a number in `results/publication/RESULTS_SUMMARY.md` disagree, that file is older.
