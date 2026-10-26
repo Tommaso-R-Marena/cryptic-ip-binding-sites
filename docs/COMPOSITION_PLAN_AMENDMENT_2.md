@@ -86,3 +86,40 @@ Option 1 is the cheaper and more honest of the two in the short run, and option
 2 is the right answer if the budget is ever to be defended as a scientific
 choice. Until one is taken, the function arm's intervals should be read with
 section 1 in view.
+
+---
+
+## 4. Postscript, added 2026-10-26: the cache is what currently makes it stable
+
+Run 40348053052, on head `6a10380`, touched nothing the pocket table's digest
+covers, so the table was restored from cache instead of detected afresh. Its
+pocket step took **one second** against 3 h 59 m and 4 h 20 m cold, and
+`--resume` skipped all 137 copies.
+
+The restored table reproduces run 40307921444 **exactly**: 120 copies, 4924
+linings clearing the floor, digest `c026eea964496d04`, every top-level field
+identical and every arm's difference, interval and verdict identical to the
+last 15 significant figures. The only differences are last-bit floating-point
+noise in a few means and interval endpoints, which comes from reduction order
+across machines and appears between any two runs on this project.
+
+So the position is now precise, and it is two statements rather than one:
+
+* **fresh pocket detection is not reproducible** — section 1;
+* **the same table read twice is** — this section.
+
+Which means the cache is not only an economy. It is, at present, the only thing
+making the function arm's control pool stable from one run to the next, and
+that is not a property anyone designed. **It also expires**: GitHub evicts a
+cache that goes unread, so the stability has a shelf life, after which the next
+cold run lands on whatever pool that machine's speed produces.
+
+This does not change which artefact is committed. `composition.json` stays the
+121-copy run, for the reason section 2 gives, and swapping in a 120-copy run
+because it happens to match today's cache would trade one arbitrary pool for
+another while implying the newer one is authoritative. Both readings are on
+record above, which is the honest state of it.
+
+It does sharpen the choice in section 3. Option 1, pinning the excluded set, is
+close to what the cache achieves by accident — so taking it deliberately would
+cost little and would survive eviction, which the accident does not.
