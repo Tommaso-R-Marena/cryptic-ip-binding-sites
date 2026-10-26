@@ -540,6 +540,11 @@ def run(sequences: pd.DataFrame, pockets: pd.DataFrame,
         "n_pocket_linings": len(pocket_rows),
         "n_shell_linings": len(site_rows),
         "n_deposited_pocket_linings": len(sibling_rows),
+        # The function arm's control is every pocket of the shell's own
+        # deposited structure, which costs hours of fpocket. Its table is
+        # optional on purpose, so a reader must be told the difference between
+        # "the arm found nothing" and "the arm had no input".
+        "deposited_pockets_supplied": site_pockets is not None and not site_pockets.empty,
         "n_classified": int(sum(1 for r in pocket_rows if r.get("element"))),
         "n_formation_pairs": len(better),
         "n_type_pairs": len(faces),
@@ -617,6 +622,19 @@ def markdown(report: Dict[str, object]) -> str:
         "the gaps cannot change one, and `cryptic_ip/detect/signature.py` is the fence "
         "that keeps periodicity statistics off that same window.",
         "",
+    ]
+    if not report.get("deposited_pockets_supplied", True):
+        lines += [
+            "**The function arm did not run, for want of its control rather than for "
+            "want of a signal.** It compares a shell against every pocket of its own "
+            "deposited structure, which is hours of pocket detection and a separate job "
+            "from this one. That table is absent from this run, so every `function` row "
+            "below reads as not runnable — which is a statement about the input and not "
+            "about inositol phosphate. The gate and the formation and type arms do not "
+            "use it and are unaffected.",
+            "",
+        ]
+    lines += [
         "## Primary",
         "",
         "| arm | statistic | linings | groups | mean z (site) | mean z (control) | "

@@ -393,3 +393,47 @@ def test_the_two_arm_test_every_other_study_uses_is_calibrated():
         ps.append(sq.compare_feature("f", site, control, n_bootstrap=400,
                                      seed=1000 + k).p_value)
     assert (np.array(ps) <= 0.05).mean() < 0.09
+
+
+# --------------------------- the gate must not depend on the expensive arm
+
+@pytest.mark.slow
+def test_the_gate_still_reads_without_the_deposited_pocket_table():
+    """The decisive number must not be hostage to hours of pocket detection.
+
+    The function arm's control is every pocket of the shell's own deposited
+    structure. The first run of this workflow put that in the same job as the
+    shells and spent four hours in fpocket without reaching the gate, so the
+    table is optional and the workflow computes it separately.
+    """
+    parts = _synthetic(True, seed=3)
+    with_table = script.run(*parts, draws=200, n_bootstrap=200)
+    without = script.run(*parts[:4], None, draws=200, n_bootstrap=200)
+
+    # The gate is identical either way.
+    assert with_table["control_fired"] is True
+    assert without["control_fired"] is True
+    for key in ("n_shell_linings", "n_pocket_linings", "n_formation_pairs"):
+        assert with_table[key] == without[key]
+
+    # And the function arm is reported as having no input, not no signal.
+    assert with_table["deposited_pockets_supplied"] is True
+    assert without["deposited_pockets_supplied"] is False
+    absent = [t for t in without["tests"] if t["arm"] == "function"]
+    assert absent and not any(t.get("runnable") for t in absent)
+    text = script.markdown(without)
+    assert "did not run, for want of its control rather than for want of a signal" in text
+    assert "statement about the input and not" in text
+
+
+@pytest.mark.slow
+def test_the_formation_and_type_arms_are_unaffected_by_the_missing_table():
+    parts = _synthetic(True, seed=3)
+    with_table = script.run(*parts, draws=200, n_bootstrap=200)
+    without = script.run(*parts[:4], None, draws=200, n_bootstrap=200)
+
+    def keyed(report):
+        return {(t["arm"], t["statistic"]): t.get("difference")
+                for t in report["tests"]
+                if t.get("runnable") and t["arm"] in ("formation", "type")}
+    assert keyed(with_table) == keyed(without)
