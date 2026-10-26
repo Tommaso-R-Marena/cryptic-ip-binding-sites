@@ -492,3 +492,69 @@ def test_the_committed_report_is_a_function_of_the_committed_artefact():
     if not artefact.exists() or not report.exists():
         pytest.skip("study Q10 has not reported yet")
     assert report.read_text() == script.markdown(json.loads(artefact.read_text()))
+
+
+# ------------------------------- the control pool is machine-dependent
+
+def test_the_deposited_copy_set_is_recorded_and_digested():
+    """Pocket detection has a wall-clock budget, so the pool is not an input.
+
+    Runs 40275846268 and 40307921444 built this table from the same commit's
+    inputs and timed out on 8 and 9 structures. The artefact has to carry which
+    copies it rests on, or two artefacts cannot be told apart.
+    """
+    table = pd.DataFrame({"uniprot_id": ["2BBB_A_1", "1AAA_A_1", "1AAA_A_1"],
+                          "residues": ["1,2", "3,4", "5,6"]})
+    out = script.deposited_provenance(table)
+    assert out["n_deposited_copies"] == 2
+    assert out["deposited_copies"] == ["1AAA_A_1", "2BBB_A_1"]
+    assert len(out["deposited_copies_digest"]) == 16
+
+
+def test_the_digest_sees_one_copy_appearing_or_leaving():
+    """One structure crossing the budget is exactly what happened between runs."""
+    full = pd.DataFrame({"uniprot_id": [f"P{i}_A_1" for i in range(10)]})
+    short = full.iloc[:9]
+    a, b = script.deposited_provenance(full), script.deposited_provenance(short)
+    assert a["deposited_copies_digest"] != b["deposited_copies_digest"]
+    assert a["n_deposited_copies"] == 10 and b["n_deposited_copies"] == 9
+
+
+def test_the_digest_ignores_row_order_and_duplicate_pockets():
+    """It identifies the POOL, not the table: many pockets share one copy."""
+    one = pd.DataFrame({"uniprot_id": ["A_A_1", "B_B_2", "A_A_1"]})
+    other = pd.DataFrame({"uniprot_id": ["B_B_2", "A_A_1"]})
+    assert (script.deposited_provenance(one)["deposited_copies_digest"]
+            == script.deposited_provenance(other)["deposited_copies_digest"])
+
+
+def test_an_absent_table_records_an_empty_pool():
+    for empty in (None, pd.DataFrame(), pd.DataFrame({"other": [1]})):
+        out = script.deposited_provenance(empty)
+        assert out == {"n_deposited_copies": 0, "deposited_copies": [],
+                       "deposited_copies_digest": ""}
+
+
+def test_the_report_warns_that_the_pool_is_machine_dependent():
+    report = {"control_fired": True, "control_arm": "positive_control",
+              "control_statistic": "basic_fraction", "tests": [],
+              "n_pocket_linings": 1, "n_shell_linings": 1,
+              "n_deposited_pocket_linings": 9, "deposited_pockets_supplied": True,
+              "n_deposited_copies": 121, "deposited_copies_digest": "abc123",
+              "window_yield": {}, "seed": 1, "subset_draws": 1}
+    text = script.markdown(report)
+    assert "121 deposited copies" in text
+    assert "not reproducible across machines" in text
+    assert "abc123" in text
+
+
+def test_a_run_without_the_table_does_not_claim_a_pool():
+    report = {"control_fired": True, "control_arm": "positive_control",
+              "control_statistic": "basic_fraction", "tests": [],
+              "n_pocket_linings": 1, "n_shell_linings": 1,
+              "n_deposited_pocket_linings": 0, "deposited_pockets_supplied": False,
+              "n_deposited_copies": 0, "deposited_copies_digest": "",
+              "window_yield": {}, "seed": 1, "subset_draws": 1}
+    text = script.markdown(report)
+    assert "not reproducible across machines" not in text
+    assert "did not run, for want of its control" in text

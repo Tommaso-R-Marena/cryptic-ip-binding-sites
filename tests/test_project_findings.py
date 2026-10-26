@@ -433,3 +433,27 @@ def test_the_floor_is_read_from_the_code_that_enforces_it():
     from cryptic_ip.detect import sequence as sq
     assert script.MIN_GROUPS == sq.MIN_GROUPS == pu.MIN_GROUPS
     assert sq.MIN_GROUPS == 5
+
+
+def test_a_function_finding_carries_the_machine_dependence_caveat(artefacts):
+    """Its control pool is built under a wall-clock budget; two runs differed."""
+    data = copy.deepcopy(artefacts)
+    report = _reported()
+    for test in report["tests"]:
+        test["runnable"] = True
+        if test["arm"] == "function":
+            test.update({"is_finding": True, "n_groups": 10, "difference": 3.994,
+                         "interval": [3.239, 4.747], "p_holm": 0.003})
+    data["composition"] = report
+    text = script.render(data)
+    assert "wall-clock budget per structure" in text
+    assert "121 and 120 copies" in text
+    assert "COMPOSITION_PLAN_AMENDMENT_2.md" in text
+
+
+def test_a_finding_in_another_arm_does_not_carry_it(artefacts):
+    """`type` reads the candidate-model table, which was bit-identical."""
+    data = copy.deepcopy(artefacts)
+    data["composition"] = _reported()
+    text = script.render(data)
+    assert "wall-clock budget" not in text

@@ -595,7 +595,7 @@ def composition(data: Mapping[str, Any]) -> list:
             "sections 3 and 4 are about what was measured and not about a pipeline that "
             "cannot measure anything.",
             "",
-        ] + thinnest_arm(findings)
+        ] + thinnest_arm(findings) + machine_dependent_pool(findings)
     absent = sorted({str(pick(t, "arm")) for t in pick(report, "tests")
                      if not t.get("runnable")})
     if absent:
@@ -609,6 +609,34 @@ def composition(data: Mapping[str, Any]) -> list:
             "",
         ]
     return lines
+
+
+def machine_dependent_pool(findings: Sequence[Mapping[str, Any]]) -> list:
+    """The `function` arm's control pool is built under a wall-clock budget.
+
+    Pocket detection gives fpocket a fixed number of seconds per structure, so
+    which copies reach the control pool depends on how fast the machine was.
+    Two runs of one commit measured 121 and 120 copies, and the single
+    difference moved the arm's control mean on `basic_fraction` from -0.07 to
+    +0.62. Every verdict survived, which is why this is a note on precision
+    rather than a withdrawal - but a reader of a finding from this arm has to
+    be told, so the note is attached to the arm and not to a field that a
+    particular artefact may or may not carry.
+    """
+    if not any(str(pick(test, "arm")) == "function" for test in findings):
+        return []
+    return [
+        "**A caveat on the `function` arm's precision.** Its control pool is every "
+        "pocket of the shell's own deposited structure, detected under a wall-clock "
+        "budget per structure — so which copies reach the pool depends on how fast the "
+        "machine was. Two runs of one commit measured 121 and 120 copies; the single "
+        "difference left every verdict standing but moved this arm's control mean on "
+        "`basic_fraction` from -0.07 to +0.62 and widened its interval. Read the sign "
+        "as established and the width as partly an accident of scheduling. "
+        "`docs/COMPOSITION_PLAN_AMENDMENT_2.md` has both runs and the two repairs that "
+        "have not been chosen between.",
+        "",
+    ]
 
 
 def thinnest_arm(findings: Sequence[Mapping[str, Any]]) -> list:

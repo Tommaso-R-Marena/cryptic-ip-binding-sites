@@ -158,6 +158,8 @@ Every value above is a **z against random same-size subsets of the lining's own 
 
 **The thinnest of them is `function`, on 10 groups** against a floor of 5. Every interval above resamples whole homology groups, so 10 is what their width rests on, and in this study the arm whose control is worth the most is also the arm with the fewest groups to spare. Read it as a result that clears the project's own floor and not as one with room underneath it.
 
+**A caveat on the `function` arm's precision.** Its control pool is every pocket of the shell's own deposited structure, detected under a wall-clock budget per structure — so which copies reach the pool depends on how fast the machine was. Two runs of one commit measured 121 and 120 copies; the single difference left every verdict standing but moved this arm's control mean on `basic_fraction` from -0.07 to +0.62 and widened its interval. Read the sign as established and the width as partly an accident of scheduling. `docs/COMPOSITION_PLAN_AMENDMENT_2.md` has both runs and the two repairs that have not been chosen between.
+
 ## 6. Feature families, and which have actually been tried
 
 The two decompositions above cover a lining's **positions** and a window's **letters**. It is easy to read their nulls as though nothing about a sequence or a structure could predict an IP site, so here is what has and has not been put to a test.

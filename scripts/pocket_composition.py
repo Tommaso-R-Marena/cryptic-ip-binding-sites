@@ -29,6 +29,7 @@ Three things follow from every statistic here being order-invariant:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import sys
@@ -545,6 +546,15 @@ def run(sequences: pd.DataFrame, pockets: pd.DataFrame,
         # optional on purpose, so a reader must be told the difference between
         # "the arm found nothing" and "the arm had no input".
         "deposited_pockets_supplied": site_pockets is not None and not site_pockets.empty,
+        # Which copies the function arm's control pool actually rests on, and a
+        # digest of that set. Pocket detection applies a WALL-CLOCK budget per
+        # structure, so a slower machine excludes more structures and the control
+        # pool is machine-dependent: runs 40275846268 and 40307921444, on the
+        # same commit's inputs, timed out on 8 and 9 structures respectively and
+        # the one extra exclusion moved this arm's control mean on
+        # `basic_fraction` from -0.07 to +0.62. Recording the set is what makes
+        # that visible in the artefact instead of only in a log.
+        **deposited_provenance(site_pockets),
         "n_classified": int(sum(1 for r in pocket_rows if r.get("element"))),
         "n_formation_pairs": len(better),
         "n_type_pairs": len(faces),
@@ -623,6 +633,19 @@ def markdown(report: Dict[str, object]) -> str:
         "that keeps periodicity statistics off that same window.",
         "",
     ]
+    if report.get("deposited_pockets_supplied", True) and report.get("n_deposited_copies"):
+        lines += [
+            f"**The function arm's control pool rests on "
+            f"{report['n_deposited_copies']} deposited copies** "
+            f"(`{report.get('deposited_copies_digest', '')}`). Pocket detection applies a "
+            "wall-clock budget per structure, so that set is a property of the machine "
+            "that built the table as well as of the inputs: two runs of one commit "
+            "measured 121 and 120 copies and the single difference moved this arm's "
+            "control mean on `basic_fraction` from -0.07 to +0.62. Every verdict held "
+            "across both, but **the pool is not reproducible across machines**, and two "
+            "artefacts are only comparable where this digest agrees.",
+            "",
+        ]
     if not report.get("deposited_pockets_supplied", True):
         lines += [
             "**The function arm did not run, for want of its control rather than for "
@@ -919,6 +942,25 @@ def cmd_validate(args: argparse.Namespace) -> int:
     print(text)
     # A failed check is a reason to stop, not a warning.
     return 0 if report["all_checks_pass"] else 1
+
+
+def deposited_provenance(site_pockets: Optional[pd.DataFrame]) -> Dict[str, object]:
+    """The copies behind the function arm's control pool, named and digested.
+
+    The pocket table is produced under a per-structure wall-clock budget, so
+    which copies are in it is a property of the machine that built it and not
+    only of the inputs. Two runs of the same commit differed by one copy. A
+    reader comparing two artefacts has to be able to see that at a glance, so
+    the set goes in the artefact: the count, the sorted ids, and a digest that
+    makes "same pool or not" a single comparison.
+    """
+    if site_pockets is None or site_pockets.empty or "uniprot_id" not in site_pockets:
+        return {"n_deposited_copies": 0, "deposited_copies": [],
+                "deposited_copies_digest": ""}
+    copies = sorted({str(c) for c in site_pockets["uniprot_id"]})
+    digest = hashlib.sha256("\n".join(copies).encode()).hexdigest()[:16]
+    return {"n_deposited_copies": len(copies), "deposited_copies": copies,
+            "deposited_copies_digest": digest}
 
 
 def read_frame(path: Optional[Path]) -> Optional[pd.DataFrame]:
