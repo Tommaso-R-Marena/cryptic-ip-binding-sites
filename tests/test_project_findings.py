@@ -157,6 +157,102 @@ def test_an_open_gate_on_real_shells_firms_up_the_sequence_nulls(artefacts):
     assert "statements about order and not about" in text
 
 
+# ------------------------------------- what a finding of that study may claim
+
+
+def _reported(**overrides) -> dict:
+    """A Q10 artefact with the gate open, shaped like the committed one."""
+    report = {
+        "control_fired": True, "control_arm": "positive_control",
+        "tests": [{"arm": "positive_control", "statistic": "basic_fraction",
+                   "runnable": True, "mean_site_z": 4.28, "p_value": 0.001,
+                   "n_groups": 13, "family": "control"},
+                  {"arm": "type", "statistic": "composition_divergence", "runnable": True,
+                   "family": "primary", "is_finding": True, "n_groups": 54,
+                   "difference": 0.317, "interval": [0.106, 0.534], "p_holm": 0.0135},
+                  {"arm": "formation", "statistic": "basic_fraction", "runnable": True,
+                   "family": "primary", "is_finding": False},
+                  {"arm": "function", "statistic": "basic_fraction", "runnable": False,
+                   "family": "primary", "is_finding": False}]}
+    report.update(overrides)
+    return report
+
+
+def test_a_finding_is_described_by_the_contrast_that_produced_it(artefacts):
+    """The arms hold different things fixed, and the page must not blur them."""
+    data = copy.deepcopy(artefacts)
+    data["composition"] = _reported()
+    text = script.render(data)
+    assert "pooled across proteins" in text
+    assert "the protein is not held fixed" in text
+    assert "`composition_divergence`" in text
+    assert "0.0135" in text or "0.01349" in text
+
+
+def test_the_findings_table_does_not_claim_a_within_protein_control(artefacts):
+    """`type` pairs across proteins; only `formation` and `function` hold one fixed."""
+    data = copy.deepcopy(artefacts)
+    data["composition"] = _reported()
+    text = script.render(data)
+    section = text.split("## 5.")[1].split("## 6.")[0]
+    assert "holds the protein fixed" not in section
+
+
+def test_an_arm_the_page_cannot_describe_fails_the_render(artefacts):
+    data = copy.deepcopy(artefacts)
+    report = _reported()
+    report["tests"].append({"arm": "solvent", "statistic": "basic_fraction",
+                            "runnable": True, "family": "primary", "is_finding": True})
+    data["composition"] = report
+    with pytest.raises(script.Contradiction, match="cannot describe"):
+        script.render(data)
+
+
+def test_an_arm_that_did_not_run_is_said_to_be_missing_its_control(artefacts):
+    data = copy.deepcopy(artefacts)
+    data["composition"] = _reported()
+    text = script.render(data)
+    assert "did not run in the committed artefact" in text
+    assert "for want of the control table rather than for want of a signal" in text
+
+
+def test_every_arm_running_leaves_no_missing_arm_paragraph(artefacts):
+    data = copy.deepcopy(artefacts)
+    report = _reported()
+    for test in report["tests"]:
+        test["runnable"] = True
+    data["composition"] = report
+    text = script.render(data)
+    assert "did not run in the committed artefact" not in text
+
+
+def test_the_feature_table_row_stops_saying_the_study_is_in_flight(artefacts):
+    data = copy.deepcopy(artefacts)
+    data["composition"] = _reported()
+    text = script.render(data)
+    assert "study in flight" not in text
+    assert "the instrument check **fired** on real shells" in text
+
+    unreported = copy.deepcopy(artefacts)
+    unreported["composition"] = None
+    assert "study in flight" in script.render(unreported)
+
+
+def test_the_feature_table_row_reports_a_shut_gate_as_unreadable(artefacts):
+    data = copy.deepcopy(artefacts)
+    data["composition"] = _reported(control_fired=False)
+    text = script.render(data)
+    assert "instrument **not** demonstrated" in text
+
+
+def test_the_finding_count_agrees_between_the_section_and_the_table(artefacts):
+    data = copy.deepcopy(artefacts)
+    data["composition"] = _reported()
+    text = script.render(data)
+    assert "**1** is a finding" in text
+    assert "1 of 2 primary tests is a finding" in text
+
+
 # ------------------------------------------------------------- the page itself
 
 def test_the_page_is_not_stale(artefacts):

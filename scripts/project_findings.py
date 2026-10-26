@@ -533,6 +533,13 @@ def composition(data: Mapping[str, Any]) -> list:
         ]
         return lines
     fired = bool(pick(report, "control_fired"))
+    unknown = sorted({str(t.get("arm")) for t in pick(report, "tests")
+                      if t.get("family") == "primary"} - set(ARM_CONTRASTS))
+    if unknown:
+        raise Contradiction(
+            f"study Q10 now has primary arms this page cannot describe ({', '.join(unknown)}); "
+            "add what each one contrasts to ARM_CONTRASTS rather than printing a finding "
+            "without its control")
     control = next(t for t in pick(report, "tests")
                    if t.get("arm") == pick(report, "control_arm"))
     if not fired:
@@ -556,10 +563,88 @@ def composition(data: Mapping[str, Any]) -> list:
         "linings, so **section 4's nulls are statements about order and not about "
         "sensitivity** — which is the whole reason this study exists.",
         "",
-        f"Of its own {len(primary)} primary tests, **{len(findings)}** is a finding.",
+        f"Of its own {len(primary)} runnable primary tests, **{len(findings)}** "
+        f"{'is a finding' if len(findings) == 1 else 'are findings'}.",
         "",
     ]
+    if findings:
+        lines += ["| arm | statistic | groups | difference | 95% interval | Holm |",
+                  "|---|---|---|---|---|---|"]
+        for test in findings:
+            low, high = pick(test, "interval")
+            lines.append(
+                f"| {pick(test, 'arm')} | `{pick(test, 'statistic')}` | "
+                f"{pick(test, 'n_groups')} | {pick(test, 'difference'):+.3f} | "
+                f"[{low:+.3f}, {high:+.3f}] | {pick(test, 'p_holm'):.4g} |")
+        lines += [
+            "",
+            "Every value above is a **z against random same-size subsets of the lining's "
+            "own chain**, so a chain's own composition is divided out row by row and none "
+            "of these rows is a statement about which protein a pocket sits in. What each "
+            "arm does contrast:",
+            "",
+        ] + [f"* **{arm}** — {ARM_CONTRASTS[arm]}"
+             for arm in sorted({str(pick(t, "arm")) for t in findings})] + [
+            "",
+            "**None of them is a discovery about inositol phosphate.** That IP sites are "
+            "basic is textbook, and this study was built to test the instrument rather "
+            "than to announce it. What they do establish is that the composition half of "
+            "the decomposition is **not** empty where the order half is — so the nulls in "
+            "sections 3 and 4 are about what was measured and not about a pipeline that "
+            "cannot measure anything.",
+            "",
+        ]
+    absent = sorted({str(pick(t, "arm")) for t in pick(report, "tests")
+                     if not t.get("runnable")})
+    if absent:
+        lines += [
+            f"The **{', '.join(absent)}** arm"
+            f"{'' if len(absent) == 1 else 's'} did not run in the committed artefact, for "
+            "want of the control table rather than for want of a signal: it compares a "
+            "shell against every pocket of its own deposited structure, which is hours of "
+            "pocket detection in a separate job. That is a statement about the input. The "
+            "gate and the arms above do not use it.",
+            "",
+        ]
     return lines
+
+
+#: What each of study Q10's arms puts on either side of its contrast, so that a
+#: finding is described by the comparison that produced it. The arms differ in
+#: what they hold fixed - `formation` splits one protein's own pockets by rank,
+#: `type` pools across proteins and matches only on lining size - and a page
+#: that blurred them would credit a finding with a control it did not have. A
+#: finding in an arm this does not name raises rather than printing.
+ARM_CONTRASTS = {
+    "formation": "a protein's better-ranked pockets against its own worse-ranked ones, "
+                 "matched on lining size. The protein is held fixed.",
+    "type": "linings the architecture module calls `helix_face` against those it calls "
+            "`none`, matched on lining size but **pooled across proteins** — so this is "
+            "a statement about architectural type, and the protein is not held fixed.",
+    "function": "annotated inositol-phosphate contact shells against the other pockets "
+                "of the same deposited structure, matched on lining size. The structure "
+                "is held fixed, which makes this the hard version.",
+}
+
+
+def composition_status(data: Mapping[str, Any]) -> str:
+    """What section 5's own row of the feature table may claim.
+
+    Written from the artefact rather than from the sentence above it, so the row
+    cannot keep saying the study is in flight after it has reported, nor claim a
+    result the artefact does not carry.
+    """
+    report = data.get("composition")
+    if report is None:
+        return ", study in flight"
+    if not pick(report, "control_fired"):
+        return "; instrument **not** demonstrated, so the nulls above are unreadable"
+    primary = [t for t in pick(report, "tests")
+               if t.get("runnable") and t.get("family") == "primary"]
+    findings = [t for t in primary if t.get("is_finding")]
+    return f", and {len(findings)} of {len(primary)} primary tests is a finding" \
+        if len(findings) == 1 else \
+        f", and {len(findings)} of {len(primary)} primary tests are findings"
 
 
 def untested(data: Mapping[str, Any]) -> list:
@@ -583,7 +668,8 @@ def untested(data: Mapping[str, Any]) -> list:
         "| lining topology and register | tested, null against the control that matters "
         "(section 3) |",
         "| sequence order | tested, null; binding arm unresolved (section 4) |",
-        "| sequence composition | instrument check calibrated, study in flight (section 5) |",
+        f"| sequence composition | tested; the instrument check **fired** on real shells "
+        f"(section 5){composition_status(data)} |",
         f"| cross-organism IP-concentration coevolution | tested, **inconclusive** — "
         f"{pick(estimate, 'point') * 100:+.3f} pp "
         f"[{pick(estimate, 'low') * 100:+.3f}, {pick(estimate, 'high') * 100:+.3f}] over "

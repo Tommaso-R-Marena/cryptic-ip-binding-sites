@@ -921,7 +921,20 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 
 def read_frame(path: Optional[Path]) -> Optional[pd.DataFrame]:
-    return pd.read_csv(path) if path and Path(path).exists() else None
+    """One optional table, or ``None`` where the arm that makes it had nothing.
+
+    A job that measured no copy still writes its table and still uploads it, so
+    the file can be present and empty. That is the same situation as the file
+    being absent - the arm did not run - and `run` already reports it that way,
+    so it must not arrive here as a parse error that fails the whole study for
+    the one case the study is built to tolerate.
+    """
+    if not path or not Path(path).exists():
+        return None
+    try:
+        return pd.read_csv(path)
+    except pd.errors.EmptyDataError:
+        return None
 
 
 def cmd_analyse(args: argparse.Namespace) -> int:

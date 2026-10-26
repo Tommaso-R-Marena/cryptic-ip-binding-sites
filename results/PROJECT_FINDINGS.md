@@ -19,7 +19,7 @@ It exists because `results/publication/RESULTS_SUMMARY.md` is generated from the
 | census | `results/redocking/census.csv` | `scripts/redocking.py census` |
 | coevolution | `results/coevolution/coevolution.json` | `scripts/coevolution.py report` |
 | revision | `manuscript/RESULTS_DRAFT.md` | `hand-written; its revision note is quoted, not re-encoded` |
-| composition *(not yet reported)* | `results/composition/composition.json` | `scripts/pocket_composition.py analyse` |
+| composition | `results/composition/composition.json` | `scripts/pocket_composition.py analyse` |
 
 Pre-registered plans are in `docs/`, each with its dated amendments. The lining-architecture line has its own detailed page at `results/architecture/FINDINGS.md`.
 
@@ -138,7 +138,21 @@ The gate is calibrated before any real lining reaches it: a planted basic patch 
 
 **What the gate decides.** If the positive control fails on real shells, every arm of that study reads *instrument not demonstrated* and **the sequence line's nulls above cannot be read as null results either**. That is fixed in code, not promised in prose.
 
-**The study itself has not reported yet.** When it does, this section gains its result and section 4's nulls either firm up into statements about order or become uninterpretable. Until then the question is open, and this page says so rather than leaving the line out.
+**On real shells the positive control fired** (mean z +4.28, p 0.0009995, 13 groups). The instrument is demonstrated on real linings, so **section 4's nulls are statements about order and not about sensitivity** — which is the whole reason this study exists.
+
+Of its own 6 runnable primary tests, **1** is a finding.
+
+| arm | statistic | groups | difference | 95% interval | Holm |
+|---|---|---|---|---|---|
+| type | `composition_divergence` | 54 | +0.317 | [+0.106, +0.534] | 0.01349 |
+
+Every value above is a **z against random same-size subsets of the lining's own chain**, so a chain's own composition is divided out row by row and none of these rows is a statement about which protein a pocket sits in. What each arm does contrast:
+
+* **type** — linings the architecture module calls `helix_face` against those it calls `none`, matched on lining size but **pooled across proteins** — so this is a statement about architectural type, and the protein is not held fixed.
+
+**None of them is a discovery about inositol phosphate.** That IP sites are basic is textbook, and this study was built to test the instrument rather than to announce it. What they do establish is that the composition half of the decomposition is **not** empty where the order half is — so the nulls in sections 3 and 4 are about what was measured and not about a pipeline that cannot measure anything.
+
+The **function** arm did not run in the committed artefact, for want of the control table rather than for want of a signal: it compares a shell against every pocket of its own deposited structure, which is hours of pocket detection in a separate job. That is a statement about the input. The gate and the arms above do not use it.
 
 ## 6. Feature families, and which have actually been tried
 
@@ -148,7 +162,7 @@ The two decompositions above cover a lining's **positions** and a window's **let
 |---|---|
 | lining topology and register | tested, null against the control that matters (section 3) |
 | sequence order | tested, null; binding arm unresolved (section 4) |
-| sequence composition | instrument check calibrated, study in flight (section 5) |
+| sequence composition | tested; the instrument check **fired** on real shells (section 5), and 1 of 6 primary tests is a finding |
 | cross-organism IP-concentration coevolution | tested, **inconclusive** — -0.017 pp [-0.341, +0.269] over 722 matched bins and 20080 clusters (`docs/COEVOLUTION_PLAN.md`) |
 | a learned pocket score | exists, and is a component of the combined score; the protein-level classifier benchmarked at chance |
 | orthogroup-level conservation of hits | computed in the comparative analysis |

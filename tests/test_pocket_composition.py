@@ -437,3 +437,20 @@ def test_the_formation_and_type_arms_are_unaffected_by_the_missing_table():
                 for t in report["tests"]
                 if t.get("runnable") and t["arm"] in ("formation", "type")}
     assert keyed(with_table) == keyed(without)
+
+
+def test_an_empty_optional_table_reads_as_an_arm_that_did_not_run(tmp_path):
+    """The pocket job writes and uploads its table even when it measured nothing.
+
+    An empty file is the same situation as a missing one - the arm has no
+    control - and `run` reports that. Reaching `analyse` as a parse error would
+    fail the whole study for the one case it is built to tolerate.
+    """
+    empty = tmp_path / "site_pockets.csv"
+    empty.write_text("")
+    assert script.read_frame(empty) is None
+    assert script.read_frame(tmp_path / "absent.csv") is None
+    header_only = tmp_path / "header.csv"
+    header_only.write_text("uniprot_id,residues\n")
+    frame = script.read_frame(header_only)
+    assert frame is not None and frame.empty

@@ -5,6 +5,9 @@ been computed on any real lining in this project.** Study Q9's artefacts are in
 hand and were read; nothing below is a function of them except where section 7
 says so explicitly and says what was read.
 
+**Amended once.** `docs/COMPOSITION_PLAN_AMENDMENT_1.md` (2026-10-26) declares
+what has been looked at on a superseded run and changes no decision rule.
+
 ## 1. Why this study exists
 
 A window of sequence factorises as **composition** (which letters) **⊕ order**

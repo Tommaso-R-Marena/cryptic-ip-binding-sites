@@ -17,10 +17,13 @@ name: Composition and pockets
 #               runs FIRST so a miscalibrated instrument costs no fpocket time.
 #   candidates  every pocket of the 75 candidate models, their chain sequences,
 #               and each pocket's architecture class. Needs fpocket.
-#   deposited   the annotated inositol-phosphate copies: each copy's contact
-#               shell AND every pocket of the same deposited structure, which
-#               is what the function arm compares a shell against. Needs
-#               fpocket and the network.
+#   shells      the annotated inositol-phosphate copies' contact shells and
+#               their chains' sequences. Needs the network, not fpocket, and
+#               takes under a minute.
+#   deposited   every pocket of those same deposited structures, which is what
+#               the function arm compares a shell against. Needs fpocket and
+#               about four hours, so its table is cached on what it is a
+#               function of and the step resumes from a killed attempt.
 #   analyse     every arm. Pure, and seconds, because the subset null is
 #               multivariate hypergeometric in the chain's letter counts and
 #               caches per (chain, size).
@@ -33,6 +36,8 @@ on:
     paths:
       - 'docs/COMPOSITION_PLAN.md'
       - 'scripts/pocket_composition.py'
+      - 'scripts/pocket_sequence.py'
+      - 'scripts/within_protein.py'
       - 'cryptic_ip/detect/composition.py'
       - '.github/workflows/pocket-composition.yml'
   workflow_dispatch:
@@ -58,6 +63,10 @@ permissions:
   contents: read
 
 env:
+  # The structure cache's key, in one place: two jobs restore it and the pocket
+  # table's own key is a function of it, because a table that recorded "structure
+  # not downloaded" must not outlive the download set that caused it.
+  RCSB_CACHE_KEY: within-protein-rcsb-v1
   DRAWS: ${{ inputs.draws || '2000' }}
   BOOTSTRAP: ${{ inputs.bootstrap || '2000' }}
   LIMIT: ${{ inputs.limit || '0' }}
@@ -181,7 +190,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: structures/rcsb
-          key: within-protein-rcsb-v1
+          key: ${{ env.RCSB_CACHE_KEY }}
       - name: List the entries this arm needs
         # The within-protein study's census filter, called rather than copied,
         # so the three studies cannot drift apart about which copies count.
@@ -233,11 +242,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 350
     # The expensive arm, on its own, and allowed to fail without taking the
-    # study with it: `analyse` does not list this job in `needs`, and treats a
-    # missing table as "the function arm did not run" rather than as an error.
-    # fpocket over every deposited structure in the census ran for four hours
-    # without finishing on the first attempt, so this is budgeted generously
-    # and reported honestly if it still does not fit.
+    # study with it: `analyse` runs whether or not this job succeeds, and
+    # treats a missing table as "the function arm did not run" rather than as
+    # an error. fpocket over every deposited structure in the census takes
+    # about four hours and a quarter, which is close enough to any budget that
+    # the table is cached and the step resumable: the first run pays the four
+    # hours, every later run reads the table back in seconds, and a run killed
+    # at its budget leaves what it measured for the next one to carry on from.
     steps:
       - uses: actions/checkout@v5
       - name: Setup Conda
@@ -258,35 +269,86 @@ jobs:
         uses: actions/cache@v5
         with:
           path: structures/rcsb
-          key: within-protein-rcsb-v1
+          key: ${{ env.RCSB_CACHE_KEY }}
+      - name: What this table is a function of
+        id: key
+        shell: bash -l {0}
+        # Everything the table depends on and nothing else: the census it reads,
+        # the detector, the script, the pocket binary's own build, and the copy
+        # limit. A key that left any of them out would serve a stale table; one
+        # that included more would throw four hours away for nothing.
+        run: |
+          digest="$( { cat results/redocking/census.csv \
+                           scripts/within_protein.py \
+                           cryptic_ip/detect/*.py
+                       fpocket -h 2>&1 | head -n 5
+                       echo "$LIMIT $RCSB_CACHE_KEY"; } | sha256sum | cut -c1-16 )"
+          echo "value=deposited-pockets-v1-${digest}" >> "$GITHUB_OUTPUT"
+      - name: Whatever an earlier attempt already measured
+        uses: actions/cache/restore@v5
+        with:
+          path: cache/deposited
+          key: ${{ steps.key.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ${{ steps.key.outputs.value }}-
       - name: Every pocket of the same structures
         shell: bash -l {0}
         run: |
+          mkdir -p cache/deposited
           python scripts/within_protein.py sites \
             --census results/redocking/census.csv \
             --structures structures/rcsb \
-            --limit "$LIMIT" \
-            --out site_pockets.csv --sites deposited_sites.csv \
-            --report sites_report.json --summary sites_summary.json
+            --limit "$LIMIT" --resume \
+            --out cache/deposited/site_pockets.csv \
+            --sites cache/deposited/deposited_sites.csv \
+            --report cache/deposited/sites_report.json \
+            --summary cache/deposited/sites_summary.json
+      - name: Keep it, finished or not
+        # `actions/cache` saves in a post step that runs only when the job
+        # succeeded, so a job killed at its budget would persist nothing. The
+        # whole point here is to keep a partial table, so the save is explicit.
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: cache/deposited
+          key: ${{ steps.key.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Print the summary
+        # The summary is rewritten after every copy, so it exists as soon as one
+        # has been measured - but a job that fell over before the first one has
+        # nothing to print, and that is not a second failure to report.
+        if: always()
         shell: bash -l {0}
         run: |
-          python scripts/extract_log_block.py emit Q10_SITE_POCKETS_SUMMARY_JSON sites_summary.json
+          if [ -f cache/deposited/sites_summary.json ]; then
+            python scripts/extract_log_block.py emit \
+              Q10_SITE_POCKETS_SUMMARY_JSON cache/deposited/sites_summary.json
+          else
+            echo "no copy was measured, so there is no summary to print"
+          fi
       - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: pocket-composition-deposited-pockets
           path: |
-            site_pockets.csv
-            sites_summary.json
+            cache/deposited/site_pockets.csv
+            cache/deposited/deposited_sites.csv
+            cache/deposited/sites_summary.json
           retention-days: 90
 
   analyse:
     name: The gate, then formation, type and function
-    # Deliberately not `deposited_pockets`: the gate and three of the four arms
-    # do not need it, and waiting on it once cost four hours and produced
-    # nothing. Its table is picked up if it exists.
-    needs: [candidates, shells]
+    # `deposited_pockets` is listed so that its table is here when it finishes,
+    # and the condition is what keeps this job from dying with it: `analyse`
+    # runs whether that job succeeded, failed or was killed at its budget, and
+    # only a failure of the two jobs it actually reads stops it.
+    #
+    # Leaving it out of `needs` instead - the first attempt at this - gets the
+    # cheap arms quickly and then loses the function arm every single time,
+    # which is what happened: run 40250237023 finished `analyse` at 01:09 and
+    # the pocket table it needed was uploaded at 05:00, four hours later, to no
+    # one. Waiting is the honest cost of one complete artefact, and with the
+    # table cached it is paid once rather than once per run.
+    needs: [candidates, shells, deposited_pockets]
+    if: ${{ !cancelled() && needs.candidates.result == 'success' && needs.shells.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -308,7 +370,7 @@ jobs:
         with:
           name: pocket-composition-shells
           path: parts
-      - name: The deposited-structure pockets, if that job finished
+      - name: The deposited-structure pockets, if that job produced any
         uses: actions/download-artifact@v7
         continue-on-error: true
         with:

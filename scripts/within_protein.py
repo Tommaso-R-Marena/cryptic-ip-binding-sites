@@ -734,6 +734,72 @@ def select_copies(census: pd.DataFrame, comp_id: str = "IHP") -> pd.DataFrame:
     return census[wanted]
 
 
+def _records(path: Path) -> List[Dict[str, object]]:
+    """A table written by an earlier attempt, or nothing if it never got one."""
+    if not path.exists() or path.stat().st_size == 0:
+        return []
+    try:
+        return pd.read_csv(path).to_dict("records")
+    except pd.errors.EmptyDataError:
+        return []
+
+
+def resume_sites(args: argparse.Namespace) -> Tuple[List[Dict[str, object]],
+                                                    List[Dict[str, object]],
+                                                    List[Dict[str, object]],
+                                                    Set[str]]:
+    """What an earlier, interrupted run of ``sites`` already measured.
+
+    This command spends about four hours in fpocket over the census, which is
+    longer than one job is reliably given, so a run that does not fit must not
+    begin again from nothing. The report already records every copy attempted
+    and why each one failed, so it serves as the resume log too: no extra file,
+    and no copy measured twice.
+    """
+    if not (args.report and args.report.exists()):
+        return [], [], [], set()
+    report = json.loads(args.report.read_text())
+    status = [dict(entry) for entry in report.get("status", [])]
+    done = {str(entry["copy"]) for entry in status if entry.get("copy")}
+    rows, sites = _records(args.out), _records(args.sites)
+    print(f"resuming: {len(done)} copies already attempted, {len(sites)} measured, "
+          f"{len(rows)} pockets kept", flush=True)
+    return rows, sites, status, done
+
+
+def write_sites(args: argparse.Namespace, rows: List[Dict[str, object]],
+                sites: List[Dict[str, object]], status: List[Dict[str, object]],
+                n_copies: int) -> Dict[str, object]:
+    """The tables and the report, as they stand after the copy just measured.
+
+    Called after every copy rather than once at the end, so that a job killed
+    at its budget leaves four hours of pocket detection on disk for the next
+    attempt to resume from instead of discarding it. Rewriting the whole table
+    keeps one code path for the per-copy write and the final one, and a few
+    thousand rows cost nothing against a minute of fpocket.
+    """
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_csv(args.out, index=False)
+    args.sites.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(sites).to_csv(args.sites, index=False)
+    report: Dict[str, object] = {"n_copies": int(n_copies), "n_measured": len(sites),
+                                 "n_pockets": len(rows), "excluded": {}, "status": status}
+    for entry in status:
+        if entry.get("error"):
+            excluded = report["excluded"]
+            excluded[entry["error"]] = excluded.get(entry["error"], 0) + 1  # type: ignore[index]
+    if args.report:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    # The per-copy status goes in the artefact; the log gets the summary, so
+    # that reading why copies were lost does not mean reading 137 entries.
+    summary = {k: v for k, v in report.items() if k != "status"}
+    if args.summary:
+        args.summary.parent.mkdir(parents=True, exist_ok=True)
+        args.summary.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+    return summary
+
+
 def cmd_sites(args: argparse.Namespace) -> int:
     """The ground-truth arm's data step: annotated sites and their structures' pockets.
 
@@ -744,14 +810,17 @@ def cmd_sites(args: argparse.Namespace) -> int:
     copies = select_copies(pd.read_csv(args.census), args.comp_id)
     if args.limit:
         copies = copies.head(int(args.limit))
-    rows, sites, status = [], [], []
+    rows, sites, status, done = resume_sites(args) if args.resume else ([], [], [], set())
     for index, row in enumerate(copies.itertuples(), start=1):
         pdb_id = str(row.pdb_id).lower()
         candidates = sorted(args.structures.glob(f"{pdb_id}.*")) + \
             sorted(args.structures.glob(f"{pdb_id.upper()}.*"))
         key = f"{row.pdb_id}_{row.chain}_{row.resseq}"
+        if key in done:
+            continue
         if not candidates:
             status.append({"copy": key, "error": "structure not downloaded"})
+            write_sites(args, rows, sites, status, len(copies))
             continue
         work = Path(tempfile.mkdtemp(prefix=f"q8site_{pdb_id}_"))
         try:
@@ -767,6 +836,7 @@ def cmd_sites(args: argparse.Namespace) -> int:
                        "n_site_residues": len(record["site"])})  # type: ignore[arg-type]
         if record["error"]:
             print(f"[{index}/{len(copies)}] {key}: {record['error']}", flush=True)
+            write_sites(args, rows, sites, status, len(copies))
             continue
         sites.append({"copy": key, "pdb_id": row.pdb_id, "chain": row.chain,
                       "group": getattr(row, "homology_group_strict", row.pdb_id),
@@ -776,23 +846,8 @@ def cmd_sites(args: argparse.Namespace) -> int:
             rows.append({"uniprot_id": key, "model": candidates[0].name, **pocket})
         print(f"[{index}/{len(copies)}] {key}: {len(record['pockets'])} pockets, "
               f"{len(record['site'])} site residues", flush=True)
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows).to_csv(args.out, index=False)
-    pd.DataFrame(sites).to_csv(args.sites, index=False)
-    report = {"n_copies": int(len(copies)), "n_measured": len(sites),
-              "n_pockets": len(rows),
-              "excluded": {},
-              "status": status}
-    for entry in status:
-        if entry.get("error"):
-            report["excluded"][entry["error"]] = report["excluded"].get(entry["error"], 0) + 1
-    if args.report:
-        args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
-    # The per-copy status goes in the artefact; the log gets the summary, so
-    # that reading why copies were lost does not mean reading 137 entries.
-    summary = {k: v for k, v in report.items() if k != "status"}
-    if args.summary:
-        args.summary.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+        write_sites(args, rows, sites, status, len(copies))
+    summary = write_sites(args, rows, sites, status, len(copies))
     print(json.dumps(summary, indent=2))
     return 0
 
@@ -870,6 +925,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     sites.add_argument("--summary", type=Path, default=None)
     sites.add_argument("--fpocket-timeout", type=float, default=900.0)
     sites.add_argument("--limit", type=int, default=0)
+    sites.add_argument("--resume", action="store_true",
+                       help="skip copies an earlier attempt's report already records, "
+                            "and keep the tables it wrote")
 
     args = parser.parse_args(argv)
     commands = {"pockets": cmd_pockets, "sites": cmd_sites, "analyse": cmd_analyse}
