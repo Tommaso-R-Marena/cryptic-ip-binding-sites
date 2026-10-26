@@ -10,9 +10,7 @@
 
 That a contact shell is arginine-rich is textbook and **is not offered here as a finding**. What it establishes is the thing study Q9 could not: that these linings, in these structures, through this machinery, can produce a detection at all. Q9's nulls are therefore statements about **order**, not about the pipeline's sensitivity.
 
-4267 candidate-pocket linings, 95 annotated shells and 0 pockets of the same deposited structures carried a null. The window is the **lining itself**, gap-closed: every statistic here is a function of the multiset of its letters, so closing the gaps cannot change one, and `cryptic_ip/detect/signature.py` is the fence that keeps periodicity statistics off that same window.
-
-**The function arm did not run, for want of its control rather than for want of a signal.** It compares a shell against every pocket of its own deposited structure, which is hours of pocket detection and a separate job from this one. That table is absent from this run, so every `function` row below reads as not runnable — which is a statement about the input and not about inositol phosphate. The gate and the formation and type arms do not use it and are unaffected.
+4267 candidate-pocket linings, 95 annotated shells and 5088 pockets of the same deposited structures carried a null. The window is the **lining itself**, gap-closed: every statistic here is a function of the multiset of its letters, so closing the gaps cannot change one, and `cryptic_ip/detect/signature.py` is the fence that keeps periodicity statistics off that same window.
 
 ## Primary
 
@@ -21,11 +19,14 @@ That a contact shell is arginine-rich is textbook and **is not offered here as a
 | formation | `basic_fraction` | 400 | 74 | +0.07 | +0.27 | -0.198 | [-0.366, -0.039] | 0.0810 | 0.246 | no |
 | formation | `composition_divergence` | 400 | 74 | +0.44 | +0.32 | +0.117 | [-0.083, +0.321] | 0.4908 | 0.285 | no |
 | formation | `nonbasic_divergence` | 400 | 74 | +0.39 | +0.38 | +0.013 | [-0.155, +0.188] | 0.8836 | 0.251 | no |
+| function | `basic_fraction` | 95 | 10 | +3.92 | -0.07 | +3.994 | [+3.239, +4.747] | 0.0030 | 1.137 | **yes** |
+| function | `composition_divergence` | 95 | 10 | +2.21 | +0.11 | +2.097 | [+1.401, +2.845] | 0.0030 | 1.100 | **yes** |
+| function | `nonbasic_divergence` | 95 | 10 | +2.59 | +0.07 | +2.519 | [+1.658, +3.358] | 0.0030 | 1.289 | **yes** |
 | type | `basic_fraction` | 400 | 54 | +0.11 | +0.32 | -0.207 | [-0.473, +0.056] | 0.2519 | 0.372 | no |
 | type | `composition_divergence` | 400 | 54 | +0.59 | +0.27 | +0.317 | [+0.106, +0.534] | 0.0135 | 0.310 | **yes** |
 | type | `nonbasic_divergence` | 400 | 54 | +0.58 | +0.41 | +0.172 | [-0.034, +0.399] | 0.2519 | 0.321 | no |
 
-**1 of 6** primary tests is a finding. A finding needs the positive control to have fired, a Holm-corrected p below 0.05, an interval excluding zero, five resampling groups, an observed difference above the minimum detectable one, and matched lining sizes — all six, fixed before this ran.
+**4 of 9** primary tests are findings. A finding needs the positive control to have fired, a Holm-corrected p below 0.05, an interval excluding zero, five resampling groups, an observed difference above the minimum detectable one, and matched lining sizes — all six, fixed before this ran.
 
 ## The control arm's other statistics
 
@@ -53,6 +54,12 @@ Reported because they say what a shell's composition looks like against its own 
 | formation | `mean_hydropathy` | 400 | 74 | +0.650 | [+0.391, +0.896] | 0.368 |
 | formation | `net_charge_per_residue` | 400 | 74 | +0.010 | [-0.119, +0.137] | 0.183 |
 | formation | `proline_fraction` | 400 | 74 | -0.194 | [-0.341, -0.048] | 0.220 |
+| function | `acidic_fraction` | 95 | 10 | -0.427 | [-0.935, +0.184] | 0.876 |
+| function | `aromatic_fraction` | 95 | 10 | -0.046 | [-0.893, +0.712] | 1.215 |
+| function | `glycine_fraction` | 95 | 10 | +0.531 | [-0.045, +1.184] | 0.926 |
+| function | `mean_hydropathy` | 95 | 10 | -2.443 | [-3.205, -1.717] | 1.136 |
+| function | `net_charge_per_residue` | 95 | 10 | +2.955 | [+2.366, +3.559] | 0.909 |
+| function | `proline_fraction` | 95 | 10 | -0.589 | [-0.857, -0.322] | 0.403 |
 | type | `acidic_fraction` | 400 | 54 | -0.180 | [-0.381, +0.043] | 0.304 |
 | type | `aromatic_fraction` | 400 | 54 | +0.256 | [+0.041, +0.493] | 0.322 |
 | type | `glycine_fraction` | 400 | 54 | -0.163 | [-0.307, -0.020] | 0.204 |
@@ -60,24 +67,14 @@ Reported because they say what a shell's composition looks like against its own 
 | type | `net_charge_per_residue` | 400 | 54 | -0.026 | [-0.207, +0.144] | 0.253 |
 | type | `proline_fraction` | 400 | 54 | -0.165 | [-0.342, +0.007] | 0.250 |
 
-Not runnable:
-
-- function:basic_fraction — no group has both arms
-- function:composition_divergence — no group has both arms
-- function:nonbasic_divergence — no group has both arms
-- function:acidic_fraction — no group has both arms
-- function:aromatic_fraction — no group has both arms
-- function:mean_hydropathy — no group has both arms
-- function:glycine_fraction — no group has both arms
-- function:proline_fraction — no group has both arms
-- function:net_charge_per_residue — no group has both arms
-
 ## Why a lining produced no window
 
 | source | reason | linings |
 |---|---|---|
 | annotated shells | under the floor | 34 |
 | candidate pockets | under the floor | 4140 |
+| deposited pockets | under the floor | 4537 |
+| deposited pockets | position not in the model | 29 |
 
 ## What this cannot conclude
 

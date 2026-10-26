@@ -454,3 +454,41 @@ def test_an_empty_optional_table_reads_as_an_arm_that_did_not_run(tmp_path):
     header_only.write_text("uniprot_id,residues\n")
     frame = script.read_frame(header_only)
     assert frame is not None and frame.empty
+
+
+def test_the_finding_count_reads_as_english_for_any_count():
+    """The committed report said "4 of 9 primary tests is a finding"."""
+    def count_line(n_findings: int) -> str:
+        tests = [{"arm": "function", "statistic": f"s{i}", "family": "primary",
+                  "runnable": True, "is_finding": i < n_findings, "n_groups": 10,
+                  "is_evidence": True, "exceeds_power": True, "length_confounded": False,
+                  "n_site": 95, "difference": 1.0, "interval": [0.5, 1.5],
+                  "p_holm": 0.01, "minimum_detectable": 0.2, "mean_site_z": 1.0,
+                  "mean_control_z": 0.0}
+                 for i in range(9)]
+        report = {"control_fired": True, "control_arm": "positive_control",
+                  "control_statistic": "basic_fraction", "tests": tests,
+                  "n_pocket_linings": 1, "n_shell_linings": 1,
+                  "n_deposited_pocket_linings": 1, "deposited_pockets_supplied": True,
+                  "window_yield": {}, "seed": 1, "subset_draws": 1}
+        text = script.markdown(report)
+        return next(line for line in text.splitlines() if "primary tests" in line)
+
+    assert "1 of 9** primary tests is a finding" in count_line(1)
+    assert "4 of 9** primary tests are findings" in count_line(4)
+    assert "0 of 9** primary tests are findings" in count_line(0)
+
+
+def test_the_committed_report_is_a_function_of_the_committed_artefact():
+    """`COMPOSITION.md` is `markdown(composition.json)` and nothing else.
+
+    The run prints both, so they agree when committed together - but the report
+    is prose and will be edited, and the only safe way to edit it is to change
+    the generator and regenerate. This fails if anyone edits the committed
+    markdown by hand, which is also how a number would get retyped.
+    """
+    artefact = ROOT / "results" / "composition" / "composition.json"
+    report = ROOT / "results" / "composition" / "COMPOSITION.md"
+    if not artefact.exists() or not report.exists():
+        pytest.skip("study Q10 has not reported yet")
+    assert report.read_text() == script.markdown(json.loads(artefact.read_text()))

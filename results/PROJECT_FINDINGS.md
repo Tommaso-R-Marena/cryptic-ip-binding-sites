@@ -140,19 +140,23 @@ The gate is calibrated before any real lining reaches it: a planted basic patch 
 
 **On real shells the positive control fired** (mean z +4.28, p 0.0009995, 13 groups). The instrument is demonstrated on real linings, so **section 4's nulls are statements about order and not about sensitivity** — which is the whole reason this study exists.
 
-Of its own 6 runnable primary tests, **1** is a finding.
+Of its own 9 runnable primary tests, **4** are findings.
 
 | arm | statistic | groups | difference | 95% interval | Holm |
 |---|---|---|---|---|---|
 | type | `composition_divergence` | 54 | +0.317 | [+0.106, +0.534] | 0.01349 |
+| function | `basic_fraction` | 10 | +3.994 | [+3.239, +4.747] | 0.002999 |
+| function | `composition_divergence` | 10 | +2.097 | [+1.401, +2.845] | 0.002999 |
+| function | `nonbasic_divergence` | 10 | +2.519 | [+1.658, +3.358] | 0.002999 |
 
 Every value above is a **z against random same-size subsets of the lining's own chain**, so a chain's own composition is divided out row by row and none of these rows is a statement about which protein a pocket sits in. What each arm does contrast:
 
+* **function** — annotated inositol-phosphate contact shells against the other pockets of the same deposited structure, matched on lining size. The structure is held fixed, which makes this the hard version.
 * **type** — linings the architecture module calls `helix_face` against those it calls `none`, matched on lining size but **pooled across proteins** — so this is a statement about architectural type, and the protein is not held fixed.
 
 **None of them is a discovery about inositol phosphate.** That IP sites are basic is textbook, and this study was built to test the instrument rather than to announce it. What they do establish is that the composition half of the decomposition is **not** empty where the order half is — so the nulls in sections 3 and 4 are about what was measured and not about a pipeline that cannot measure anything.
 
-The **function** arm did not run in the committed artefact, for want of the control table rather than for want of a signal: it compares a shell against every pocket of its own deposited structure, which is hours of pocket detection in a separate job. That is a statement about the input. The gate and the arms above do not use it.
+**The thinnest of them is `function`, on 10 groups** against a floor of 5. Every interval above resamples whole homology groups, so 10 is what their width rests on, and in this study the arm whose control is worth the most is also the arm with the fewest groups to spare. Read it as a result that clears the project's own floor and not as one with room underneath it.
 
 ## 6. Feature families, and which have actually been tried
 
@@ -162,7 +166,7 @@ The two decompositions above cover a lining's **positions** and a window's **let
 |---|---|
 | lining topology and register | tested, null against the control that matters (section 3) |
 | sequence order | tested, null; binding arm unresolved (section 4) |
-| sequence composition | tested; the instrument check **fired** on real shells (section 5), and 1 of 6 primary tests is a finding |
+| sequence composition | tested; the instrument check **fired** on real shells (section 5), and 4 of 9 primary tests are findings |
 | cross-organism IP-concentration coevolution | tested, **inconclusive** — -0.017 pp [-0.341, +0.269] over 722 matched bins and 20080 clusters (`docs/COEVOLUTION_PLAN.md`) |
 | a learned pocket score | exists, and is a component of the combined score; the protein-level classifier benchmarked at chance |
 | orthogroup-level conservation of hits | computed in the comparative analysis |

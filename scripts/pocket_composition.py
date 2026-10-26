@@ -667,7 +667,8 @@ def markdown(report: Dict[str, object]) -> str:
     findings = [e for e in primary if e.get("is_finding")]
     lines += [
         "",
-        f"**{len(findings)} of {len(primary)}** primary tests is a finding. A finding "
+        f"**{len(findings)} of {len(primary)}** primary tests "
+        f"{'is a finding' if len(findings) == 1 else 'are findings'}. A finding "
         "needs the positive control to have fired, a Holm-corrected p below 0.05, an "
         "interval excluding zero, five resampling groups, an observed difference above "
         "the minimum detectable one, and matched lining sizes — all six, fixed before "

@@ -398,3 +398,38 @@ def test_a_per_lining_verdict_is_not_presented_as_a_contrast(artefacts):
     section = text[two:three]
     assert "why section 3 exists" in section
     assert "null" in section
+
+
+def test_a_thin_finding_is_flagged_against_the_floor(artefacts):
+    """The arm with the best control has the fewest groups; the table hides that."""
+    data = copy.deepcopy(artefacts)
+    report = _reported()
+    for test in report["tests"]:
+        test["runnable"] = True
+        if test["arm"] == "function":
+            test.update({"is_finding": True, "n_groups": 10, "difference": 3.994,
+                         "interval": [3.239, 4.747], "p_holm": 0.003})
+    data["composition"] = report
+    text = script.render(data)
+    assert "on 10 groups** against a floor of 5" in text
+    assert "`type`, on 54" not in text, "the thinnest arm is the one to name"
+
+
+def test_a_comfortable_finding_is_not_flagged(artefacts):
+    """The caveat has to be a fact about the artefact, not boilerplate."""
+    data = copy.deepcopy(artefacts)
+    report = _reported()
+    for test in report["tests"]:
+        test["runnable"] = True
+        test["n_groups"] = 54
+    data["composition"] = report
+    text = script.render(data)
+    assert "against a floor of" not in text
+
+
+def test_the_floor_is_read_from_the_code_that_enforces_it():
+    """Not written out again in the page, where it could drift."""
+    from cryptic_ip.detect import pu
+    from cryptic_ip.detect import sequence as sq
+    assert script.MIN_GROUPS == sq.MIN_GROUPS == pu.MIN_GROUPS
+    assert sq.MIN_GROUPS == 5

@@ -25,6 +25,8 @@ from typing import Any, Dict, Mapping, Optional, Sequence
 
 import pandas as pd
 
+from cryptic_ip.detect.sequence import MIN_GROUPS
+
 #: Artefacts the page is assembled from. Every one is committed.
 SOURCES = {
     "controls": Path("results/publication/validation/positive_controls.csv"),
@@ -593,7 +595,7 @@ def composition(data: Mapping[str, Any]) -> list:
             "sections 3 and 4 are about what was measured and not about a pipeline that "
             "cannot measure anything.",
             "",
-        ]
+        ] + thinnest_arm(findings)
     absent = sorted({str(pick(t, "arm")) for t in pick(report, "tests")
                      if not t.get("runnable")})
     if absent:
@@ -607,6 +609,33 @@ def composition(data: Mapping[str, Any]) -> list:
             "",
         ]
     return lines
+
+
+def thinnest_arm(findings: Sequence[Mapping[str, Any]]) -> list:
+    """Say so where a finding rests on barely more groups than the floor.
+
+    Every interval here resamples whole homology groups, so the group count is
+    what the interval is wide or narrow because of - and the arm with the only
+    control in this study worth anything is also the arm with the fewest
+    groups. A table of five columns does not make a reader notice that, so this
+    says it in words, with the floor read from the code that enforces it rather
+    than written out again here.
+    """
+    if not findings:
+        return []
+    thinnest = min(findings, key=lambda t: int(pick(t, "n_groups")))
+    groups = int(pick(thinnest, "n_groups"))
+    if groups >= 3 * MIN_GROUPS:
+        return []
+    return [
+        f"**The thinnest of them is `{pick(thinnest, 'arm')}`, on {groups} groups** "
+        f"against a floor of {MIN_GROUPS}. Every interval above resamples whole "
+        f"homology groups, so {groups} is what their width rests on, and in this study "
+        "the arm whose control is worth the most is also the arm with the fewest "
+        "groups to spare. Read it as a result that clears the project's own floor and "
+        "not as one with room underneath it.",
+        "",
+    ]
 
 
 #: What each of study Q10's arms puts on either side of its contrast, so that a

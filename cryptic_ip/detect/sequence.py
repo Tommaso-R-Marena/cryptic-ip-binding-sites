@@ -119,6 +119,12 @@ STRAND_PERIOD = 2.0
 #: bootstrap convention.
 DEFAULT_SHUFFLES = 2000
 
+#: Below this many homology groups on either side, a comparison is not evidence
+#: whichever way it points. The project's standing floor, named here rather than
+#: written as a literal inside `is_evidence`, so a report can state the floor it
+#: is being judged against instead of repeating the number.
+MIN_GROUPS = 5
+
 
 class SequenceError(ValueError):
     """A sequence or window from which no descriptor can be computed."""
@@ -864,10 +870,10 @@ class FeatureComparison:
     def is_evidence(self) -> bool:
         """Whether the comparison had the groups to mean anything.
 
-        The project's standing floor: fewer than five homology groups on either
-        side is not evidence whichever way it points.
+        The project's standing floor: fewer than `MIN_GROUPS` homology groups
+        on either side is not evidence whichever way it points.
         """
-        return min(self.n_site_groups, self.n_control_groups) >= 5
+        return min(self.n_site_groups, self.n_control_groups) >= MIN_GROUPS
 
     @property
     def exceeds_power(self) -> bool:

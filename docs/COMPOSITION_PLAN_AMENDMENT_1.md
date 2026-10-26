@@ -75,3 +75,34 @@ contact shell is more basic and more compositionally divergent from its chain
 than the other pockets of the same structure — which is textbook, and is the
 instrument check this study was built to be. It is not a sequence-only
 predictor of anything and this study does not attempt one.
+
+---
+
+## 5. Postscript, added 2026-10-26 after the arm reported
+
+Nothing above was changed. This section records what the function arm did on
+current code (run 40275846268, head `66b400a`), against the look section 1
+declared, because a declared prediction that is never checked is not a
+discipline.
+
+| statistic | the look (87 shells, 10 groups) | the result (95 shells, 10 groups) |
+|---|---|---|
+| `basic_fraction` | +3.967 [+3.176, +4.780] | **+3.994** [+3.239, +4.747] |
+| `composition_divergence` | +2.094 [+1.392, +2.862] | **+2.097** [+1.401, +2.845] |
+| `nonbasic_divergence` | +2.478 [+1.611, +3.326] | **+2.519** [+1.658, +3.358] |
+
+All three are findings, all at Holm 0.0030, as on the superseded run. Section 3
+said the arm was expected to read the same and it does; the largest move is
+0.041 in `nonbasic_divergence`, well inside every interval.
+
+**One prediction in section 3 was wrong.** It said the arm's "n should rise
+from 87 and its groups from 10". The n rose to 95; the groups did not move. The
+eight recovered shells fell in homology groups the arm already had, so the
+function arm still rests on **ten** groups while the gate rests on thirteen.
+That matters more than the reproduction does: the arm with the only control in
+this study worth anything is also the arm with the fewest groups, and ten is
+twice the plan's floor of five rather than comfortably above it.
+
+Every `formation` and `type` row is identical to the run committed before this
+one, to the last digit, which is the property the workflow's two tests exist to
+hold: adding the expensive table changes the function arm and nothing else.
