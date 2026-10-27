@@ -26,15 +26,156 @@ on:
       - 'cryptic_ip/analysis/features.py'
       - 'cryptic_ip/analysis/structure_arrays.py'
       - 'cryptic_ip/analysis/filters.py'
+      # The screen cannot run without its structures, so how they are fetched
+      # is part of what decides its result. Left out of this list, a fix to the
+      # fetcher was pushed and never exercised, and the check stayed red on an
+      # untested change.
+      - 'scripts/fetch_structures.py'
+      - 'scripts/fetch_until_complete.py'
       - '.github/workflows/yeast-rescreen.yml'
   workflow_dispatch:
+    inputs:
+      attempts:
+        description: 'download attempts before giving up for this run'
+        default: '5'
+      sleep:
+        description: 'seconds to wait between download attempts'
+        default: '1800'
+
+env:
+  ATTEMPTS: ${{ inputs.attempts || '5' }}
+  SLEEP: ${{ inputs.sleep || '1800' }}
 
 jobs:
+  fetch:
+    name: Assemble the 499 AlphaFold models
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    # Separate from the screen, and waiting is the reason. The endpoint
+    # rate-limits by address, so the set is assembled over several attempts
+    # with sleeps between them - and sleeps in the same job as the screen
+    # would eat the budget the screen needs. No fpocket here either: this job
+    # only downloads.
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+
+      # Restore and save are separate on purpose. `actions/cache` saves in a
+      # post step only when the job SUCCEEDED, and the download step below
+      # exits non-zero if any model failed - so with a single cache action the
+      # partial download was never saved, every run re-fetched all 499 from
+      # scratch, and the endpoint's cumulative per-address quota drained
+      # further each time (200 of 499 on the first run, then 100). Saving the
+      # partial set makes successive runs resume instead of restart, so the
+      # directory fills over a few runs without asking the endpoint for the
+      # same files again.
+      - name: Restore AlphaFold models
+        uses: actions/cache/restore@v5
+        with:
+          path: data/structures/yeast_rescreen
+          key: yeast-rescreen-af-models-v2-${{ github.run_id }}
+          restore-keys: |
+            yeast-rescreen-af-models-v2-
+
+      - name: Download the pilot's 499 AlphaFold models, over several attempts
+        # Partial downloads are kept rather than discarded: the gate below is
+        # what fails the job, after the cache has been saved.
+        continue-on-error: true
+        # The model URL comes from the AlphaFold API rather than a hard-coded
+        # version suffix, so the current model is fetched whichever version it
+        # is; downloads run concurrently and are checked before being kept.
+        #
+        # What is new is the retry policy. The set needs all 499 models and the
+        # endpoint hands over a fraction per pass, so previously a PERSON
+        # re-ran this workflow and the set sat incomplete between nudges. Now
+        # one job waits: it retries while progress is being made, stops the
+        # moment the set is complete, and stops early if two attempts in a row
+        # add nothing - because then the endpoint's window is longer than this
+        # job can usefully wait and burning the rest of the budget on sleeps
+        # cannot help. The partial set is cached either way.
+        run: |
+          python scripts/fetch_until_complete.py alphafold \
+            --out data/structures/yeast_rescreen \
+            --ids-json results/yeast_pilot/screen_checkpoint.json --json-key processed \
+            --attempts "$ATTEMPTS" --sleep "$SLEEP" \
+            --progress data/structures/yeast_rescreen/download_progress.json
+
+      - name: Save whatever was downloaded
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: data/structures/yeast_rescreen
+          key: yeast-rescreen-af-models-v2-${{ github.run_id }}
+
+      - name: How fast the endpoint gave them back
+        if: always()
+        continue-on-error: true
+        # The only measurement anyone has of the recovery window, and it is
+        # written after every attempt, so a job killed at its budget still
+        # leaves it.
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          path = Path("data/structures/yeast_rescreen/download_progress.json")
+          if not path.exists():
+              print("no attempt was recorded")
+              raise SystemExit(0)
+          record = json.loads(path.read_text())
+          print("## AlphaFold download attempts\n")
+          print(f"Stopped because: **{record.get('reason')}**\n")
+          print("| attempt | gained | present | owed | absent upstream |")
+          print("| --- | --- | --- | --- | --- |")
+          for row in record.get("attempts", []):
+              print(f"| {row['attempt']} | +{row['gained']} | {row['ok']} "
+                    f"| {row['failed']} | {row['not_found']} |")
+          PY
+      - name: Upload the download record
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: yeast-rescreen-download
+          path: data/structures/yeast_rescreen/download_progress.json
+          if-no-files-found: warn
+
+      - name: Every model must be present before the screen means anything
+        # A screen of 200 of 499 proteins is not the re-screen this workflow
+        # exists to run, so an incomplete set fails here instead of producing a
+        # number. The cache above has already kept the partial set, so the next
+        # run starts closer.
+        run: |
+          python - <<'PY'
+          import json, sys
+          from pathlib import Path
+          manifest = Path("data/structures/yeast_rescreen/alphafold_manifest.json")
+          if not manifest.exists():
+              sys.exit("no manifest: the download step produced nothing")
+          entries = json.loads(manifest.read_text())
+          rows = entries if isinstance(entries, list) else entries.get("results", [])
+          total = len(rows)
+          missing = [r for r in rows if not (r.get("ok") or r.get("path"))]
+          print(json.dumps({"in_manifest": total, "missing": len(missing)}))
+          if missing or total == 0:
+              sys.exit(
+                  f"{len(missing)} of {total} models are still missing; the partial "
+                  "set is cached, so re-run this workflow to resume rather than "
+                  "re-fetching what is already here")
+          print("every model is present")
+          PY
+
   rescreen:
     name: Strict yeast re-screen (499 proteins)
+    needs: [fetch]
     runs-on: ubuntu-latest
     timeout-minutes: 240
-
     steps:
       - uses: actions/checkout@v5
 
@@ -54,21 +195,13 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install -e .
 
-      - name: Cache AlphaFold models
-        uses: actions/cache@v5
+      - name: Restore the assembled models
+        uses: actions/cache/restore@v5
         with:
           path: data/structures/yeast_rescreen
-          key: yeast-rescreen-af-models-v1
-
-      - name: Download the pilot's 499 AlphaFold models
-        shell: bash -l {0}
-        # The model URL comes from the AlphaFold API rather than a hard-coded
-        # version suffix, so the current model is fetched whichever version it
-        # is; downloads run concurrently and are checked before being kept.
-        run: |
-          python scripts/fetch_structures.py alphafold \
-            --out data/structures/yeast_rescreen \
-            --ids-json results/yeast_pilot/screen_checkpoint.json --json-key processed
+          key: yeast-rescreen-af-models-v2-${{ github.run_id }}
+          restore-keys: |
+            yeast-rescreen-af-models-v2-
 
       - name: Run the strict screen
         shell: bash -l {0}
@@ -102,6 +235,22 @@ jobs:
           scored.sort_values("composite_score", ascending=False).head(10).to_csv(out, index=False)
           print(f"wrote {out}")
           PY
+
+      - name: Print the results for extraction
+        shell: bash -l {0}
+        if: always()
+        # This workflow predated the project's marker convention, so its result
+        # existed only inside an artifact - which means it could be read by a
+        # person and not committed without retyping. Run 40504642919 produced
+        # the first complete re-screen and its numbers could not be recorded
+        # from it for exactly that reason. Printed between markers, the tables
+        # are extracted and committed with `extract_log_block.py read`.
+        run: |
+          for f in yeast_pilot_summary.json yeast_pilot_hits.csv P07264_pockets.csv; do
+            [ -f "results/yeast_rescreen/$f" ] || continue
+            name="YEAST_$(echo "${f%%.*}" | tr '[:lower:]' '[:upper:]')_B64"
+            python scripts/extract_log_block.py emit "$name" "results/yeast_rescreen/$f"
+          done
 
       - name: Upload re-screen results
         uses: actions/upload-artifact@v6

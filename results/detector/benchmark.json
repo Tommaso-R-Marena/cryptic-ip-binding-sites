@@ -1,0 +1,463 @@
+{
+  "n_failures": 0,
+  "n_measurements": 48,
+  "n_suites": 7,
+  "ok": true,
+  "seed": 20261012,
+  "suites": [
+    {
+      "code": "B1",
+      "measurements": [
+        {
+          "detail": "",
+          "expected": "identical",
+          "name": "cavity map reproducible (acidic_lined)",
+          "passed": true,
+          "unit": "",
+          "value": 1.0
+        },
+        {
+          "detail": "",
+          "expected": "identical",
+          "name": "cavity map reproducible (basic_lined)",
+          "passed": true,
+          "unit": "",
+          "value": 1.0
+        },
+        {
+          "detail": "",
+          "expected": "identical",
+          "name": "cavity map reproducible (narrow)",
+          "passed": true,
+          "unit": "",
+          "value": 1.0
+        },
+        {
+          "detail": "",
+          "expected": "identical",
+          "name": "cavity map reproducible (trp_plugged)",
+          "passed": true,
+          "unit": "",
+          "value": 1.0
+        },
+        {
+          "detail": "",
+          "expected": "identical",
+          "name": "cavity map reproducible (wide_open)",
+          "passed": true,
+          "unit": "",
+          "value": 1.0
+        },
+        {
+          "detail": "",
+          "expected": "bit-identical",
+          "name": "field spectrum reproducible",
+          "passed": true,
+          "unit": "",
+          "value": 1.0
+        }
+      ],
+      "note": "A result that is not reproducible cannot be a provenance claim, and this project's reports are extracted from logs by script on the assumption that a rerun gives the same numbers.",
+      "ok": true,
+      "seconds": 0.869,
+      "supports": "positions",
+      "title": "Determinism"
+    },
+    {
+      "code": "B2",
+      "measurements": [
+        {
+          "detail": "largest change in the power spectrum, as a fraction of its own scale, over three rotations about the pocket centre",
+          "expected": "< 0.01",
+          "name": "rotation discrepancy",
+          "passed": true,
+          "unit": "",
+          "value": 0.002018104774879785
+        },
+        {
+          "detail": "exact, because translating the system and its centre together changes nothing",
+          "expected": "< 1e-9",
+          "name": "translation discrepancy",
+          "passed": true,
+          "unit": "",
+          "value": 6.062944311844886e-16
+        }
+      ],
+      "note": "The field descriptor's whole purpose is to need no alignment, which is what study N's rigid transplantation needed and got wrong.",
+      "ok": true,
+      "seconds": 0.087,
+      "supports": "positions",
+      "title": "Invariance"
+    },
+    {
+      "code": "B3",
+      "measurements": [
+        {
+          "detail": "",
+          "expected": "grows smoothly",
+          "name": "field discrepancy at 0.1 A noise",
+          "passed": null,
+          "unit": "",
+          "value": 0.014486149336652772
+        },
+        {
+          "detail": "",
+          "expected": "grows smoothly",
+          "name": "cavity volume change at 0.1 A noise",
+          "passed": null,
+          "unit": "fraction",
+          "value": 0.007827788649706457
+        },
+        {
+          "detail": "",
+          "expected": "grows smoothly",
+          "name": "field discrepancy at 0.25 A noise",
+          "passed": null,
+          "unit": "",
+          "value": 0.035803637779709546
+        },
+        {
+          "detail": "",
+          "expected": "grows smoothly",
+          "name": "cavity volume change at 0.25 A noise",
+          "passed": null,
+          "unit": "fraction",
+          "value": 0.018264840182648477
+        },
+        {
+          "detail": "",
+          "expected": "grows smoothly",
+          "name": "field discrepancy at 0.5 A noise",
+          "passed": null,
+          "unit": "",
+          "value": 0.13844963342872635
+        },
+        {
+          "detail": "",
+          "expected": "grows smoothly",
+          "name": "cavity volume change at 0.5 A noise",
+          "passed": null,
+          "unit": "fraction",
+          "value": 0.21461187214611877
+        },
+        {
+          "detail": "",
+          "expected": "grows smoothly",
+          "name": "field discrepancy at 1.0 A noise",
+          "passed": null,
+          "unit": "",
+          "value": 0.23782362818943112
+        },
+        {
+          "detail": "",
+          "expected": "grows smoothly",
+          "name": "cavity volume change at 1.0 A noise",
+          "passed": null,
+          "unit": "fraction",
+          "value": 0.41748206131767773
+        }
+      ],
+      "note": "Every candidate is a predicted model, so sensitivity to small coordinate error is sensitivity to the predictor rather than to the protein.",
+      "ok": true,
+      "seconds": 0.888,
+      "supports": "positions",
+      "title": "Robustness to coordinate noise"
+    },
+    {
+      "code": "B4",
+      "measurements": [
+        {
+          "detail": "a pocket lined with arginine and lysine must present a more favourable well to a -9 polyanion than one lined with aspartate and glutamate",
+          "expected": "> 0, strongly",
+          "name": "basic minus acidic well depth",
+          "passed": true,
+          "unit": "kT/e",
+          "value": 3.430337035398102
+        },
+        {
+          "detail": "",
+          "expected": "< 0",
+          "name": "acidic well is repulsive",
+          "passed": true,
+          "unit": "kT/e",
+          "value": -1.9345154627334178
+        },
+        {
+          "detail": "The field is unfavourable for a polyanion at all (-1.93 kT/e), so no comparison between polyanions is meaningful.",
+          "expected": "no_polyanion_site",
+          "name": "acidic pocket refused as a polyanion site",
+          "passed": true,
+          "unit": "",
+          "value": 1.0
+        },
+        {
+          "detail": "",
+          "expected": "> 0",
+          "name": "narrow barrel is more enclosed",
+          "passed": true,
+          "unit": "directions",
+          "value": 0.3522492218026798
+        },
+        {
+          "detail": "burial and model confidence must not outvote the physics",
+          "expected": "field_depth_kt vetoed",
+          "name": "veto fires on a repulsive well",
+          "passed": true,
+          "unit": "",
+          "value": 1.0
+        }
+      ],
+      "note": "The fixtures differ in exactly one property each, so a detector that cannot separate them is broken rather than merely weak. Separating them is necessary and nowhere near sufficient for the biological questions.",
+      "ok": true,
+      "seconds": 0.707,
+      "supports": "geometry",
+      "title": "Discrimination on known construction"
+    },
+    {
+      "code": "B5",
+      "measurements": [
+        {
+          "detail": "",
+          "expected": "",
+          "name": "cavity detection, 360 atoms",
+          "passed": null,
+          "unit": "ms",
+          "value": 34.52654100010477
+        },
+        {
+          "detail": "",
+          "expected": "",
+          "name": "field panel, 360 atoms",
+          "passed": null,
+          "unit": "ms",
+          "value": 130.9647779999068
+        },
+        {
+          "detail": "",
+          "expected": "",
+          "name": "cavity detection, 540 atoms",
+          "passed": null,
+          "unit": "ms",
+          "value": 42.75727999993251
+        },
+        {
+          "detail": "",
+          "expected": "",
+          "name": "field panel, 540 atoms",
+          "passed": null,
+          "unit": "ms",
+          "value": 129.96276000012585
+        },
+        {
+          "detail": "",
+          "expected": "",
+          "name": "cavity detection, 720 atoms",
+          "passed": null,
+          "unit": "ms",
+          "value": 64.55744899994897
+        },
+        {
+          "detail": "",
+          "expected": "",
+          "name": "field panel, 720 atoms",
+          "passed": null,
+          "unit": "ms",
+          "value": 135.25714200000039
+        },
+        {
+          "detail": "",
+          "expected": "",
+          "name": "cavity detection, 900 atoms",
+          "passed": null,
+          "unit": "ms",
+          "value": 83.28222999989521
+        },
+        {
+          "detail": "",
+          "expected": "",
+          "name": "field panel, 900 atoms",
+          "passed": null,
+          "unit": "ms",
+          "value": 133.5133659999883
+        },
+        {
+          "detail": "",
+          "expected": "",
+          "name": "cavity detection, 1260 atoms",
+          "passed": null,
+          "unit": "ms",
+          "value": 116.6683210001338
+        },
+        {
+          "detail": "no enclosed cavity at this barrel radius, so nothing to describe",
+          "expected": "no pocket",
+          "name": "field panel, 1260 atoms",
+          "passed": null,
+          "unit": "ms",
+          "value": 0.0
+        },
+        {
+          "detail": "fitted over the measured sizes; above 2 the method would not reach the long tail of the candidate set",
+          "expected": "< 2",
+          "name": "cavity detection scaling exponent",
+          "passed": true,
+          "unit": "d log t / d log n",
+          "value": 1.0156885404074198
+        },
+        {
+          "detail": "fitted over the measured sizes; above 2 the method would not reach the long tail of the candidate set",
+          "expected": "< 2",
+          "name": "field panel scaling exponent",
+          "passed": true,
+          "unit": "d log t / d log n",
+          "value": 0.031555492879968394
+        }
+      ],
+      "note": "The candidates run to 2,352 residues and the cavity grid grows with the bounding box, so the scaling exponent matters more than the absolute figure. The barrel radius grows with the helix count, so the protein really does get bigger rather than just denser.",
+      "ok": true,
+      "seconds": 3.845,
+      "supports": "positions",
+      "title": "Cost and scaling"
+    },
+    {
+      "code": "B6",
+      "measurements": [
+        {
+          "detail": "the mean estimator gives 0.70 of the truth, biased low by the class overlap",
+          "expected": "0.92 to 1.08",
+          "name": "label frequency recovered at c=0.2",
+          "passed": true,
+          "unit": "",
+          "value": 0.9761133219257851
+        },
+        {
+          "detail": "the mean estimator gives 0.70 of the truth, biased low by the class overlap",
+          "expected": "0.92 to 1.08",
+          "name": "label frequency recovered at c=0.5",
+          "passed": true,
+          "unit": "",
+          "value": 0.9772597557727357
+        },
+        {
+          "detail": "the mean estimator gives 0.70 of the truth, biased low by the class overlap",
+          "expected": "0.92 to 1.08",
+          "name": "label frequency recovered at c=0.9",
+          "passed": true,
+          "unit": "",
+          "value": 0.9787880759032873
+        },
+        {
+          "detail": "the guarantee is the point of the method, so it is measured rather than cited",
+          "expected": "0.85 to 0.95",
+          "name": "conformal coverage at alpha=0.1",
+          "passed": true,
+          "unit": "",
+          "value": 0.903
+        },
+        {
+          "detail": "",
+          "expected": "> 0.8",
+          "name": "minimum detectable AUC at 5 groups",
+          "passed": true,
+          "unit": "",
+          "value": 0.8723755389680039
+        },
+        {
+          "detail": "",
+          "expected": "< 0.7",
+          "name": "minimum detectable AUC at 40 groups",
+          "passed": true,
+          "unit": "",
+          "value": 0.6518423005215169
+        },
+        {
+          "detail": "fifty copies of one protein are one observation, not fifty",
+          "expected": "1.0 on one positive group",
+          "name": "group AUC collapses copies",
+          "passed": true,
+          "unit": "",
+          "value": 1.0
+        },
+        {
+          "detail": "",
+          "expected": "0",
+          "name": "monotonicity violations in 2000 perturbations",
+          "passed": true,
+          "unit": "",
+          "value": 0.0
+        },
+        {
+          "detail": "three translations and three rotations; any other count is a wrong Hessian",
+          "expected": "exactly 6",
+          "name": "elastic network rigid-body modes",
+          "passed": true,
+          "unit": "",
+          "value": 6.0
+        }
+      ],
+      "note": "Synthetic populations with a chosen label frequency and a chosen class structure, so the estimator can be compared with the truth rather than with another estimate.",
+      "ok": true,
+      "seconds": 1.546,
+      "supports": "statistics",
+      "title": "Statistical recovery"
+    },
+    {
+      "code": "B7",
+      "measurements": [
+        {
+          "detail": "a negative margin means the raw ranking puts a constructed negative above a constructed positive",
+          "expected": "> 0",
+          "name": "deployed composite: worst positive minus best negative",
+          "passed": true,
+          "unit": "",
+          "value": 0.051577036663706444
+        },
+        {
+          "detail": "a negative margin means the raw ranking puts a constructed negative above a constructed positive",
+          "expected": "> 0",
+          "name": "monotone score: worst positive minus best negative",
+          "passed": true,
+          "unit": "",
+          "value": 0.09458236083500127
+        },
+        {
+          "detail": "none, at this threshold",
+          "expected": "(reported)",
+          "name": "constructed negatives the deployed scorer admits",
+          "passed": null,
+          "unit": "",
+          "value": 0.0
+        },
+        {
+          "detail": "none",
+          "expected": "0",
+          "name": "constructed negatives the monotone score admits",
+          "passed": true,
+          "unit": "",
+          "value": 0.0
+        },
+        {
+          "detail": "none",
+          "expected": "0",
+          "name": "constructed positives the monotone score misses",
+          "passed": true,
+          "unit": "",
+          "value": 0.0
+        },
+        {
+          "detail": "interval 0.459 to 0.803, missing relative_sasa, cavity_openness, mean_plddt",
+          "expected": "abstain",
+          "name": "abstains when burial and confidence are both unmeasured",
+          "passed": true,
+          "unit": "",
+          "value": 1.0
+        }
+      ],
+      "note": "Both scorers are handed the same measurements from the same fixtures, so the comparison is between the methods and not between two measurement paths. The cases are the ones where being wrong means broken, not the ones where being right means useful.",
+      "ok": true,
+      "seconds": 1.646,
+      "supports": "geometry",
+      "title": "Head to head against the deployed scorer"
+    }
+  ]
+}

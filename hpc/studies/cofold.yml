@@ -1,0 +1,117 @@
+# Study M, co-folding the candidates. NOT RUNNABLE YET, and deliberately so.
+#
+# `rockfish.py submit` refuses this manifest because docs/COFOLD_PLAN.md does
+# not exist. That refusal is the feature: docs/GPU_REQUIREMENTS.md commits to
+# pre-registering study M before any candidate is scored, with the calibration
+# guard first - if the co-folding score cannot separate the 62 annotated
+# binders from matched controls, it cannot classify candidates either, and the
+# study reports that and stops. Study N's workflow already implements that
+# shape, where the candidate arm does not run unless the guard passes.
+#
+# The stages below are the engineering, ready for when the plan exists. The
+# numbers in them are from docs/GPU_REQUIREMENTS.md: four arms so that "has a
+# basic pocket" cannot masquerade as "binds IP6" - 75 candidates, 75 matched
+# controls, 62 annotated binders, plus ligand decoys (ATP, sulfate, IP3)
+# against the same receptors - about 280 systems, times 3 seeds.
+#
+# Two decisions the plan has to make before this runs, because neither can be
+# improvised when a job dies:
+#
+#   1. Truncation. If the GPU partition turns out to be 40 GB rather than 80,
+#      the 19 candidates >= 600 residues and especially the 5 >= 1,000 will not
+#      fit whole. Truncating to a domain around the pocket is a modelling
+#      decision and changes what the result means.
+#   2. MSAs. The CPU probe used an empty MSA, which degrades accuracy
+#      substantially. Whether real alignments are used has to be stated,
+#      because it changes what the number means. The `msa` stage below is CPU
+#      work and is why the GPU ask in GPU_REQUIREMENTS.md includes CPU cores.
+
+study: M
+title: Co-folding candidates, controls, binders and ligand decoys
+description: >
+  Calibration guard on annotated binders against matched controls first; the
+  candidate and decoy arms only if the guard passes.
+
+plan:
+  - docs/COFOLD_PLAN.md
+
+stages:
+  - name: msa
+    description: alignments for every receptor, on CPU, so the GPU is never idle waiting for one
+    shards: 280
+    throttle: 40
+    output: msa-{shard}.a3m
+    resources:
+      partition: shared
+      cpus: 8
+      mem_gb: 32
+      walltime: "08:00:00"
+    command:
+      - python
+      - scripts/cofold.py
+      - msa
+      - --shard
+      - "{shard}"
+      - --shards
+      - "{shards}"
+      - --out
+      - "{stage_dir}/msa-{shard}.a3m"
+
+  # The guard. 62 annotated binders against 75 matched controls, scored first
+  # and read first. If it fails, nothing below it should be submitted.
+  - name: guard
+    description: can the score separate annotated binders from matched controls at all
+    depends_on: [msa]
+    shards: 137
+    throttle: 8
+    output: guard-{shard}.json
+    resources:
+      partition: gpu
+      cpus: 4
+      mem_gb: 48
+      walltime: "04:00:00"
+      gpus: 1
+    command:
+      - python
+      - scripts/cofold.py
+      - predict
+      - --arm
+      - guard
+      - --shard
+      - "{shard}"
+      - --shards
+      - "{shards}"
+      - --msa-dir
+      - "{work_dir}/msa"
+      - --out
+      - "{stage_dir}/guard-{shard}.json"
+
+  - name: guard_report
+    description: the guard's verdict; the candidate arm is submitted separately and only if it passes
+    depends_on: [guard]
+    after: any
+    output: guard.json
+    resources:
+      partition: shared
+      cpus: 2
+      mem_gb: 8
+      walltime: "00:30:00"
+    command:
+      - python
+      - scripts/rockfish.py
+      - collect
+      - --manifest
+      - hpc/studies/cofold.yml
+      - --stage
+      - guard
+      - --work-dir
+      - "{work_dir}"
+      - --records
+      - "{stage_dir}/records.json"
+      - --census-out
+      - "{stage_dir}/census.json"
+      - --provenance
+      - "{stage_dir}/PROVENANCE.md"
+      - --then
+      - "python scripts/cofold.py guard-report --records {stage_dir}/records.json
+         --out {stage_dir}/guard.json --markdown {stage_dir}/GUARD.md"

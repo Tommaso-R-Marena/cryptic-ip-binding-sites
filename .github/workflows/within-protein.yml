@@ -1,0 +1,238 @@
+name: Within-protein control
+
+# docs/WITHIN_PROTEIN_PLAN.md (study Q8).
+#
+# The architecture line's real-lining comparison sets 75 candidate pocket
+# linings against random position sets matched on size and span, and says
+# plainly that the comparison is nearly tautological: a random position set is
+# not a protein. The control that would mean something is other pockets from
+# the same proteins, and no committed table carries residue lists for them -
+# checked, not assumed.
+#
+# So this workflow builds that control. Two jobs, and only the first needs the
+# network:
+#
+#   pockets   fetches the 75 AlphaFold models and re-detects EVERY pocket in
+#             each, keeping each pocket's lining residues. Needs fpocket.
+#   sites     the ground-truth arm (amendment 1): fetches the deposited
+#             structures of the census's annotated IHP copies, computes each
+#             copy's contact shell and re-detects every pocket in the same
+#             structure. The positive control the candidate arm cannot be read
+#             without.
+#   analyse   re-identifies the selected pocket by overlap, matches siblings on
+#             lining size, and scores its quantile among them - the SAME
+#             statistic for both arms, which is what makes them comparable. A
+#             pure function of two tables, so it needs no network at all.
+
+on:
+  push:
+    # An analysis, not a test: on main it runs on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/WITHIN_PROTEIN_PLAN.md'
+      - 'docs/WITHIN_PROTEIN_PLAN_AMENDMENT_1.md'
+      - 'scripts/within_protein.py'
+      - 'cryptic_ip/detect/architecture.py'
+      - '.github/workflows/within-protein.yml'
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Re-detect at most this many proteins (0 = all)'
+        default: '0'
+      null_draws:
+        description: 'permutation draws per architecture null'
+        default: '800'
+
+concurrency:
+  group: within-protein-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NULL_DRAWS: ${{ inputs.null_draws || '800' }}
+  LIMIT: ${{ inputs.limit || '0' }}
+
+jobs:
+  pockets:
+    name: Re-detect every pocket in the candidate proteins
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda,defaults
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge fpocket freesasa pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Cache the AlphaFold models
+        uses: actions/cache@v5
+        with:
+          path: structures/alphafold
+          key: within-protein-models-v1
+      - name: Re-detect pockets, keeping every lining
+        shell: bash -l {0}
+        run: |
+          python scripts/within_protein.py pockets \
+            --table results/specificity/candidates.csv \
+            --cache-dir structures/alphafold \
+            --limit "$LIMIT" \
+            --out pockets.csv --report pockets_report.json
+      - name: Print the pocket table
+        shell: bash -l {0}
+        run: |
+          python scripts/extract_log_block.py emit Q8_POCKETS_B64 pockets.csv
+          python scripts/extract_log_block.py emit Q8_POCKETS_REPORT_JSON pockets_report.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: within-protein-pockets
+          path: |
+            pockets.csv
+            pockets_report.json
+          retention-days: 90
+
+  sites:
+    name: Annotated IHP sites against their own structures' pockets
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda,defaults
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge fpocket freesasa pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Cache the deposited structures
+        uses: actions/cache@v5
+        with:
+          path: structures/rcsb
+          key: within-protein-rcsb-v1
+      - name: List the entries this arm needs
+        shell: bash -l {0}
+        # Only the copies the amendment names, not all 662 census rows: the
+        # filter is the census's own, applied here so the download matches the
+        # analysis exactly.
+        run: |
+          python - <<'PY'
+          import importlib.util, sys
+          import pandas as pd
+          spec = importlib.util.spec_from_file_location("wp", "scripts/within_protein.py")
+          wp = importlib.util.module_from_spec(spec)
+          sys.modules["wp"] = wp
+          spec.loader.exec_module(wp)
+          copies = wp.select_copies(pd.read_csv("results/redocking/census.csv"))
+          ids = sorted(set(copies["pdb_id"].astype(str)))
+          pd.DataFrame({"pdb_id": ids}).to_csv("entries.csv", index=False)
+          print(f"{len(copies)} copies across {len(ids)} entries")
+          PY
+      - name: Download them
+        shell: bash -l {0}
+        # Legacy PDB only: fpocket and the analyzer's parser both read PDB, and
+        # an entry with no legacy file is reported as not downloaded rather than
+        # silently analysed in a format the detector cannot read.
+        run: |
+          python scripts/fetch_structures.py rcsb \
+            --out structures/rcsb --prefer pdb \
+            --ids-csv entries.csv --column pdb_id
+      - name: Annotated sites, and every pocket in the same structure
+        shell: bash -l {0}
+        run: |
+          python scripts/within_protein.py sites \
+            --census results/redocking/census.csv \
+            --structures structures/rcsb \
+            --limit "$LIMIT" \
+            --out site_pockets.csv --sites sites.csv \
+            --report sites_report.json --summary sites_summary.json
+      - name: Print the tables
+        shell: bash -l {0}
+        run: |
+          python scripts/extract_log_block.py emit Q8_SITE_POCKETS_B64 site_pockets.csv
+          python scripts/extract_log_block.py emit Q8_SITES_B64 sites.csv
+          python scripts/extract_log_block.py emit Q8_SITES_SUMMARY_JSON sites_summary.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: within-protein-sites
+          path: |
+            site_pockets.csv
+            sites.csv
+            sites_report.json
+            sites_summary.json
+          retention-days: 90
+
+  analyse:
+    name: Both arms, on the same statistic
+    needs: [pockets, sites]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: within-protein-*
+          path: parts
+          merge-multiple: true
+      - name: The candidate arm
+        run: |
+          python scripts/within_protein.py analyse \
+            --arm candidate \
+            --pockets parts/pockets.csv \
+            --table results/specificity/candidates.csv \
+            --draws "$NULL_DRAWS" \
+            --out within_protein.json --markdown WITHIN_PROTEIN.md
+      - name: The ground-truth arm
+        if: always()
+        run: |
+          python scripts/within_protein.py analyse \
+            --arm site \
+            --pockets parts/site_pockets.csv \
+            --table parts/sites.csv \
+            --draws "$NULL_DRAWS" \
+            --out within_protein_sites.json --markdown WITHIN_PROTEIN_SITES.md
+      - name: Print the results
+        if: always()
+        run: |
+          python scripts/extract_log_block.py emit WITHIN_PROTEIN_MD_B64 WITHIN_PROTEIN.md
+          python scripts/extract_log_block.py emit WITHIN_PROTEIN_JSON_B64 within_protein.json
+          python scripts/extract_log_block.py emit WITHIN_PROTEIN_SITES_MD_B64 WITHIN_PROTEIN_SITES.md
+          python scripts/extract_log_block.py emit WITHIN_PROTEIN_SITES_JSON_B64 within_protein_sites.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: within-protein-results
+          path: |
+            within_protein.json
+            WITHIN_PROTEIN.md
+            within_protein_sites.json
+            WITHIN_PROTEIN_SITES.md
+          retention-days: 90

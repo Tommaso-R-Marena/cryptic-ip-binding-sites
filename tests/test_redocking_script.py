@@ -163,6 +163,7 @@ def test_census_dock_and_report_end_to_end(tmp_path, monkeypatch):
 
 
 def test_audit_names_the_differing_centre():
+    pytest.importorskip("rdkit")
     from rdkit import Chem
     from rdkit.Chem import AllChem
 

@@ -1,0 +1,83 @@
+# The co-folding cost probe. This is a measurement of compute, not a study.
+#
+# docs/GPU_REQUIREMENTS.md has the one hard number we own: on 4 CPUs and 15 GB,
+# at the cheapest settings the model offers (1 diffusion sample, 0 recycling
+# steps, empty MSA), one 100-residue protein with IP6 did not finish in 5,400 s
+# (run 36729986766). The probe stops at the first length that fails, so 300 and
+# 600 residues were never attempted - and the candidates have median length 436,
+# with 19 of 75 at >= 600 and 5 at >= 1,000. CPU co-folding is not slow here, it
+# is impossible.
+#
+# This manifest answers only: at what length does a GPU run stop finishing, and
+# how long does each length take. It scores nothing and ranks nothing. That is
+# why its plan is GPU_REQUIREMENTS.md rather than a study plan - and why the
+# candidate arm lives in cofold.yml, which is gated on docs/COFOLD_PLAN.md and
+# will refuse to submit until that plan is written.
+#
+# Do not add a candidate, control or binder arm to this file. The moment this
+# probe scores a real receptor it has become study M, and study M has to be
+# pre-registered first, calibration guard first, as study N's workflow already
+# does it.
+
+study: M-probe
+title: Co-folding cost probe
+description: >
+  One synthetic receptor per length, IP6 as the ligand, at fixed cheap settings.
+  Measures wall-clock and peak VRAM against sequence length so the production
+  ask is a measurement rather than an estimate.
+
+plan:
+  - docs/GPU_REQUIREMENTS.md
+
+stages:
+  # Each shard is one length. A shard that runs out of time or VRAM is the
+  # measurement, not a failure: the status sentinel records which, and the
+  # report reads the boundary off the census.
+  - name: probe
+    description: one length per shard, at the cheapest settings the model offers
+    shards: 6
+    throttle: 2
+    output: probe-{shard}.json
+    resources:
+      partition: gpu
+      cpus: 4
+      mem_gb: 32
+      walltime: "02:00:00"
+      gpus: 1
+    command:
+      - python
+      - scripts/cofold_probe.py
+      - gpu-probe
+      - --length-index
+      - "{shard}"
+      - --out
+      - "{stage_dir}/probe-{shard}.json"
+
+  - name: report
+    description: the length at which co-folding stops finishing, and the cost curve below it
+    depends_on: [probe]
+    after: any
+    output: cofold_probe.json
+    resources:
+      partition: shared
+      cpus: 2
+      mem_gb: 8
+      walltime: "00:30:00"
+    command:
+      - python
+      - scripts/rockfish.py
+      - collect
+      - --manifest
+      - hpc/studies/cofold_probe.yml
+      - --stage
+      - probe
+      - --work-dir
+      - "{work_dir}"
+      - --records
+      - "{stage_dir}/records.json"
+      - --census-out
+      - "{stage_dir}/census.json"
+      - --provenance
+      - "{stage_dir}/PROVENANCE.md"
+      - --allow-missing
+      - "6"

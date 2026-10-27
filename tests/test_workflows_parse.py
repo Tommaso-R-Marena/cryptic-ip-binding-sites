@@ -41,13 +41,19 @@ ANALYSES = {
     "proteome-screen.yml", "train-real-data.yml", "yeast-rescreen.yml", "transfer.yml",
     "transfer-secondary.yml", "learned-screen.yml", "redocking.yml", "arrestin.yml", "specificity.yml",
     "hull-gate.yml", "redocking-audit.yml", "rerank.yml", "sampling.yml", "triage.yml",
-    "orthogonal.yml", "coevolution.yml", "kinase.yml",
+    "orthogonal.yml", "coevolution.yml", "kinase.yml", "cofold-probe.yml",
+    "template-fit.yml", "template2.yml", "flexible.yml", "sequence.yml",
+    "architecture.yml", "within-protein.yml", "pocket-sequence.yml",
+    "pocket-composition.yml",
 }
 
 #: Workflows written under the conventions below from the start; older ones are
 #: not edited, because touching their files would re-run their analyses.
 STRICT = {"redocking.yml", "arrestin.yml", "specificity.yml", "hull-gate.yml", "redocking-audit.yml",
-          "rerank.yml", "sampling.yml", "triage.yml", "orthogonal.yml", "coevolution.yml", "kinase.yml"}
+          "rerank.yml", "sampling.yml", "triage.yml", "orthogonal.yml", "coevolution.yml", "kinase.yml",
+          "cofold-probe.yml", "template-fit.yml", "template2.yml", "flexible.yml",
+          "sequence.yml", "architecture.yml", "within-protein.yml",
+          "pocket-sequence.yml", "pocket-composition.yml"}
 
 
 @pytest.mark.parametrize("path", [p for p in WORKFLOWS if p.name in ANALYSES], ids=lambda p: p.name)
@@ -97,3 +103,220 @@ def test_matrices_stay_small(path):
             if isinstance(values, list):
                 size *= len(values)
         assert size <= 30, f"{path.name}: {name} has {size} matrix entries"
+
+
+#: GitHub generates at most this many jobs from one matrix. Past it the job is dropped
+#: without failing the run, which is how study J's 272-shard matrix produced a green run
+#: with no docking in it (run 36883632819).
+MATRIX_JOB_LIMIT = 256
+
+
+def _flexible():
+    path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "flexible.yml"
+    return path, yaml.safe_load(path.read_text())
+
+
+def test_the_shard_halves_tile_every_shard_exactly_once():
+    """The split must cover range(DOCK_SHARDS) with no gap and no overlap.
+
+    A gap silently drops copies from the study; an overlap docks them twice.
+    """
+    _path, data = _flexible()
+    n = int(data["env"]["DOCK_SHARDS"])
+    half = (n + 1) // 2
+    first, second = list(range(half)), list(range(half, n))
+    assert first + second == list(range(n))
+    assert not set(first) & set(second)
+
+
+def test_neither_shard_matrix_can_reach_the_matrix_job_limit():
+    _path, data = _flexible()
+    n = int(data["env"]["DOCK_SHARDS"])
+    half = (n + 1) // 2
+    assert half <= MATRIX_JOB_LIMIT, f"first half is {half} jobs"
+    assert n - half <= MATRIX_JOB_LIMIT, f"second half is {n - half} jobs"
+
+
+def test_both_shard_matrices_are_wired_to_their_own_half():
+    _path, data = _flexible()
+    jobs = data["jobs"]
+    for job, output in (("dock_a", "dock_a"), ("dock_b", "dock_b")):
+        matrix = jobs[job]["strategy"]["matrix"]["shard"]
+        assert f"needs.plan.outputs.{output}" in matrix, f"{job} reads {matrix}"
+    assert set(jobs["report"]["needs"]) == {"dock_a", "dock_b"}
+
+
+def test_the_report_fails_when_no_shard_produced_a_file():
+    """A dropped matrix must not look like a run whose copies all failed."""
+    _path, data = _flexible()
+    merge = [s for s in data["jobs"]["report"]["steps"] if s.get("name") == "Merge the shards"]
+    assert merge, "the report no longer has a merge step"
+    assert "no shard produced an output file" in merge[0]["run"]
+
+
+# ---------------------------------------------------------------------------
+# Study Q10's expensive arm. Four hours of fpocket produced a table that no
+# job ever read, twice over, for two different reasons - once because the
+# analysis waited on the job and the job was killed, once because the analysis
+# no longer waited and finished four hours before the table existed. The shape
+# that works is narrow enough that these pin it.
+
+
+def _composition():
+    path = Path(".github/workflows/pocket-composition.yml")
+    return path, yaml.safe_load(path.read_text())
+
+
+def test_the_analysis_waits_for_the_expensive_table():
+    """Without this the function arm is absent from every run, silently."""
+    _path, data = _composition()
+    assert "deposited_pockets" in data["jobs"]["analyse"]["needs"]
+
+
+def test_the_analysis_is_not_gated_on_the_expensive_job_succeeding():
+    """And without this a killed fpocket budget takes the whole study with it."""
+    _path, data = _composition()
+    condition = data["jobs"]["analyse"]["if"]
+    assert "cancelled()" in condition
+    for job in ("candidates", "shells"):
+        assert f"needs.{job}.result == 'success'" in condition
+    assert "needs.deposited_pockets.result" not in condition, \
+        "the function arm's job must be allowed to fail alone"
+
+
+def test_a_partial_pocket_table_is_saved_and_resumed():
+    """`actions/cache` saves in a post step that only runs on success.
+
+    The whole value of caching this step is keeping a table a killed job had
+    half-finished, so the save has to be an explicit `always()` step and the
+    command has to be told to resume from what the restore brought back.
+    """
+    _path, data = _composition()
+    steps = data["jobs"]["deposited_pockets"]["steps"]
+    restore = [s for s in steps if "cache/restore" in str(s.get("uses", ""))]
+    save = [s for s in steps if "cache/save" in str(s.get("uses", ""))]
+    assert restore and save, "the pocket table is not cached across runs"
+    assert save[0].get("if") == "always()", "a killed job would persist nothing"
+    combined = [s for s in steps if s.get("uses", "").startswith("actions/cache@")]
+    assert all(s["with"]["path"] != save[0]["with"]["path"] for s in combined), \
+        "the combined cache action cannot keep partial work on this path"
+    assert restore[0]["with"]["key"] == save[0]["with"]["key"]
+    assert restore[0]["with"]["path"] == save[0]["with"]["path"]
+    assert restore[0]["with"]["restore-keys"] in restore[0]["with"]["key"]
+    detect = [s for s in steps if s.get("name") == "Every pocket of the same structures"]
+    assert detect and "--resume" in detect[0]["run"], \
+        "a restored table is only useful if the step skips what it already holds"
+
+
+def test_the_cache_key_is_a_function_of_what_the_table_depends_on():
+    """A key missing an input serves a stale table; one with too much in it
+    throws four hours away whenever anything at all changes."""
+    _path, data = _composition()
+    steps = data["jobs"]["deposited_pockets"]["steps"]
+    key = [s for s in steps if s.get("id") == "key"]
+    assert key, "the cache key is no longer computed from the inputs"
+    run = key[0]["run"]
+    for dependency in ("results/redocking/census.csv", "scripts/within_protein.py",
+                       "cryptic_ip/detect/", "fpocket", "$LIMIT", "$RCSB_CACHE_KEY"):
+        assert dependency in run, f"the key ignores {dependency}"
+
+
+def test_the_structure_cache_key_is_written_once():
+    """Two jobs restore it and the pocket table's key is a function of it."""
+    _path, data = _composition()
+    assert data["env"]["RCSB_CACHE_KEY"]
+    for job in ("shells", "deposited_pockets"):
+        steps = data["jobs"][job]["steps"]
+        cache = [s for s in steps if s.get("name") == "Cache the deposited structures"]
+        assert cache, f"{job} no longer caches the structures"
+        assert cache[0]["with"]["key"] == "${{ env.RCSB_CACHE_KEY }}", \
+            f"{job} hard-codes a key the pocket table's digest cannot see"
+
+
+def test_the_workflow_reruns_when_the_scripts_that_make_its_tables_change():
+    _path, data = _composition()
+    paths = (data.get(True, data.get("on")))["push"]["paths"]
+    for script in ("scripts/pocket_composition.py", "scripts/pocket_sequence.py",
+                   "scripts/within_protein.py"):
+        assert script in paths, f"{script} produces this study's tables"
+
+
+# ---------------------------------------------------------------------------
+# The yeast re-screen's download has to outlast a rate-limited endpoint. For
+# days the thing that caused the next attempt was a person re-running the
+# workflow, and the model set sat incomplete between nudges.
+
+
+def _yeast():
+    path = Path(".github/workflows/yeast-rescreen.yml")
+    return path, yaml.safe_load(path.read_text())
+
+
+def test_the_download_retries_within_one_job():
+    _path, data = _yeast()
+    steps = data["jobs"]["fetch"]["steps"]
+    download = [s for s in steps if "fetch_until_complete.py" in str(s.get("run", ""))]
+    assert download, "the download no longer retries; a human is the retry policy again"
+    assert "--attempts" in download[0]["run"] and "--sleep" in download[0]["run"]
+
+
+def test_the_waiting_job_does_not_share_a_budget_with_the_screen():
+    """Sleeps in the screen's job would eat the budget the screen needs."""
+    _path, data = _yeast()
+    assert data["jobs"]["rescreen"]["needs"] == ["fetch"]
+    fetch_steps = data["jobs"]["fetch"]["steps"]
+    assert not any("run_yeast_pilot_screen" in str(s.get("run", "")) for s in fetch_steps)
+    assert not any("setup-miniconda" in str(s.get("uses", "")) for s in fetch_steps), \
+        "the download needs no fpocket, and installing it costs a minute of every attempt"
+
+
+def test_a_partial_download_is_still_saved_and_still_fails_the_set():
+    """Both halves matter: keep what arrived, and refuse to screen a partial set."""
+    _path, data = _yeast()
+    steps = data["jobs"]["fetch"]["steps"]
+    save = [s for s in steps if "cache/save" in str(s.get("uses", ""))]
+    assert save and save[0].get("if") == "always()"
+    gate = [s for s in steps if "must be present" in str(s.get("name", ""))]
+    assert gate, "nothing stops a screen of 200 of 499 proteins"
+    download = [s for s in steps if "fetch_until_complete.py" in str(s.get("run", ""))]
+    assert download[0].get("continue-on-error") is True, \
+        "the download must not fail the job before the cache is saved"
+    names = [s.get("name") or s.get("uses") for s in steps]
+    assert names.index(save[0].get("name") or save[0]["uses"]) < names.index(gate[0]["name"])
+
+
+def test_the_screen_reads_what_the_download_job_assembled():
+    _path, data = _yeast()
+    restore = [s for s in data["jobs"]["rescreen"]["steps"]
+               if "cache/restore" in str(s.get("uses", ""))]
+    assert restore, "the screen job has no models"
+    assert "github.run_id" in restore[0]["with"]["key"], \
+        "it must prefer this run's own saved set over an older one"
+
+
+def test_the_recovery_measurement_is_kept():
+    """How fast the endpoint gives models back is the only data on the window."""
+    _path, data = _yeast()
+    steps = data["jobs"]["fetch"]["steps"]
+    assert any("download_progress.json" in str(s.get("run", "")) for s in steps)
+    uploads = [s for s in steps if "upload-artifact" in str(s.get("uses", ""))]
+    assert any("download_progress.json" in str(s.get("with", {}).get("path", ""))
+               for s in uploads), "the attempt record is not published"
+
+
+def test_the_rescreen_prints_its_result_for_extraction():
+    """Its first complete run's numbers were readable but not committable.
+
+    Run 40504642919 screened all 499 proteins and the result existed only
+    inside an artifact, so recording it would have meant retyping - which this
+    project does not do. The tables go between markers instead.
+    """
+    _path, data = _yeast()
+    steps = data["jobs"]["rescreen"]["steps"]
+    emit = [s for s in steps if "extract_log_block.py emit" in str(s.get("run", ""))]
+    assert emit, "the re-screen's result cannot be committed without retyping it"
+    run = emit[0]["run"]
+    for table in ("yeast_pilot_summary.json", "yeast_pilot_hits.csv", "P07264_pockets.csv"):
+        assert table in run, f"{table} is not printed for extraction"
+    names = [s.get("name") or s.get("uses") for s in steps]
+    assert names.index(emit[0]["name"]) > names.index("Run the strict screen")

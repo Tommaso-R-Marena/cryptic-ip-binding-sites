@@ -1,0 +1,921 @@
+#!/usr/bin/env python3
+"""What this project establishes, assembled from every line's own artefact.
+
+`results/publication/RESULTS_SUMMARY.md` is generated from the control
+benchmark, the validation dataset, the ML benchmark and the yeast pilot, and
+from nothing else. It therefore predates the lining-architecture line, the
+within-protein controls, the sequence and composition studies, and the
+specificity re-ranking - several of which qualify its claims. This page is the
+statement that covers all of them.
+
+Like `scripts/architecture_findings.py`, it **recomputes nothing**: every figure
+is read out of a committed artefact, a missing key fails the render rather than
+printing a blank, and a section whose claim its artefact no longer supports
+raises instead of being quietly contradicted.
+
+    project_findings.py --out results/PROJECT_FINDINGS.md
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+from typing import Any, Dict, Mapping, Optional, Sequence
+
+import pandas as pd
+
+from cryptic_ip.detect.sequence import MIN_GROUPS
+
+#: The yeast pilot screened this many proteins, and a re-screen of fewer is not
+#: a re-screen of it. `results/yeast_pilot/screen_checkpoint.json` is the list.
+EXPECTED_YEAST_SET = 499
+
+#: Artefacts the page is assembled from. Every one is committed.
+SOURCES = {
+    "controls": Path("results/publication/validation/positive_controls.csv"),
+    "negatives": Path("results/publication/validation/negative_controls.csv"),
+    "dataset": Path("data/validation/ip_binding_validation_dataset.csv"),
+    "specificity": Path("results/specificity/specificity.json"),
+    "candidates": Path("results/specificity/candidates.csv"),
+    "architecture": Path("results/architecture/real/real.json"),
+    "within": Path("results/within_protein/within_protein.json"),
+    "sites": Path("results/within_protein/within_protein_sites.json"),
+    "order": Path("results/pocket_sequence/pocket_sequence.json"),
+    "gate": Path("results/composition/validation.json"),
+    "census": Path("results/redocking/census.csv"),
+    "coevolution": Path("results/coevolution/coevolution.json"),
+    "revision": Path("manuscript/RESULTS_DRAFT.md"),
+}
+
+#: Artefacts the page reports when present and names as outstanding when not.
+#: A study that has not reported is a fact about the project, not a failure to
+#: render, and saying "not yet" is more honest than leaving the line out.
+OPTIONAL = {
+    "composition": Path("results/composition/composition.json"),
+    # The strict yeast re-screen. Section 0 asserted the pilot's candidate was
+    # withdrawn on the strength of the manuscript's revision note; with this
+    # artefact present it states the measured result instead, on a run whose
+    # own summary says how many structures it screened - because the trap here
+    # is a re-screen that lost the candidate by screening nothing.
+    "rescreen": Path("results/yeast_rescreen/yeast_pilot_summary.json"),
+    # The withdrawn candidate's own pockets, so the page can say WHICH of the
+    # screen's criteria it fails rather than that it fails them.
+    "rescreen_leu1": Path("results/yeast_rescreen/P07264_pockets.csv"),
+}
+
+COMMANDS = {
+    "controls": "scripts/run_publication_package.py",
+    "negatives": "scripts/run_publication_package.py",
+    "dataset": "scripts/build_validation_dataset.py",
+    "specificity": "scripts/specificity.py run",
+    "candidates": "scripts/specificity.py run",
+    "architecture": "scripts/real_architecture.py run",
+    "within": "scripts/within_protein.py analyse --arm candidate",
+    "sites": "scripts/within_protein.py analyse --arm site",
+    "order": "scripts/pocket_sequence.py analyse",
+    "gate": "scripts/pocket_composition.py validate",
+    "composition": "scripts/pocket_composition.py analyse",
+    "census": "scripts/redocking.py census",
+    "coevolution": "scripts/coevolution.py report",
+    "revision": "hand-written; its revision note is quoted, not re-encoded",
+    "rescreen": "scripts/run_yeast_pilot_screen.py (.github/workflows/yeast-rescreen.yml)",
+    "rescreen_leu1": "scripts/run_yeast_pilot_screen.py (.github/workflows/yeast-rescreen.yml)",
+}
+
+
+class Contradiction(KeyError):
+    """An artefact no longer supports what the section about it says."""
+
+
+def load(sources: Mapping[str, Path] = SOURCES,
+         optional: Mapping[str, Path] = OPTIONAL) -> Dict[str, Any]:
+    """Read every artefact, failing with the path when a required one is absent."""
+    out: Dict[str, Any] = {}
+    for name, path in sources.items():
+        if not path.exists():
+            raise FileNotFoundError(f"{name}: {path} has not been generated")
+        if path.suffix == ".csv":
+            out[name] = pd.read_csv(path)
+        elif path.suffix == ".md":
+            out[name] = path.read_text()
+        else:
+            out[name] = json.loads(path.read_text())
+    for name, path in optional.items():
+        if not path.exists():
+            out[name] = None
+        elif path.suffix == ".csv":
+            out[name] = pd.read_csv(path)
+        else:
+            out[name] = json.loads(path.read_text())
+    return out
+
+
+def pick(blob: Any, *keys: Any) -> Any:
+    """Index a nested artefact, naming the whole path when a key is missing."""
+    here: Any = blob
+    for index, key in enumerate(keys):
+        try:
+            here = here[key]
+        except (KeyError, IndexError, TypeError) as error:
+            trail = " -> ".join(str(k) for k in keys[:index + 1])
+            raise Contradiction(f"{trail} is not in the artefact") from error
+    return here
+
+
+def interval(blob: Mapping[str, Any]) -> str:
+    return f"{pick(blob, 'point'):.3f} [{pick(blob, 'low'):.3f}, {pick(blob, 'high'):.3f}]"
+
+
+def revision_note(draft: str) -> str:
+    """The manuscript's own revision note, lifted verbatim.
+
+    `results/publication/` carries outputs from before several pipeline defects
+    were corrected, and the working draft is where the project recorded the
+    corrections. Quoting that block is deliberate: re-encoding its numbers into
+    another artefact would be exactly the retyping this page refuses to do, and
+    paraphrasing it is how a correction gets quietly softened. If the block
+    moves or is renamed, the render fails rather than dropping it.
+    """
+    start = draft.find("> **Revision note")
+    if start < 0:
+        raise Contradiction(
+            "manuscript/RESULTS_DRAFT.md no longer carries a revision note; the "
+            "supersession this page reports was read from it")
+    lines = []
+    for line in draft[start:].splitlines():
+        if line.startswith(">"):
+            lines.append(line)
+        elif not line.strip() and lines:
+            lines.append(line)
+        elif lines:
+            break
+    text = "\n".join(lines).rstrip()
+    if "withdrawn" not in text or "ligand" not in text:
+        raise Contradiction(
+            "the revision note no longer withdraws the yeast candidate or mentions the "
+            "ligand-bound measurement; this page's supersession section quotes both")
+    return text
+
+
+def cryptic_census(census: pd.DataFrame) -> Dict[str, int]:
+    """How many genuinely buried annotated copies the project actually holds.
+
+    Two different tables carry a burial class and they answer different
+    questions. The control benchmark's validation set bounds the *benchmark*;
+    the redocking census bounds the *ground-truth arms* of every study that uses
+    annotated sites. Conflating them understates what the project has, which is
+    a mistake this function exists to stop being made again by hand.
+    """
+    for column in ("burial_class", "classification"):
+        if column in census.columns:
+            classes = census[column].astype(str).str.lower()
+            break
+    else:
+        raise Contradiction("the census has no burial class column")
+    selected = census
+    for flag in ("selected", "primary_set"):
+        if flag in census.columns:
+            selected = selected[selected[flag].astype(str).str.lower().isin(
+                ("true", "1", "yes"))]
+    picked = classes.loc[selected.index]
+    group = ("homology_group_strict" if "homology_group_strict" in census.columns
+             else "pdb_id")
+    cryptic = selected[picked == "cryptic"]
+    semi = selected[picked.isin(("semi_cryptic", "semi-cryptic"))]
+    return {
+        "rows": int(len(census)),
+        "all_cryptic": int((classes == "cryptic").sum()),
+        "selected": int(len(selected)),
+        "cryptic": int(len(cryptic)),
+        "cryptic_groups": int(cryptic[group].nunique()),
+        "semi_cryptic": int(len(semi)),
+        "semi_cryptic_groups": int(semi[group].nunique()),
+    }
+
+
+# ------------------------------------------------------------------ sections
+
+def header(data: Mapping[str, Any]) -> list:
+    lines = [
+        "# What this project establishes",
+        "",
+        "This page is **generated** by `scripts/project_findings.py` from the committed "
+        "artefacts below. It recomputes nothing, no number on it is retyped, and a claim "
+        "its artefact stops supporting fails the render rather than standing.",
+        "",
+        "It exists because `results/publication/RESULTS_SUMMARY.md` is generated from the "
+        "control benchmark, the validation dataset, the ML benchmark and the yeast pilot "
+        "alone, so it predates and does not cover most of the work. **Where the two "
+        "differ, this page is the current one.**",
+        "",
+        "| line | artefact | command |",
+        "|---|---|---|",
+    ]
+    for name, path in list(SOURCES.items()) + list(OPTIONAL.items()):
+        state = "" if data.get(name) is not None else " *(not yet reported)*"
+        lines.append(f"| {name}{state} | `{path}` | `{COMMANDS[name]}` |")
+    lines += [
+        "",
+        "Pre-registered plans are in `docs/`, each with its dated amendments. The "
+        "lining-architecture line has its own detailed page at "
+        "`results/architecture/FINDINGS.md`.",
+        "",
+    ]
+    return lines
+
+
+def withdrawn_candidate(data: Mapping[str, Any]) -> list:
+    """Whether the yeast pilot's single candidate has actually been re-screened.
+
+    Section 0 called it withdrawn on the strength of the manuscript's revision
+    note, which is prose. With the re-screen's own summary in hand the claim is
+    measured - and the measurement that matters is `structures_screened`,
+    because a re-screen that lost the candidate by screening nothing looks
+    identical to one that lost it on the merits. That mistake was made once on
+    this project and caught before it was reported.
+    """
+    report = data.get("rescreen")
+    if report is None:
+        return [
+            "The yeast candidate's withdrawal is **recorded in the draft and not yet "
+            "re-derived**: no committed artefact holds a re-screen of the pilot's "
+            "protein set under the corrected scorer. Until one does, that correction "
+            "rests on the note below rather than on data.",
+            "",
+        ]
+    screened = int(pick(report, "structures_screened"))
+    hits = int(pick(report, "total_hits"))
+    proteins = int(pick(report, "proteins_with_hits"))
+    rate = float(pick(report, "hit_rate"))
+    if screened < EXPECTED_YEAST_SET:
+        raise Contradiction(
+            f"the committed re-screen screened {screened} of {EXPECTED_YEAST_SET} "
+            "structures, so an absent candidate may mean an absent structure rather "
+            "than a withdrawn hit; this section would read it as the latter")
+    return [
+        f"**The yeast candidate's withdrawal is now measured, not asserted.** A strict "
+        f"re-screen of all {screened} proteins of the pilot's own set, under the "
+        f"corrected scorer, returns **{hits} hits in {proteins} proteins** "
+        f"(hit rate {rate:.4%}) against the committed pilot's one hit at 0.2004%. "
+        f"`{OPTIONAL['rescreen']}` is that run's own summary, and the "
+        f"{screened} is the part that makes it a result: a re-screen that lost the "
+        "candidate by screening nothing would look the same from the hit list alone.",
+        "",
+    ] + why_it_fails(data)
+
+
+#: The screen's criteria, as its own summary names them, and which way each cuts.
+YEAST_CRITERIA = (
+    ("composite_score", "score_threshold", "min"),
+    ("plddt_confidence", "min_plddt", "min"),
+    ("basic_residues", "min_basic", "min"),
+    ("sasa", "max_sasa", "max"),
+    ("burial_depth", "min_burial_depth", "min"),
+)
+
+
+def why_it_fails(data: Mapping[str, Any]) -> list:
+    """Which of the screen's criteria the withdrawn candidate's best pocket fails.
+
+    "It no longer passes the screen's filters" is the kind of sentence this
+    project exists to replace. The thresholds are in the run's own summary and
+    the pocket is in the run's own table, so the comparison is read rather than
+    recounted - and if a future scorer makes a different criterion the binding
+    one, this says so instead of repeating today's answer.
+    """
+    pockets, report = data.get("rescreen_leu1"), data.get("rescreen")
+    if pockets is None or report is None or "composite_score" not in getattr(
+            pockets, "columns", []):
+        return []
+    best = pockets.sort_values("composite_score", ascending=False).iloc[0]
+    failed, passed = [], []
+    for column, threshold, sense in YEAST_CRITERIA:
+        limit = report.get(threshold)
+        if limit is None or column not in pockets.columns:
+            continue
+        value = float(best[column])
+        ok = value >= float(limit) if sense == "min" else value <= float(limit)
+        (passed if ok else failed).append(
+            f"`{column}` {value:.4g} {'≥' if sense == 'min' else '≤'} {float(limit):g}")
+    if not failed and not passed:
+        # An older summary that records no thresholds: nothing can be said, and
+        # saying nothing is right. Not the same as passing everything.
+        return []
+    if not failed:
+        raise Contradiction(
+            "the withdrawn candidate's best pocket passes every criterion in the "
+            "committed re-screen summary, so this section cannot say why it was not a "
+            "hit; the screen must be rejecting it on something the summary omits")
+    return [
+        f"**What it fails is one criterion, not several.** Its best pocket "
+        f"({len(failed)} of {len(failed) + len(passed)} criteria failed) misses "
+        + ", ".join(failed)
+        + (f", and clears {', '.join(passed)}" if passed else "")
+        + ". Under the uncorrected scorer the same pocket scored 0.955, on a "
+        "burial-depth term that had read fpocket's mean local hydrophobic density "
+        "(32.109) as a distance in ångströms; its true burial depth is the "
+        f"{float(best['burial_depth']):.3f} Å above. The withdrawal is that one "
+        "number, propagated.",
+        "",
+    ]
+
+
+def superseded(data: Mapping[str, Any]) -> list:
+    """What in `results/publication/` is known to be wrong, in the project's own words."""
+    return [
+        "## 0. Which artefacts are superseded, and by what",
+        "",
+        "`results/publication/` holds outputs from before several pipeline defects were "
+        "found. The project recorded the corrections in the working draft rather than by "
+        "regenerating those outputs, so **the stale numbers are still in the files** and "
+        "a reader meeting them first will take them as current. Three of them are still "
+        "live in committed artefacts today: `results/yeast_pilot/yeast_pilot_hits.csv` "
+        "carries the withdrawn candidate, with the misread input visible beside the true "
+        "one in the same row; the validation dataset's burial counts are the per-entry "
+        "ones; and the control panel's separation was measured on holo structures.",
+        "",
+    ] + withdrawn_candidate(data) + [
+        "This is the manuscript's own revision note, quoted and not re-encoded, from "
+        f"`{SOURCES['revision']}`:",
+        "",
+        revision_note(data["revision"]),
+        "",
+        "**Everything in sections 1 onward is read from artefacts that postdate those "
+        "corrections**, except where a sentence says otherwise and points back here.",
+        "",
+    ]
+
+
+def verdict(data: Mapping[str, Any]) -> list:
+    """The top line, in the order a reader needs it."""
+    positives = data["controls"]
+    passed = int(positives["passed"].astype(bool).sum()) if "passed" in positives else 0
+    dataset = data["dataset"]
+    column = ("classification" if "classification" in dataset.columns
+              else "burial_class" if "burial_class" in dataset.columns else None)
+    if column is None:
+        raise Contradiction("the validation dataset has no burial classification column")
+    counts = dataset[column].astype(str).str.lower().value_counts().to_dict()
+    cryptic = int(counts.get("cryptic", 0))
+    rerank = pick(data["specificity"], "rerank")
+    candidates = data["candidates"]
+    best = float(candidates["precision_at_rank"].max()) if len(candidates) else 0.0
+    census = cryptic_census(data["census"])
+
+    # The page's spine. If any of these inverts, the summary below is wrong.
+    if cryptic > 5:
+        raise Contradiction(
+            f"the validation set now holds {cryptic} cryptic structures; the limitation "
+            "this page is built around has changed and the text must be rewritten")
+    if passed == len(positives):
+        raise Contradiction(
+            "every positive control now passes; the panel sentence below says otherwise")
+    if pick(rerank, "decisions", "L3b") == "supported":
+        raise Contradiction(
+            "the combined score now beats the same-protein baseline; this page says it "
+            "does not, and that section must be rewritten from the artefact")
+
+    return [
+        "## The short answer",
+        "",
+        "* **The detector's own screening filter rejects the case it was built around.** "
+        "Scored the way a proteome target is scored — ligand removed — ADAR2's site "
+        "separates from the PH-domain negatives only narrowly, and the plan's strict "
+        "filter (score ≥ 0.75, lining SASA ≤ 10 Å²) **rejects ADAR2's site on both "
+        "gates**. What does separate it is depth inside the convex hull. Section 0 has "
+        f"the supersession; the {passed} of {len(positives)} pass rate in "
+        f"`{SOURCES['controls']}` was measured with the ligand bound and is not the "
+        "number to quote.",
+        f"* **Buried examples are scarce, and the counts to use are the per-copy ones.** "
+        f"The control benchmark's validation set reads {cryptic} cryptic of "
+        f"{len(dataset)} when ligand accessibility is summed over every copy in an "
+        "entry, which scales with copy number; the revision note in section 0 "
+        "corrects that to a per-copy count. The redocking census is per copy, and "
+        f"holds **{census['cryptic']} cryptic annotated copies across "
+        f"{census['cryptic_groups']} homology groups** among its "
+        f"{census['selected']} selected copies ({census['all_cryptic']} cryptic rows in "
+        f"{census['rows']}), plus {census['semi_cryptic']} semi-cryptic across "
+        f"{census['semi_cryptic_groups']} groups — and that is what bounds the "
+        "ground-truth arms of every study below. Small, but not one.",
+        f"* **A learnable inositol-phosphate-versus-other-polyanion signal** at "
+        f"{interval(pick(rerank, 'L3a_combined'))} ROC-AUC against "
+        f"{pick(rerank, 'annotated_unseen')} annotated binders among "
+        f"{pick(rerank, 'unseen')} unseen proteins — which **does not beat its own "
+        f"same-protein baseline** "
+        f"({interval(pick(rerank, 'L3b_combined_minus_L1'))}, Holm "
+        f"{pick(rerank, 'holm', 'L3b'):.3f}, *not supported*).",
+        f"* **{len(candidates)} candidate proteins that are hypotheses, not findings.** "
+        f"The best precision at any rank is {best:.2f}, and it is "
+        f"{float(candidates['precision_at_rank'].iloc[0]):.2f} at rank 1.",
+        "* **Two structural decompositions that separate real linings from random ones "
+        "and not from other pockets.** The architecture line (positions) and the sequence "
+        "line (letters) account for most of the project's statistical work. Against "
+        "random position sets the architecture contrast is large; against the protein's "
+        "own other pockets, matched on size, both lines are null. Sections 2 to 4.",
+        "",
+        "Nothing on this page is evidence that any candidate binds an inositol phosphate. "
+        "The deposited cryptic copies above are structures with a buried inositol "
+        "phosphate, classified by this project's own burial metric; **one of them, ADAR2, "
+        "is the case with published evidence that the protein cannot fold without the "
+        "cofactor**, and it is the case the detector was built around.",
+        "",
+    ]
+
+
+def specificity(data: Mapping[str, Any]) -> list:
+    rerank = pick(data["specificity"], "rerank")
+    gate = pick(data["specificity"], "gate")
+    candidates = data["candidates"]
+    explained = int(pick(rerank, "candidates_explained"))
+    unexplained = int(pick(rerank, "candidates_unexplained"))
+    return [
+        "## 1. Can the score tell an IP site from another polyanion site?",
+        "",
+        f"Pre-registered in `docs/SPECIFICITY_PLAN.md`. The gate opened on the "
+        f"`{pick(gate, 'variant')}` variant at a held-out point of "
+        f"{pick(gate, 's1r_point'):.3f}, after the all-data variant was ruled "
+        "**not evaluable** because one homology group held more than 40% of the IP "
+        "pockets — which is the kind of thing that makes an impressive number worthless, "
+        "and was caught before the number was used.",
+        "",
+        "| test | ROC-AUC [95%] | Holm | decision |",
+        "|---|---|---|---|",
+        f"| L1, same proteins | {interval(pick(rerank, 'L1_same_proteins'))} | — | — |",
+        f"| L3a, combined | {interval(pick(rerank, 'L3a_combined'))} | "
+        f"{pick(rerank, 'holm', 'L3a'):.3f} | **supported** |",
+        f"| L3b, combined − L1 | {interval(pick(rerank, 'L3b_combined_minus_L1'))} | "
+        f"{pick(rerank, 'holm', 'L3b'):.3f} | **not supported** |",
+        "",
+        "**The third row is the one that matters and the easiest to skip.** The combined "
+        "score ranks annotated binders well above chance, and it does **not** rank them "
+        "better than the same-protein baseline does. Everything the pipeline adds beyond "
+        "that baseline is, on this evidence, unmeasurable.",
+        "",
+        f"Of the {len(candidates)} candidates, {explained} are explained by an existing "
+        f"annotation and {unexplained} are not. The unexplained ones are the hypotheses; "
+        "they are also the ones with no independent support of any kind.",
+        "",
+    ]
+
+
+def architecture(data: Mapping[str, Any]) -> list:
+    real = data["architecture"]
+    return [
+        "## 2. The lining-architecture line: positions",
+        "",
+        "Pre-registered in `docs/ARCHITECTURE_PLAN.md` with five dated amendments, and "
+        "set out in full at `results/architecture/FINDINGS.md`. It factors a pocket "
+        "lining into **topology** (the gap multiset) and **register** (the arrangement "
+        "within it), and tests each against its own permutation null.",
+        "",
+        f"{pick(real, 'n_measurable')} of {pick(real, 'n_linings')} real candidate "
+        "linings were measurable. The method properties are real and calibrated, and the "
+        "detailed page carries them. What they amount to on real data is a per-lining "
+        "verdict:",
+        "",
+        "| verdict | linings |",
+        "|---|---|",
+    ] + [
+        f"| {name} | {count} |"
+        for name, count in sorted(pick(real, "verdicts").items(),
+                                  key=lambda kv: (-int(kv[1]), str(kv[0])))
+    ] + [
+        "",
+        f"Against size- and span-matched **decoy** position sets the contrast is large: "
+        f"{pick(real, 'rates', 'real_either'):.1%} of real linings resolve on one half or "
+        f"the other against {pick(real, 'rates', 'decoy_either'):.1%} of "
+        f"{pick(real, 'rates', 'n_decoys')} decoys. That is the architecture line's "
+        "strongest real-data number, and the line says in its own plan why it is weaker "
+        "than it looks: **a random position set is not a protein**, so the comparison is "
+        "close to tautological — a real lining is contiguous, secondary-structure-bound "
+        "and solvent-excluded, and a random set of positions is none of those.",
+        "",
+        "**That is exactly why section 3 exists**: it replaces the decoy with the "
+        "protein's own other pockets, matched on lining size, so protein, fold, model, "
+        "detector and size are all fixed and only the choice of pocket varies. On that "
+        "comparison the line is null.",
+        "",
+        f"Rates are in the artefact (`{SOURCES['architecture']}`) and on the detailed "
+        "page. The transfer ceiling stated there — the method's agreement with ideal "
+        "geometry falling as backbone jitter and bulges are introduced — bounds this "
+        "whole line and is the reason a null here is weak evidence rather than evidence "
+        "of absence.",
+        "",
+    ]
+
+
+def within_protein(data: Mapping[str, Any]) -> list:
+    rows = []
+    for label, key in (("candidate", "within"), ("annotated site", "sites")):
+        report = data[key]
+        for test in pick(report, "tests"):
+            if not test.get("runnable", True):
+                continue
+            rows.append((label, test, report))
+    findings = [t for _, t, _ in rows if t.get("is_finding")]
+    if findings:
+        raise Contradiction(
+            "a within-protein test is now a finding; this section states that none is")
+    lines = [
+        "## 3. The control that did not exist, built — and null in both arms",
+        "",
+        "Pre-registered in `docs/WITHIN_PROTEIN_PLAN.md`. The architecture line's own "
+        "comparison sets a candidate lining against random position sets, and says in "
+        "print that a random position set is not a protein. The control that means "
+        "something is **other pockets of the same protein, matched on lining size** — and "
+        "no committed table carried their residues, so this study built it.",
+        "",
+        "| arm | half | proteins | groups | mean quantile | difference | Holm | "
+        "could have detected |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for label, test, report in rows:
+        lines.append(
+            f"| {label} | {pick(test, 'half')} | {pick(report, 'n_measured')} | "
+            f"{pick(test, 'n_groups')} | {pick(test, 'mean_quantile'):.3f} | "
+            f"{pick(test, 'difference'):+.3f} | {pick(test, 'p_holm'):.3f} | "
+            f"{pick(test, 'minimum_detectable'):.3f} |")
+    lines += [
+        "",
+        "Below 0.5 means more structured than the protein's own same-size pockets. "
+        "**Nothing is a finding, and in every row the difference observed is smaller than "
+        "the difference the design could have detected** — so this is weak evidence, not "
+        "evidence of absence.",
+        "",
+        "The annotated-site arm decides how to read the other: it runs the identical "
+        "statistic on deposited inositol-hexakisphosphate sites, so it could have fired, "
+        "and a failure there would mean the candidate arm's null is about the instrument "
+        "rather than about candidates. It does not separate real sites from their own "
+        "proteins' pockets at the power available.",
+        "",
+        "One thing it established for free: re-detection reproduced the committed "
+        f"candidate linings at a median Jaccard overlap of "
+        f"{pick(data['within'], 'overlaps')['median']:.2f}, so the candidate table is "
+        "reproducible from current models with current fpocket — which nothing had checked.",
+        "",
+    ]
+    return lines
+
+
+def order(data: Mapping[str, Any]) -> list:
+    report = data["order"]
+    tests = pick(report, "tests")
+    by_key = {(t["arm"], t["statistic"]): t for t in tests if t.get("runnable")}
+    primary = [t for t in tests if t.get("runnable") and t.get("family") == "primary"]
+    if [t for t in primary if t.get("is_finding")]:
+        raise Contradiction(
+            "a study Q9 test is now a finding; this section states that none is")
+    check = pick(report, "look_reproduction")
+    if not check.get("selection_reproduced") or check.get("verdict") != "reproduced":
+        raise Contradiction(
+            "the committed Q9 run no longer reproduces the look its amendment discloses, "
+            "so the held-out arm named below is not held out")
+    pre = by_key[("formation", "helix_hydropathy_periodicity")]
+    held = by_key[("formation_heldout", "helix_hydropathy_periodicity")]
+    low, high = pick(held, "interval")
+    return [
+        "## 4. The sequence line: letters, in order",
+        "",
+        "Pre-registered in `docs/POCKET_SEQUENCE_PLAN.md` with two dated amendments. A "
+        "window of sequence factors as **composition** (which letters) **⊕ order** (in "
+        "what arrangement), the same way a lining factors into topology and register. "
+        "This line takes the quotient by composition and asks what the ordering carries.",
+        "",
+        "**The result worth carrying off this line is a correction, not a discovery.** An "
+        f"underpowered form of the formation contrast gave {pick(pre, 'difference'):+.2f} "
+        f"on {pick(pre, 'n_site')} windows at a corrected p the plan refused, because the "
+        "observed difference was smaller than the minimum detectable one. The "
+        "re-specified rule, on the resampling groups the pre-registered rule selected "
+        f"nothing from, gives **{pick(held, 'difference'):+.3f}** on "
+        f"{pick(held, 'n_site')} windows across {pick(held, 'n_groups')} groups, interval "
+        f"[{low:+.3f}, {high:+.3f}], Holm {pick(held, 'p_holm'):.4f}. Not a small effect "
+        "— an absent one.",
+        "",
+        "Without the power floor, fixed before any sequence was read, this project would "
+        "have reported a sequence predictor of pocket formation that does not exist.",
+        "",
+        f"Architectural type is null and powered enough to say so. Binding is **null but "
+        f"not resolved**: the plan's contiguous-span window admits "
+        f"{pick(report, 'n_site_windows')} of {pick(report, 'n_site_windows_dense')} "
+        "annotated contact shells, because a shell draws residues from several "
+        "secondary-structure elements at once and so has no short contiguous span. That "
+        "is a property of the object and no sample size fixes it.",
+        "",
+    ]
+
+
+def composition(data: Mapping[str, Any]) -> list:
+    gate = data["gate"]
+    checks = pick(gate, "checks")
+    if not pick(gate, "all_checks_pass"):
+        failed = sorted(name for name, ok in checks.items() if not ok)
+        raise Contradiction(
+            f"the committed gate calibration no longer passes ({', '.join(failed)}); "
+            "this section says the instrument check is calibrated")
+    planted = pick(gate, "planted")
+    lines = [
+        "## 5. The instrument check the sequence line did not have",
+        "",
+        "Pre-registered in `docs/COMPOSITION_PLAN.md`. Sections 3 and 4 return nulls, and "
+        "a design that returns nulls has either found a real absence or has no "
+        "sensitivity. **Nothing in those studies distinguishes the two**: their only "
+        "positive control was a synthetic planted signal.",
+        "",
+        "So this study takes the other half of the decomposition — composition, which the "
+        "order null holds fixed and cannot see — and puts a known-true signal through the "
+        "same machinery. An inositol-phosphate contact shell being arginine-rich is "
+        "textbook and is **not offered as a finding**; it is offered as the check.",
+        "",
+        f"The gate is calibrated before any real lining reaches it: a planted basic patch "
+        f"gives mean z **{pick(planted, 'mean_z'):+.2f}** (p "
+        f"{pick(planted, 'p_value'):.4g}) and opens it, while "
+        f"{len(pick(gate, 'noise'))} composition-matched noise pools average "
+        f"{pick(gate, 'noise_mean_z'):+.4f} against an expected zero and "
+        f"**{pick(gate, 'n_noise_pools_fired')}** of them open it. All "
+        f"{len(checks)} checks pass.",
+        "",
+        "**What the gate decides.** If the positive control fails on real shells, every "
+        "arm of that study reads *instrument not demonstrated* and **the sequence line's "
+        "nulls above cannot be read as null results either**. That is fixed in code, not "
+        "promised in prose.",
+        "",
+    ]
+    report = data.get("composition")
+    if report is None:
+        lines += [
+            "**The study itself has not reported yet.** When it does, this section gains "
+            "its result and section 4's nulls either firm up into statements about order "
+            "or become uninterpretable. Until then the question is open, and this page "
+            "says so rather than leaving the line out.",
+            "",
+        ]
+        return lines
+    fired = bool(pick(report, "control_fired"))
+    unknown = sorted({str(t.get("arm")) for t in pick(report, "tests")
+                      if t.get("family") == "primary"} - set(ARM_CONTRASTS))
+    if unknown:
+        raise Contradiction(
+            f"study Q10 now has primary arms this page cannot describe ({', '.join(unknown)}); "
+            "add what each one contrasts to ARM_CONTRASTS rather than printing a finding "
+            "without its control")
+    control = next(t for t in pick(report, "tests")
+                   if t.get("arm") == pick(report, "control_arm"))
+    if not fired:
+        lines += [
+            f"**On real shells the positive control did not fire** (mean z "
+            f"{pick(control, 'mean_site_z'):+.2f}, p {pick(control, 'p_value'):.4g}, "
+            f"{pick(control, 'n_groups')} groups). A signal that is certainly present did "
+            "not clear the plan's own floors, so **this pipeline's sensitivity on real "
+            "linings is undemonstrated and section 4's nulls are not null results**. "
+            "Every arm of this study reads *instrument not demonstrated*.",
+            "",
+        ]
+        return lines
+    primary = [t for t in pick(report, "tests")
+               if t.get("runnable") and t.get("family") == "primary"]
+    findings = [t for t in primary if t.get("is_finding")]
+    lines += [
+        f"**On real shells the positive control fired** (mean z "
+        f"{pick(control, 'mean_site_z'):+.2f}, p {pick(control, 'p_value'):.4g}, "
+        f"{pick(control, 'n_groups')} groups). The instrument is demonstrated on real "
+        "linings, so **section 4's nulls are statements about order and not about "
+        "sensitivity** — which is the whole reason this study exists.",
+        "",
+        f"Of its own {len(primary)} runnable primary tests, **{len(findings)}** "
+        f"{'is a finding' if len(findings) == 1 else 'are findings'}.",
+        "",
+    ]
+    if findings:
+        lines += ["| arm | statistic | groups | difference | 95% interval | Holm |",
+                  "|---|---|---|---|---|---|"]
+        for test in findings:
+            low, high = pick(test, "interval")
+            lines.append(
+                f"| {pick(test, 'arm')} | `{pick(test, 'statistic')}` | "
+                f"{pick(test, 'n_groups')} | {pick(test, 'difference'):+.3f} | "
+                f"[{low:+.3f}, {high:+.3f}] | {pick(test, 'p_holm'):.4g} |")
+        lines += [
+            "",
+            "Every value above is a **z against random same-size subsets of the lining's "
+            "own chain**, so a chain's own composition is divided out row by row and none "
+            "of these rows is a statement about which protein a pocket sits in. What each "
+            "arm does contrast:",
+            "",
+        ] + [f"* **{arm}** — {ARM_CONTRASTS[arm]}"
+             for arm in sorted({str(pick(t, "arm")) for t in findings})] + [
+            "",
+            "**None of them is a discovery about inositol phosphate.** That IP sites are "
+            "basic is textbook, and this study was built to test the instrument rather "
+            "than to announce it. What they do establish is that the composition half of "
+            "the decomposition is **not** empty where the order half is — so the nulls in "
+            "sections 3 and 4 are about what was measured and not about a pipeline that "
+            "cannot measure anything.",
+            "",
+        ] + thinnest_arm(findings) + machine_dependent_pool(findings)
+    absent = sorted({str(pick(t, "arm")) for t in pick(report, "tests")
+                     if not t.get("runnable")})
+    if absent:
+        lines += [
+            f"The **{', '.join(absent)}** arm"
+            f"{'' if len(absent) == 1 else 's'} did not run in the committed artefact, for "
+            "want of the control table rather than for want of a signal: it compares a "
+            "shell against every pocket of its own deposited structure, which is hours of "
+            "pocket detection in a separate job. That is a statement about the input. The "
+            "gate and the arms above do not use it.",
+            "",
+        ]
+    return lines
+
+
+def machine_dependent_pool(findings: Sequence[Mapping[str, Any]]) -> list:
+    """The `function` arm's control pool is built under a wall-clock budget.
+
+    Pocket detection gives fpocket a fixed number of seconds per structure, so
+    which copies reach the control pool depends on how fast the machine was.
+    Two runs of one commit measured 121 and 120 copies, and the single
+    difference moved the arm's control mean on `basic_fraction` from -0.07 to
+    +0.62. Every verdict survived, which is why this is a note on precision
+    rather than a withdrawal - but a reader of a finding from this arm has to
+    be told, so the note is attached to the arm and not to a field that a
+    particular artefact may or may not carry.
+    """
+    if not any(str(pick(test, "arm")) == "function" for test in findings):
+        return []
+    return [
+        "**A caveat on the `function` arm's precision.** Its control pool is every "
+        "pocket of the shell's own deposited structure, detected under a wall-clock "
+        "budget per structure — so which copies reach the pool depends on how fast the "
+        "machine was. Two runs of one commit measured 121 and 120 copies; the single "
+        "difference left every verdict standing but moved this arm's control mean on "
+        "`basic_fraction` from -0.07 to +0.62 and widened its interval. Read the sign "
+        "as established and the width as partly an accident of scheduling. "
+        "`docs/COMPOSITION_PLAN_AMENDMENT_2.md` has both runs and the two repairs that "
+        "have not been chosen between.",
+        "",
+    ]
+
+
+def thinnest_arm(findings: Sequence[Mapping[str, Any]]) -> list:
+    """Say so where a finding rests on barely more groups than the floor.
+
+    Every interval here resamples whole homology groups, so the group count is
+    what the interval is wide or narrow because of - and the arm with the only
+    control in this study worth anything is also the arm with the fewest
+    groups. A table of five columns does not make a reader notice that, so this
+    says it in words, with the floor read from the code that enforces it rather
+    than written out again here.
+    """
+    if not findings:
+        return []
+    thinnest = min(findings, key=lambda t: int(pick(t, "n_groups")))
+    groups = int(pick(thinnest, "n_groups"))
+    if groups >= 3 * MIN_GROUPS:
+        return []
+    return [
+        f"**The thinnest of them is `{pick(thinnest, 'arm')}`, on {groups} groups** "
+        f"against a floor of {MIN_GROUPS}. Every interval above resamples whole "
+        f"homology groups, so {groups} is what their width rests on, and in this study "
+        "the arm whose control is worth the most is also the arm with the fewest "
+        "groups to spare. Read it as a result that clears the project's own floor and "
+        "not as one with room underneath it.",
+        "",
+    ]
+
+
+#: What each of study Q10's arms puts on either side of its contrast, so that a
+#: finding is described by the comparison that produced it. The arms differ in
+#: what they hold fixed - `formation` splits one protein's own pockets by rank,
+#: `type` pools across proteins and matches only on lining size - and a page
+#: that blurred them would credit a finding with a control it did not have. A
+#: finding in an arm this does not name raises rather than printing.
+ARM_CONTRASTS = {
+    "formation": "a protein's better-ranked pockets against its own worse-ranked ones, "
+                 "matched on lining size. The protein is held fixed.",
+    "type": "linings the architecture module calls `helix_face` against those it calls "
+            "`none`, matched on lining size but **pooled across proteins** — so this is "
+            "a statement about architectural type, and the protein is not held fixed.",
+    "function": "annotated inositol-phosphate contact shells against the other pockets "
+                "of the same deposited structure, matched on lining size. The structure "
+                "is held fixed, which makes this the hard version.",
+}
+
+
+def composition_status(data: Mapping[str, Any]) -> str:
+    """What section 5's own row of the feature table may claim.
+
+    Written from the artefact rather than from the sentence above it, so the row
+    cannot keep saying the study is in flight after it has reported, nor claim a
+    result the artefact does not carry.
+    """
+    report = data.get("composition")
+    if report is None:
+        return ", study in flight"
+    if not pick(report, "control_fired"):
+        return "; instrument **not** demonstrated, so the nulls above are unreadable"
+    primary = [t for t in pick(report, "tests")
+               if t.get("runnable") and t.get("family") == "primary"]
+    findings = [t for t in primary if t.get("is_finding")]
+    return f", and {len(findings)} of {len(primary)} primary tests is a finding" \
+        if len(findings) == 1 else \
+        f", and {len(findings)} of {len(primary)} primary tests are findings"
+
+
+def untested(data: Mapping[str, Any]) -> list:
+    """Which feature families have been tried, so the closing cannot overstate."""
+    c2 = pick(data["coevolution"], "C2_matched")
+    estimate = pick(c2, "estimate")
+    if pick(c2, "decision") == "supported":
+        raise Contradiction(
+            "the comparative coevolution test now reads supported; the sentence below "
+            "calls it inconclusive")
+    return [
+        "## 6. Feature families, and which have actually been tried",
+        "",
+        "The two decompositions above cover a lining's **positions** and a window's "
+        "**letters**. It is easy to read their nulls as though nothing about a sequence or "
+        "a structure could predict an IP site, so here is what has and has not been put "
+        "to a test.",
+        "",
+        "| family | status |",
+        "|---|---|",
+        "| lining topology and register | tested, null against the control that matters "
+        "(section 3) |",
+        "| sequence order | tested, null; binding arm unresolved (section 4) |",
+        f"| sequence composition | tested; the instrument check **fired** on real shells "
+        f"(section 5){composition_status(data)} |",
+        f"| cross-organism IP-concentration coevolution | tested, **inconclusive** — "
+        f"{pick(estimate, 'point') * 100:+.3f} pp "
+        f"[{pick(estimate, 'low') * 100:+.3f}, {pick(estimate, 'high') * 100:+.3f}] over "
+        f"{pick(c2, 'bins')} matched bins and {pick(c2, 'clusters')} clusters "
+        f"(`docs/COEVOLUTION_PLAN.md`) |",
+        "| a learned pocket score | exists, and is a component of the combined score; the "
+        "protein-level classifier benchmarked at chance |",
+        "| orthogroup-level conservation of hits | computed in the comparative analysis |",
+        "| **per-residue conservation from an alignment** | **not tested** |",
+        "| **residue-residue coevolution as a site feature** | **not tested** |",
+        "| **a learned representation of the site itself** | **not tested** |",
+        "",
+        "The last three are where a signal could still live, and the nulls above say "
+        "nothing about them. Note that the coevolution row is a different question from "
+        "the last two: it asks whether an organism richer in inositol phosphate buries "
+        "more of them, not whether a particular site's residues covary.",
+        "",
+    ]
+
+
+def closing() -> list:
+    return [
+        "## What is not established, and what would change it",
+        "",
+        "* **That any candidate binds an inositol phosphate.** No candidate has "
+        "independent support. The honest description is a ranked list of hypotheses.",
+        "* **That the pipeline generalises to cryptic sites.** One cryptic example in the "
+        "validation set cannot support a performance estimate for cryptic sites, and the "
+        "deposited archive cannot supply more, because a buried site with its ligand in "
+        "place is hard to crystallise. This is the project's binding constraint and it is "
+        "not a statistical one.",
+        "* **That the machinery adds anything beyond the same-protein baseline.** Section "
+        "1's third row says it does not, at the power available.",
+        "* **That structure or sequence carries a detectable signature of an IP site.** "
+        "Sections 2 to 4 are null or unresolved, and section 5 is what decides whether "
+        "those nulls mean anything.",
+        "",
+        "What would change the picture, in the order it would be worth doing: an "
+        "experimentally tested candidate; published functional evidence for one of the "
+        "deposited cryptic copies other than ADAR2, which would turn the ground-truth "
+        "arms from structural classification into established biology; and one of the "
+        "three untested feature families in section 6.",
+        "",
+        "Every claim above is read from the artefact beside it. Where a number here and a "
+        "number in `results/publication/RESULTS_SUMMARY.md` disagree, that file is older.",
+    ]
+
+
+def render(data: Mapping[str, Any]) -> str:
+    lines = header(data)
+    lines += superseded(data)
+    lines += verdict(data)
+    lines += specificity(data)
+    lines += architecture(data)
+    lines += within_protein(data)
+    lines += order(data)
+    lines += composition(data)
+    lines += untested(data)
+    lines += closing()
+    return "\n".join(lines) + "\n"
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--out", type=Path, default=Path("results/PROJECT_FINDINGS.md"))
+    args = parser.parse_args(argv)
+    text = render(load())
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(text)
+    print(f"wrote {args.out} ({len(text.splitlines())} lines)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

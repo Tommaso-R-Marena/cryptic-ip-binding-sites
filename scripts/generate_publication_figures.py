@@ -262,7 +262,13 @@ def plot_pipeline_schematic(ax: plt.Axes) -> None:
 
 def _auc(fpr: np.ndarray, tpr: np.ndarray) -> float:
     order = np.argsort(fpr)
-    return float(np.trapz(np.asarray(tpr)[order], np.asarray(fpr)[order]))
+    y, x = np.asarray(tpr)[order], np.asarray(fpr)[order]
+    # np.trapz was removed from the NumPy namespace after 2.2; np.trapezoid is the
+    # replacement and exists from 2.0. Same guard as
+    # cryptic_ip.analysis.statistical_validation._trapz.
+    if hasattr(np, "trapezoid"):
+        return float(np.trapezoid(y, x))
+    return float(np.trapz(y, x))
 
 
 def make_figure1(config: Dict, output_dir: Path) -> None:

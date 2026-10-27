@@ -91,7 +91,14 @@ def main(argv: Optional[List[str]] = None) -> int:
             concurrency=args.concurrency or 8,
         )
     else:
-        results = fetch_alphafold_models(ids, args.out, fmt=args.format, concurrency=args.concurrency or 16)
+        # Four, not sixteen. The AlphaFold endpoint rate-limits: a 499-accession
+        # re-screen at sixteen took 429 on 299 of them, each exhausting six
+        # retries against a server already throttling, so the step failed with
+        # 200 of 499 downloaded. The retry logic in `async_fetch` is not the
+        # problem - it honours Retry-After and jitters its backoff - the request
+        # rate is. Raise it with --concurrency for a private mirror.
+        results = fetch_alphafold_models(
+            ids, args.out, fmt=args.format, concurrency=args.concurrency or 4)
 
     summary = write_manifest(results.values(), manifest)
     print(json.dumps({"source": args.source, **summary, "manifest": str(manifest)}))

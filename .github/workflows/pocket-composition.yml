@@ -1,0 +1,400 @@
+name: Composition and pockets
+
+# docs/COMPOSITION_PLAN.md (study Q10).
+#
+# Study Q9 took the quotient by composition and asked whether order carries
+# anything about a pocket. This takes the other quotient - not because a
+# compositional difference would be a discovery, since an inositol-phosphate
+# contact shell being arginine-rich is textbook, but because Q9's nulls have no
+# real-data positive control. Nothing in Q9 distinguishes "no ordering signal"
+# from "no sensitivity", and this study puts a known-true signal through the
+# same machinery to find out which it was.
+#
+# Four jobs, and the first one gates the other three:
+#
+#   validate    does the gate open on a planted basic patch and stay shut on
+#               matched noise? Synthetic, no network, about a second - and it
+#               runs FIRST so a miscalibrated instrument costs no fpocket time.
+#   candidates  every pocket of the 75 candidate models, their chain sequences,
+#               and each pocket's architecture class. Needs fpocket.
+#   shells      the annotated inositol-phosphate copies' contact shells and
+#               their chains' sequences. Needs the network, not fpocket, and
+#               takes under a minute.
+#   deposited   every pocket of those same deposited structures, which is what
+#               the function arm compares a shell against. Needs fpocket and
+#               about four hours, so its table is cached on what it is a
+#               function of and the step resumes from a killed attempt.
+#   analyse     every arm. Pure, and seconds, because the subset null is
+#               multivariate hypergeometric in the chain's letter counts and
+#               caches per (chain, size).
+
+on:
+  push:
+    # An analysis, not a test: on main it runs on demand only.
+    branches-ignore:
+      - main
+    paths:
+      - 'docs/COMPOSITION_PLAN.md'
+      - 'scripts/pocket_composition.py'
+      - 'scripts/pocket_sequence.py'
+      - 'scripts/within_protein.py'
+      - 'cryptic_ip/detect/composition.py'
+      - '.github/workflows/pocket-composition.yml'
+  workflow_dispatch:
+    inputs:
+      draws:
+        description: 'subset draws per lining for the composition null'
+        default: '2000'
+      bootstrap:
+        description: 'group bootstrap resamples'
+        default: '2000'
+      limit:
+        description: 'at most this many proteins or copies (0 = all)'
+        default: '0'
+      class_draws:
+        description: 'permutation draws per architecture null in the class step'
+        default: '800'
+
+concurrency:
+  group: pocket-composition-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # The structure cache's key, in one place: two jobs restore it and the pocket
+  # table's own key is a function of it, because a table that recorded "structure
+  # not downloaded" must not outlive the download set that caused it.
+  RCSB_CACHE_KEY: within-protein-rcsb-v1
+  DRAWS: ${{ inputs.draws || '2000' }}
+  BOOTSTRAP: ${{ inputs.bootstrap || '2000' }}
+  LIMIT: ${{ inputs.limit || '0' }}
+  CLASS_DRAWS: ${{ inputs.class_draws || '800' }}
+
+jobs:
+  validate:
+    name: Is the gate calibrated
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Does the gate open on a planted signal and shut on matched noise
+        # A non-zero exit here means a check failed, and that is a reason to
+        # stop rather than a warning: the gate decides how every other row of
+        # this study and every null of study Q9 may be read.
+        run: |
+          python scripts/pocket_composition.py validate \
+            --out validation.json --markdown VALIDATION.md
+      - name: Print the validation
+        run: |
+          python scripts/extract_log_block.py emit Q10_VALIDATION_MD_B64 VALIDATION.md
+          python scripts/extract_log_block.py emit Q10_VALIDATION_JSON_B64 validation.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pocket-composition-validation
+          path: |
+            validation.json
+            VALIDATION.md
+          retention-days: 90
+
+  candidates:
+    name: Every pocket of the candidate proteins
+    needs: [validate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda,defaults
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge fpocket freesasa pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Cache the AlphaFold models
+        uses: actions/cache@v5
+        with:
+          path: structures/alphafold
+          key: within-protein-models-v1
+      - name: Re-detect every pocket
+        shell: bash -l {0}
+        run: |
+          python scripts/within_protein.py pockets \
+            --table results/specificity/candidates.csv \
+            --cache-dir structures/alphafold \
+            --limit "$LIMIT" \
+            --out pockets.csv --report pockets_report.json
+      - name: Read the sequences out of the same files
+        shell: bash -l {0}
+        run: |
+          python scripts/pocket_sequence.py sequences \
+            --structures structures/alphafold --out sequences.csv
+      - name: Classify each pocket's architecture from its positions
+        shell: bash -l {0}
+        run: |
+          python scripts/pocket_sequence.py classes \
+            --sequences sequences.csv --pockets pockets.csv \
+            --draws "$CLASS_DRAWS" --out classes.csv
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pocket-composition-candidates
+          path: |
+            pockets.csv
+            sequences.csv
+            classes.csv
+            pockets_report.json
+          retention-days: 90
+
+  shells:
+    name: Annotated contact shells, and the sequences they sit in
+    needs: [validate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # No fpocket, and that is the point. The gate and the formation and type
+    # arms need a shell's residues and its chain's sequence and nothing else,
+    # so they must not wait on - or be lost with - the hours of pocket
+    # detection that only the function arm requires. The first run of this
+    # workflow put both in one job and spent four hours in fpocket without
+    # reaching the one number the study exists to read.
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Cache the deposited structures
+        uses: actions/cache@v5
+        with:
+          path: structures/rcsb
+          key: ${{ env.RCSB_CACHE_KEY }}
+      - name: List the entries this arm needs
+        # The within-protein study's census filter, called rather than copied,
+        # so the three studies cannot drift apart about which copies count.
+        run: |
+          python - <<'PY'
+          import importlib.util, sys
+          import pandas as pd
+          spec = importlib.util.spec_from_file_location("wp", "scripts/within_protein.py")
+          wp = importlib.util.module_from_spec(spec)
+          sys.modules["wp"] = wp
+          spec.loader.exec_module(wp)
+          copies = wp.select_copies(pd.read_csv("results/redocking/census.csv"))
+          ids = sorted(set(copies["pdb_id"].astype(str)))
+          pd.DataFrame({"pdb_id": ids}).to_csv("entries.csv", index=False)
+          print(f"{len(copies)} copies across {len(ids)} entries")
+          PY
+      - name: Download them
+        run: |
+          python scripts/fetch_structures.py rcsb \
+            --out structures/rcsb --prefer pdb \
+            --ids-csv entries.csv --column pdb_id
+      - name: The contact shells
+        run: |
+          python scripts/pocket_sequence.py sites \
+            --census results/redocking/census.csv \
+            --structures structures/rcsb \
+            --limit "$LIMIT" \
+            --out sites.csv --report sites_report.json
+      - name: And the sequences of the same files
+        run: |
+          python scripts/pocket_sequence.py sequences \
+            --structures structures/rcsb --out site_sequences.csv
+      - name: Print the summary
+        run: |
+          python scripts/extract_log_block.py emit Q10_SITES_REPORT_JSON sites_report.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pocket-composition-shells
+          path: |
+            sites.csv
+            site_sequences.csv
+            sites_report.json
+          retention-days: 90
+
+  deposited_pockets:
+    name: Every pocket of the deposited structures (the function arm only)
+    needs: [validate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    # The expensive arm, on its own, and allowed to fail without taking the
+    # study with it: `analyse` runs whether or not this job succeeds, and
+    # treats a missing table as "the function arm did not run" rather than as
+    # an error. fpocket over every deposited structure in the census takes
+    # about four hours and a quarter, which is close enough to any budget that
+    # the table is cached and the step resumable: the first run pays the four
+    # hours, every later run reads the table back in seconds, and a run killed
+    # at its budget leaves what it measured for the next one to carry on from.
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v4
+        with:
+          run-post: 'false'
+          auto-update-conda: true
+          python-version: '3.11'
+          channels: conda-forge,bioconda,defaults
+      - name: Install dependencies
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge fpocket freesasa pip
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - name: Cache the deposited structures
+        uses: actions/cache@v5
+        with:
+          path: structures/rcsb
+          key: ${{ env.RCSB_CACHE_KEY }}
+      - name: What this table is a function of
+        id: key
+        shell: bash -l {0}
+        # Everything the table depends on and nothing else: the census it reads,
+        # the detector, the script, the pocket binary's own build, and the copy
+        # limit. A key that left any of them out would serve a stale table; one
+        # that included more would throw four hours away for nothing.
+        run: |
+          digest="$( { cat results/redocking/census.csv \
+                           scripts/within_protein.py \
+                           cryptic_ip/detect/*.py
+                       fpocket -h 2>&1 | head -n 5
+                       echo "$LIMIT $RCSB_CACHE_KEY"; } | sha256sum | cut -c1-16 )"
+          echo "value=deposited-pockets-v1-${digest}" >> "$GITHUB_OUTPUT"
+      - name: Whatever an earlier attempt already measured
+        uses: actions/cache/restore@v5
+        with:
+          path: cache/deposited
+          key: ${{ steps.key.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ${{ steps.key.outputs.value }}-
+      - name: Every pocket of the same structures
+        shell: bash -l {0}
+        run: |
+          mkdir -p cache/deposited
+          python scripts/within_protein.py sites \
+            --census results/redocking/census.csv \
+            --structures structures/rcsb \
+            --limit "$LIMIT" --resume \
+            --out cache/deposited/site_pockets.csv \
+            --sites cache/deposited/deposited_sites.csv \
+            --report cache/deposited/sites_report.json \
+            --summary cache/deposited/sites_summary.json
+      - name: Keep it, finished or not
+        # `actions/cache` saves in a post step that runs only when the job
+        # succeeded, so a job killed at its budget would persist nothing. The
+        # whole point here is to keep a partial table, so the save is explicit.
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: cache/deposited
+          key: ${{ steps.key.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Print the summary
+        # The summary is rewritten after every copy, so it exists as soon as one
+        # has been measured - but a job that fell over before the first one has
+        # nothing to print, and that is not a second failure to report.
+        if: always()
+        shell: bash -l {0}
+        run: |
+          if [ -f cache/deposited/sites_summary.json ]; then
+            python scripts/extract_log_block.py emit \
+              Q10_SITE_POCKETS_SUMMARY_JSON cache/deposited/sites_summary.json
+          else
+            echo "no copy was measured, so there is no summary to print"
+          fi
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pocket-composition-deposited-pockets
+          path: |
+            cache/deposited/site_pockets.csv
+            cache/deposited/deposited_sites.csv
+            cache/deposited/sites_summary.json
+          retention-days: 90
+
+  analyse:
+    name: The gate, then formation, type and function
+    # `deposited_pockets` is listed so that its table is here when it finishes,
+    # and the condition is what keeps this job from dying with it: `analyse`
+    # runs whether that job succeeded, failed or was killed at its budget, and
+    # only a failure of the two jobs it actually reads stops it.
+    #
+    # Leaving it out of `needs` instead - the first attempt at this - gets the
+    # cheap arms quickly and then loses the function arm every single time,
+    # which is what happened: run 40250237023 finished `analyse` at 01:09 and
+    # the pocket table it needed was uploaded at 05:00, four hours later, to no
+    # one. Waiting is the honest cost of one complete artefact, and with the
+    # table cached it is paid once rather than once per run.
+    needs: [candidates, shells, deposited_pockets]
+    if: ${{ !cancelled() && needs.candidates.result == 'success' && needs.shells.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+          python -m pip install -e .
+      - uses: actions/download-artifact@v7
+        with:
+          name: pocket-composition-candidates
+          path: parts
+      - uses: actions/download-artifact@v7
+        with:
+          name: pocket-composition-shells
+          path: parts
+      - name: The deposited-structure pockets, if that job produced any
+        uses: actions/download-artifact@v7
+        continue-on-error: true
+        with:
+          name: pocket-composition-deposited-pockets
+          path: parts
+      - name: Run study Q10
+        run: |
+          python scripts/pocket_composition.py analyse \
+            --sequences parts/sequences.csv parts/site_sequences.csv \
+            --pockets parts/pockets.csv \
+            --classes parts/classes.csv \
+            --sites parts/sites.csv \
+            --site-pockets parts/site_pockets.csv \
+            --draws "$DRAWS" --bootstrap "$BOOTSTRAP" \
+            --out composition.json --markdown COMPOSITION.md
+      - name: Print the results
+        run: |
+          python scripts/extract_log_block.py emit Q10_MD_B64 COMPOSITION.md
+          python scripts/extract_log_block.py emit Q10_JSON_B64 composition.json
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: pocket-composition-results
+          path: |
+            composition.json
+            COMPOSITION.md
+          retention-days: 90

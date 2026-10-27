@@ -46,6 +46,36 @@ Some proteins don't just bind inositol phosphates (IPs) for signaling—**they c
 
 This project builds the first **proteome-wide computational screen** to answer that question.
 
+### What it has and has not established
+
+**Read [`results/PROJECT_FINDINGS.md`](results/PROJECT_FINDINGS.md) before any number
+below.** It is generated from each study's own committed artefact and states, in order,
+what this project establishes and what it does not. The short version:
+
+- **Some committed outputs under `results/publication/` and `results/yeast_pilot/` are
+  superseded.** The yeast pilot's single hit is withdrawn (a mislabelled input), the
+  validation set's burial counts are per entry not per copy, and the control panel's
+  separation was measured with the ligand bound. Scored as a proteome target is scored,
+  the plan's own strict filter **rejects ADAR2's site** — the case the detector was built
+  around. The revision note in `manuscript/RESULTS_DRAFT.md` is the authority.
+- The screen produces a **ranked list of hypotheses**, not findings. No candidate has
+  independent support.
+- Buried examples are scarce. The control benchmark's validation set holds **1 cryptic
+  structure in 136**, which bounds the benchmark; the redocking census holds **15 cryptic
+  annotated copies across 4 homology groups**, which bounds the ground-truth arms. Small,
+  but not one — and only ADAR2 has published evidence that the protein cannot fold
+  without the cofactor.
+- The combined score ranks annotated binders well above chance and **does not beat its
+  own same-protein baseline**.
+- Two pre-registered structural lines — lining architecture and sequence — separate real
+  pocket linings from **random position sets** (33.3% vs 4.3%) but not from **the same
+  protein's other pockets of the same size**, which is the comparison that controls for
+  fold, model and detector. On that comparison both are null.
+
+`results/publication/RESULTS_SUMMARY.md` covers only the control benchmark, validation
+dataset, ML benchmark and yeast pilot, and predates most of the work. Where the two
+disagree, the findings page is current.
+
 ---
 
 ## 📒 Interactive Notebooks (Colab-ready tutorials)

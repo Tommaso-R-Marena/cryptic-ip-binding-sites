@@ -486,7 +486,12 @@ holds too few independent families with a buried inositol phosphate.
 
 Applying the pipeline with strict filters (composite score ≥ 0.75, pocket SASA
 ≤ 10 Å², ≥ 4 basic residues, AlphaFold pLDDT ≥ 70) to **499** *S. cerevisiae*
-AlphaFold structures yields **no** candidates under the corrected scorer.
+AlphaFold structures yields **no** candidates under the corrected scorer. That
+is now a re-screen of the pilot's own protein set rather than an inference from
+re-scoring one pocket: `results/yeast_rescreen/yeast_pilot_summary.json` records
+499 structures screened, 0 proteins with hits, 0 total hits. The screened count
+is what makes it a result — an incomplete download would also have produced an
+empty hit list.
 
 An earlier version of this draft reported one: **P07264 (LEU1,
 3-isopropylmalate dehydratase)**, pocket 2, with a composite of 0.955. That score
@@ -496,6 +501,16 @@ this pocket — and treated it as a distance, awarding full credit for any value
 above 15. The pocket's true burial depth is 2.84 Å. Re-scoring with the same
 scorer and only that input corrected gives **0.711**, below threshold; the
 depth term alone falls from 0.250 to 0.007 of the composite.
+
+Under the **current** scorer, which also carries the corrected volume window and
+weights, the same pocket measures **0.627**
+(`results/yeast_rescreen/P07264_pockets.csv`). The two figures answer different
+questions and should not be read as disagreeing: 0.711 isolates the depth input
+against the scorer of the day, 0.627 is what the pipeline now produces. Of the
+four filter criteria the composite is the only one the pocket fails — it clears
+pLDDT (93.2 ≥ 70), basic residues (7 ≥ 4) and SASA (8.2 ≤ 10) — so the
+withdrawal rests on that single misread input propagated into the score, not on
+a filter change or a different structure.
 
 The pocket is not uninteresting. It is fully enclosed (enclosure 1.0), has low
 solvent accessibility (8.2 Å²), is lined by seven basic residues (H40, H70,
@@ -553,5 +568,7 @@ visible as such.
 - Burial survey and descriptor discrimination: `python scripts/burial_survey.py` (CI: `.github/workflows/burial-survey.yml`)
 - Classifier training on corrected labels: `.github/workflows/train-real-data.yml`
 - Yeast pilot: `python scripts/run_yeast_pilot_screen.py --n-proteins 499`
-- Re-screen of the pilot's 499 proteins under the current scorer: `.github/workflows/yeast-rescreen.yml`
+- Re-screen of the pilot's 499 proteins under the current scorer: `.github/workflows/yeast-rescreen.yml`,
+  committed at `results/yeast_rescreen/` (summary, hit list, and the withdrawn
+  candidate's own pockets)
 - Candidate dossiers: `python scripts/characterize_candidates.py --hits-csv results/yeast_pilot/yeast_pilot_hits.csv`

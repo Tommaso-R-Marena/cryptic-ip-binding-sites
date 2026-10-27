@@ -1,0 +1,36 @@
+# The conda environment the studies run in on Rockfish.
+#
+# Pinned to the same versions the GitHub workflows install, because a study run
+# here and the same study run on shared runners have to be the same study. The
+# Python pins come from requirements.txt; the docking pins are the workflows'
+# PY_DOCKING line; the binaries are the ones `cryptic-ip check-dependencies`
+# looks for.
+#
+# Three tools are deliberately unpinned and are a stated reproducibility limit
+# in docs/PIPELINE.md: mmseqs2, foldseek and apbs have no pin available that
+# conda will honour across rebuilds. build_env.sh records the versions it
+# actually resolved, so a run can say what it used even though the recipe
+# cannot say what it will get.
+name: cryptic-ip
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - pip
+  # External binaries: not pip-installable, and fpocket is required rather
+  # than optional - the docking pipeline raises without it.
+  - fpocket
+  - apbs
+  - mmseqs2
+  - foldseek
+  - mafft
+  - pip:
+      - -r ../../requirements.txt
+      # The docking stack, matching PY_DOCKING in .github/workflows/*.yml.
+      - rdkit==2026.3.6
+      - vina==1.2.7
+      - meeko==0.8.0
+      - gemmi==0.7.5
+      - pdb2pqr==3.6.1
+      - propka==3.5.1

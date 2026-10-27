@@ -66,6 +66,41 @@ def test_matching_is_deterministic(triage):
     assert a.sort_values("matched_to")["uniprot_id"].tolist() == b.sort_values("matched_to")["uniprot_id"].tolist()
 
 
+def test_a_pool_of_one_is_byte_identical_to_the_published_rule(triage):
+    """Studies H, I and N ran the default; it must not shift under the new parameter."""
+    cands, prots = _candidates(), _proteins()
+    one = triage.matched_controls(cands, prots)
+    pooled = triage.matched_controls(cands, prots, n_per_candidate=1)
+    assert one["uniprot_id"].tolist() == pooled["uniprot_id"].tolist()
+    assert one["matched_to"].tolist() == pooled["matched_to"].tolist()
+
+
+def test_a_pool_returns_several_distinct_controls_per_candidate(triage):
+    cands, prots = _candidates(), _proteins()
+    pooled = triage.matched_controls(cands, prots, n_per_candidate=3)
+    assert len(pooled) > len(triage.matched_controls(cands, prots))
+    # Still never reuses a protein, and still never draws a candidate as its own control.
+    assert len(pooled) == pooled["uniprot_id"].nunique()
+    assert set(pooled["uniprot_id"]) & set(cands["uniprot_id"]) == set()
+    # Every pooled control still satisfies the plan's matching rule.
+    cutoff = prots["combined"].quantile(0.5)
+    picked = prots.set_index("uniprot_id").loc[pooled["uniprot_id"]]
+    assert (picked["combined"] <= cutoff).all()
+    assert (picked["plddt_mean"] - 90.0).abs().le(triage.PLDDT_TOLERANCE).all()
+    assert (picked["hull_depth"] - 10.0).abs().le(triage.DEPTH_TOLERANCE).all()
+    # pool_rank orders each candidate's pool and starts at 0.
+    for _, block in pooled.groupby("matched_to"):
+        assert block["pool_rank"].tolist() == list(range(len(block)))
+
+
+def test_a_pool_is_capped_by_what_the_matching_actually_admits(triage):
+    """Asking for more controls than exist returns fewer, rather than relaxing the match."""
+    cands, prots = _candidates(), _proteins(n=12)
+    pooled = triage.matched_controls(cands, prots, n_per_candidate=50)
+    assert 0 < len(pooled) <= len(prots)
+    assert len(pooled) == pooled["uniprot_id"].nunique()
+
+
 # ------------------------------------------------------------ decisions
 def _conservation(cand_conserved, ctrl_conserved, positives_conserved, n=8):
     out = {}

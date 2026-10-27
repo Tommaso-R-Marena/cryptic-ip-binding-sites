@@ -1,0 +1,50 @@
+{
+  "all_checks_pass": true,
+  "checks": {
+    "all_pools_have_the_same_basic_fraction": true,
+    "all_pools_within_0.1_bits": true,
+    "composition_control_has_identical_basic_fraction": true,
+    "composition_control_stays_quiet": true,
+    "planted_pool_fires": true,
+    "shuffle_control_has_identical_basic_fraction": true,
+    "shuffle_control_has_identical_entropy": true,
+    "shuffle_control_stays_quiet": true
+  },
+  "n_shuffles": 400,
+  "pools": [
+    {
+      "basic_fraction": 0.2697916666666667,
+      "distinct_letters": 11,
+      "fraction_firing": 1.0,
+      "length": 24,
+      "mean_entropy": 3.2113287306934097,
+      "mean_raw": 0.5857786998948855,
+      "mean_z": 4.046716324484695,
+      "n_windows": 40,
+      "pool": "planted helical face"
+    },
+    {
+      "basic_fraction": 0.2697916666666667,
+      "distinct_letters": 11,
+      "fraction_firing": 0.0,
+      "length": 24,
+      "mean_entropy": 3.2113287306934097,
+      "mean_raw": 0.17160092983855452,
+      "mean_z": -0.2365305450686385,
+      "n_windows": 40,
+      "pool": "same letters, shuffled"
+    },
+    {
+      "basic_fraction": 0.2697916666666667,
+      "distinct_letters": 11,
+      "fraction_firing": 0.025,
+      "length": 24,
+      "mean_entropy": 3.2533572424748627,
+      "mean_raw": 0.1827102168273424,
+      "mean_z": -0.13083343337496983,
+      "n_windows": 40,
+      "pool": "basic-rich, no ordering"
+    }
+  ],
+  "statistic": "helix_charge_periodicity"
+}
