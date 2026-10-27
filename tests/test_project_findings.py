@@ -601,3 +601,34 @@ def test_the_committed_artefacts_agree_with_each_other():
     best = pd.read_csv(pockets).sort_values("composite_score", ascending=False).iloc[0]
     assert report["total_hits"] == 0
     assert float(best["composite_score"]) < float(report["score_threshold"])
+
+
+# --------------------------- the draft's yeast numbers against the artefact
+
+def test_the_draft_quotes_the_committed_rescreen_correctly():
+    """Prose drifts from data unless something compares them.
+
+    `manuscript/RESULTS_DRAFT.md` and `results/yeast_pilot/README.md` both now
+    give the withdrawn candidate's score under the current scorer. That number
+    is in a committed table, so it is checked rather than trusted - and the two
+    different figures in the draft (0.711 for the depth input alone, 0.627 for
+    the current scorer) are exactly the kind of pair that gets conflated.
+    """
+    pockets = ROOT / "results" / "yeast_rescreen" / "P07264_pockets.csv"
+    summary = ROOT / "results" / "yeast_rescreen" / "yeast_pilot_summary.json"
+    if not (pockets.exists() and summary.exists()):
+        pytest.skip("the re-screen is not committed")
+    best = pd.read_csv(pockets).sort_values("composite_score", ascending=False).iloc[0]
+    report = json.loads(summary.read_text())
+    quoted = f"{float(best['composite_score']):.3f}"
+    for path in (ROOT / "manuscript" / "RESULTS_DRAFT.md",
+                 ROOT / "results" / "yeast_pilot" / "README.md"):
+        text = path.read_text()
+        if "under the current scorer" not in text:
+            continue
+        assert quoted in text, (
+            f"{path.name} does not carry the committed score {quoted}; "
+            "the prose and the artefact have drifted apart")
+    draft = (ROOT / "manuscript" / "RESULTS_DRAFT.md").read_text()
+    assert f"{int(report['structures_screened'])} structures screened" in draft
+    assert float(best["composite_score"]) < float(report["score_threshold"])

@@ -11,6 +11,13 @@ composite score's depth term was fed fpocket's *mean local hydrophobic density*
 corrected gives 0.711, below the 0.75 threshold, and re-screening the same 499
 proteins under the corrected scorer yields no candidates.
 
+That re-screen is committed, not asserted: `results/yeast_rescreen/` holds its
+summary (499 screened, 0 hits), its empty hit list, and this pocket's own row,
+where it measures **0.627** under the current scorer. The 0.711 above isolates
+the depth input alone; 0.627 is the full current scorer, which also carries the
+corrected volume window and weights. The composite is the only one of the four
+filter criteria the pocket fails.
+
 - Why the score fell, with the component breakdown: `manuscript/RESULTS_DRAFT.md`
   ("The yeast pilot does not yet yield a candidate").
 - The re-screen itself: `.github/workflows/yeast-rescreen.yml`, which writes to
