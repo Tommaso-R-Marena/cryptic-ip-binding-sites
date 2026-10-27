@@ -239,3 +239,66 @@ def test_the_workflow_reruns_when_the_scripts_that_make_its_tables_change():
     for script in ("scripts/pocket_composition.py", "scripts/pocket_sequence.py",
                    "scripts/within_protein.py"):
         assert script in paths, f"{script} produces this study's tables"
+
+
+# ---------------------------------------------------------------------------
+# The yeast re-screen's download has to outlast a rate-limited endpoint. For
+# days the thing that caused the next attempt was a person re-running the
+# workflow, and the model set sat incomplete between nudges.
+
+
+def _yeast():
+    path = Path(".github/workflows/yeast-rescreen.yml")
+    return path, yaml.safe_load(path.read_text())
+
+
+def test_the_download_retries_within_one_job():
+    _path, data = _yeast()
+    steps = data["jobs"]["fetch"]["steps"]
+    download = [s for s in steps if "fetch_until_complete.py" in str(s.get("run", ""))]
+    assert download, "the download no longer retries; a human is the retry policy again"
+    assert "--attempts" in download[0]["run"] and "--sleep" in download[0]["run"]
+
+
+def test_the_waiting_job_does_not_share_a_budget_with_the_screen():
+    """Sleeps in the screen's job would eat the budget the screen needs."""
+    _path, data = _yeast()
+    assert data["jobs"]["rescreen"]["needs"] == ["fetch"]
+    fetch_steps = data["jobs"]["fetch"]["steps"]
+    assert not any("run_yeast_pilot_screen" in str(s.get("run", "")) for s in fetch_steps)
+    assert not any("setup-miniconda" in str(s.get("uses", "")) for s in fetch_steps), \
+        "the download needs no fpocket, and installing it costs a minute of every attempt"
+
+
+def test_a_partial_download_is_still_saved_and_still_fails_the_set():
+    """Both halves matter: keep what arrived, and refuse to screen a partial set."""
+    _path, data = _yeast()
+    steps = data["jobs"]["fetch"]["steps"]
+    save = [s for s in steps if "cache/save" in str(s.get("uses", ""))]
+    assert save and save[0].get("if") == "always()"
+    gate = [s for s in steps if "must be present" in str(s.get("name", ""))]
+    assert gate, "nothing stops a screen of 200 of 499 proteins"
+    download = [s for s in steps if "fetch_until_complete.py" in str(s.get("run", ""))]
+    assert download[0].get("continue-on-error") is True, \
+        "the download must not fail the job before the cache is saved"
+    names = [s.get("name") or s.get("uses") for s in steps]
+    assert names.index(save[0].get("name") or save[0]["uses"]) < names.index(gate[0]["name"])
+
+
+def test_the_screen_reads_what_the_download_job_assembled():
+    _path, data = _yeast()
+    restore = [s for s in data["jobs"]["rescreen"]["steps"]
+               if "cache/restore" in str(s.get("uses", ""))]
+    assert restore, "the screen job has no models"
+    assert "github.run_id" in restore[0]["with"]["key"], \
+        "it must prefer this run's own saved set over an older one"
+
+
+def test_the_recovery_measurement_is_kept():
+    """How fast the endpoint gives models back is the only data on the window."""
+    _path, data = _yeast()
+    steps = data["jobs"]["fetch"]["steps"]
+    assert any("download_progress.json" in str(s.get("run", "")) for s in steps)
+    uploads = [s for s in steps if "upload-artifact" in str(s.get("uses", ""))]
+    assert any("download_progress.json" in str(s.get("with", {}).get("path", ""))
+               for s in uploads), "the attempt record is not published"
