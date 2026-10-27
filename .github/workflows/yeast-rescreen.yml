@@ -236,6 +236,22 @@ jobs:
           print(f"wrote {out}")
           PY
 
+      - name: Print the results for extraction
+        shell: bash -l {0}
+        if: always()
+        # This workflow predated the project's marker convention, so its result
+        # existed only inside an artifact - which means it could be read by a
+        # person and not committed without retyping. Run 40504642919 produced
+        # the first complete re-screen and its numbers could not be recorded
+        # from it for exactly that reason. Printed between markers, the tables
+        # are extracted and committed with `extract_log_block.py read`.
+        run: |
+          for f in yeast_pilot_summary.json yeast_pilot_hits.csv P07264_pockets.csv; do
+            [ -f "results/yeast_rescreen/$f" ] || continue
+            name="YEAST_$(echo "${f%%.*}" | tr '[:lower:]' '[:upper:]')_B64"
+            python scripts/extract_log_block.py emit "$name" "results/yeast_rescreen/$f"
+          done
+
       - name: Upload re-screen results
         uses: actions/upload-artifact@v6
         if: always()

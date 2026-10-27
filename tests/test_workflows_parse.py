@@ -302,3 +302,21 @@ def test_the_recovery_measurement_is_kept():
     uploads = [s for s in steps if "upload-artifact" in str(s.get("uses", ""))]
     assert any("download_progress.json" in str(s.get("with", {}).get("path", ""))
                for s in uploads), "the attempt record is not published"
+
+
+def test_the_rescreen_prints_its_result_for_extraction():
+    """Its first complete run's numbers were readable but not committable.
+
+    Run 40504642919 screened all 499 proteins and the result existed only
+    inside an artifact, so recording it would have meant retyping - which this
+    project does not do. The tables go between markers instead.
+    """
+    _path, data = _yeast()
+    steps = data["jobs"]["rescreen"]["steps"]
+    emit = [s for s in steps if "extract_log_block.py emit" in str(s.get("run", ""))]
+    assert emit, "the re-screen's result cannot be committed without retyping it"
+    run = emit[0]["run"]
+    for table in ("yeast_pilot_summary.json", "yeast_pilot_hits.csv", "P07264_pockets.csv"):
+        assert table in run, f"{table} is not printed for extraction"
+    names = [s.get("name") or s.get("uses") for s in steps]
+    assert names.index(emit[0]["name"]) > names.index("Run the strict screen")
