@@ -20,12 +20,18 @@ It exists because `results/publication/RESULTS_SUMMARY.md` is generated from the
 | coevolution | `results/coevolution/coevolution.json` | `scripts/coevolution.py report` |
 | revision | `manuscript/RESULTS_DRAFT.md` | `hand-written; its revision note is quoted, not re-encoded` |
 | composition | `results/composition/composition.json` | `scripts/pocket_composition.py analyse` |
+| rescreen | `results/yeast_rescreen/yeast_pilot_summary.json` | `scripts/run_yeast_pilot_screen.py (.github/workflows/yeast-rescreen.yml)` |
+| rescreen_leu1 | `results/yeast_rescreen/P07264_pockets.csv` | `scripts/run_yeast_pilot_screen.py (.github/workflows/yeast-rescreen.yml)` |
 
 Pre-registered plans are in `docs/`, each with its dated amendments. The lining-architecture line has its own detailed page at `results/architecture/FINDINGS.md`.
 
 ## 0. Which artefacts are superseded, and by what
 
 `results/publication/` holds outputs from before several pipeline defects were found. The project recorded the corrections in the working draft rather than by regenerating those outputs, so **the stale numbers are still in the files** and a reader meeting them first will take them as current. Three of them are still live in committed artefacts today: `results/yeast_pilot/yeast_pilot_hits.csv` carries the withdrawn candidate, with the misread input visible beside the true one in the same row; the validation dataset's burial counts are the per-entry ones; and the control panel's separation was measured on holo structures.
+
+**The yeast candidate's withdrawal is now measured, not asserted.** A strict re-screen of all 499 proteins of the pilot's own set, under the corrected scorer, returns **0 hits in 0 proteins** (hit rate 0.0000%) against the committed pilot's one hit at 0.2004%. `results/yeast_rescreen/yeast_pilot_summary.json` is that run's own summary, and the 499 is the part that makes it a result: a re-screen that lost the candidate by screening nothing would look the same from the hit list alone.
+
+**What it fails is one criterion, not several.** Its best pocket (1 of 4 criteria failed) misses `composite_score` 0.6273 ≥ 0.75, and clears `plddt_confidence` 93.2 ≥ 70, `basic_residues` 7 ≥ 4, `sasa` 8.211 ≤ 10. Under the uncorrected scorer the same pocket scored 0.955, on a burial-depth term that had read fpocket's mean local hydrophobic density (32.109) as a distance in ångströms; its true burial depth is the 2.844 Å above. The withdrawal is that one number, propagated.
 
 This is the manuscript's own revision note, quoted and not re-encoded, from `manuscript/RESULTS_DRAFT.md`:
 

@@ -27,6 +27,10 @@ import pandas as pd
 
 from cryptic_ip.detect.sequence import MIN_GROUPS
 
+#: The yeast pilot screened this many proteins, and a re-screen of fewer is not
+#: a re-screen of it. `results/yeast_pilot/screen_checkpoint.json` is the list.
+EXPECTED_YEAST_SET = 499
+
 #: Artefacts the page is assembled from. Every one is committed.
 SOURCES = {
     "controls": Path("results/publication/validation/positive_controls.csv"),
@@ -49,6 +53,15 @@ SOURCES = {
 #: render, and saying "not yet" is more honest than leaving the line out.
 OPTIONAL = {
     "composition": Path("results/composition/composition.json"),
+    # The strict yeast re-screen. Section 0 asserted the pilot's candidate was
+    # withdrawn on the strength of the manuscript's revision note; with this
+    # artefact present it states the measured result instead, on a run whose
+    # own summary says how many structures it screened - because the trap here
+    # is a re-screen that lost the candidate by screening nothing.
+    "rescreen": Path("results/yeast_rescreen/yeast_pilot_summary.json"),
+    # The withdrawn candidate's own pockets, so the page can say WHICH of the
+    # screen's criteria it fails rather than that it fails them.
+    "rescreen_leu1": Path("results/yeast_rescreen/P07264_pockets.csv"),
 }
 
 COMMANDS = {
@@ -66,6 +79,8 @@ COMMANDS = {
     "census": "scripts/redocking.py census",
     "coevolution": "scripts/coevolution.py report",
     "revision": "hand-written; its revision note is quoted, not re-encoded",
+    "rescreen": "scripts/run_yeast_pilot_screen.py (.github/workflows/yeast-rescreen.yml)",
+    "rescreen_leu1": "scripts/run_yeast_pilot_screen.py (.github/workflows/yeast-rescreen.yml)",
 }
 
 
@@ -87,7 +102,12 @@ def load(sources: Mapping[str, Path] = SOURCES,
         else:
             out[name] = json.loads(path.read_text())
     for name, path in optional.items():
-        out[name] = (json.loads(path.read_text()) if path.exists() else None)
+        if not path.exists():
+            out[name] = None
+        elif path.suffix == ".csv":
+            out[name] = pd.read_csv(path)
+        else:
+            out[name] = json.loads(path.read_text())
     return out
 
 
@@ -205,6 +225,102 @@ def header(data: Mapping[str, Any]) -> list:
     return lines
 
 
+def withdrawn_candidate(data: Mapping[str, Any]) -> list:
+    """Whether the yeast pilot's single candidate has actually been re-screened.
+
+    Section 0 called it withdrawn on the strength of the manuscript's revision
+    note, which is prose. With the re-screen's own summary in hand the claim is
+    measured - and the measurement that matters is `structures_screened`,
+    because a re-screen that lost the candidate by screening nothing looks
+    identical to one that lost it on the merits. That mistake was made once on
+    this project and caught before it was reported.
+    """
+    report = data.get("rescreen")
+    if report is None:
+        return [
+            "The yeast candidate's withdrawal is **recorded in the draft and not yet "
+            "re-derived**: no committed artefact holds a re-screen of the pilot's "
+            "protein set under the corrected scorer. Until one does, that correction "
+            "rests on the note below rather than on data.",
+            "",
+        ]
+    screened = int(pick(report, "structures_screened"))
+    hits = int(pick(report, "total_hits"))
+    proteins = int(pick(report, "proteins_with_hits"))
+    rate = float(pick(report, "hit_rate"))
+    if screened < EXPECTED_YEAST_SET:
+        raise Contradiction(
+            f"the committed re-screen screened {screened} of {EXPECTED_YEAST_SET} "
+            "structures, so an absent candidate may mean an absent structure rather "
+            "than a withdrawn hit; this section would read it as the latter")
+    return [
+        f"**The yeast candidate's withdrawal is now measured, not asserted.** A strict "
+        f"re-screen of all {screened} proteins of the pilot's own set, under the "
+        f"corrected scorer, returns **{hits} hits in {proteins} proteins** "
+        f"(hit rate {rate:.4%}) against the committed pilot's one hit at 0.2004%. "
+        f"`{OPTIONAL['rescreen']}` is that run's own summary, and the "
+        f"{screened} is the part that makes it a result: a re-screen that lost the "
+        "candidate by screening nothing would look the same from the hit list alone.",
+        "",
+    ] + why_it_fails(data)
+
+
+#: The screen's criteria, as its own summary names them, and which way each cuts.
+YEAST_CRITERIA = (
+    ("composite_score", "score_threshold", "min"),
+    ("plddt_confidence", "min_plddt", "min"),
+    ("basic_residues", "min_basic", "min"),
+    ("sasa", "max_sasa", "max"),
+    ("burial_depth", "min_burial_depth", "min"),
+)
+
+
+def why_it_fails(data: Mapping[str, Any]) -> list:
+    """Which of the screen's criteria the withdrawn candidate's best pocket fails.
+
+    "It no longer passes the screen's filters" is the kind of sentence this
+    project exists to replace. The thresholds are in the run's own summary and
+    the pocket is in the run's own table, so the comparison is read rather than
+    recounted - and if a future scorer makes a different criterion the binding
+    one, this says so instead of repeating today's answer.
+    """
+    pockets, report = data.get("rescreen_leu1"), data.get("rescreen")
+    if pockets is None or report is None or "composite_score" not in getattr(
+            pockets, "columns", []):
+        return []
+    best = pockets.sort_values("composite_score", ascending=False).iloc[0]
+    failed, passed = [], []
+    for column, threshold, sense in YEAST_CRITERIA:
+        limit = report.get(threshold)
+        if limit is None or column not in pockets.columns:
+            continue
+        value = float(best[column])
+        ok = value >= float(limit) if sense == "min" else value <= float(limit)
+        (passed if ok else failed).append(
+            f"`{column}` {value:.4g} {'≥' if sense == 'min' else '≤'} {float(limit):g}")
+    if not failed and not passed:
+        # An older summary that records no thresholds: nothing can be said, and
+        # saying nothing is right. Not the same as passing everything.
+        return []
+    if not failed:
+        raise Contradiction(
+            "the withdrawn candidate's best pocket passes every criterion in the "
+            "committed re-screen summary, so this section cannot say why it was not a "
+            "hit; the screen must be rejecting it on something the summary omits")
+    return [
+        f"**What it fails is one criterion, not several.** Its best pocket "
+        f"({len(failed)} of {len(failed) + len(passed)} criteria failed) misses "
+        + ", ".join(failed)
+        + (f", and clears {', '.join(passed)}" if passed else "")
+        + ". Under the uncorrected scorer the same pocket scored 0.955, on a "
+        "burial-depth term that had read fpocket's mean local hydrophobic density "
+        "(32.109) as a distance in ångströms; its true burial depth is the "
+        f"{float(best['burial_depth']):.3f} Å above. The withdrawal is that one "
+        "number, propagated.",
+        "",
+    ]
+
+
 def superseded(data: Mapping[str, Any]) -> list:
     """What in `results/publication/` is known to be wrong, in the project's own words."""
     return [
@@ -219,6 +335,7 @@ def superseded(data: Mapping[str, Any]) -> list:
         "one in the same row; the validation dataset's burial counts are the per-entry "
         "ones; and the control panel's separation was measured on holo structures.",
         "",
+    ] + withdrawn_candidate(data) + [
         "This is the manuscript's own revision note, quoted and not re-encoded, from "
         f"`{SOURCES['revision']}`:",
         "",

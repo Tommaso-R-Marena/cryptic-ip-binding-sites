@@ -9,6 +9,7 @@ interpretive sentence must be shown to fire when its artefact inverts.
 from __future__ import annotations
 
 import copy
+import json
 import importlib.util
 import sys
 from pathlib import Path
@@ -457,3 +458,146 @@ def test_a_finding_in_another_arm_does_not_carry_it(artefacts):
     data["composition"] = _reported()
     text = script.render(data)
     assert "wall-clock budget" not in text
+
+
+# ------------------------------- the yeast candidate's withdrawal, measured
+
+
+def _rescreen(**overrides) -> dict:
+    report = {"structures_screened": 499, "proteins_with_hits": 0,
+              "total_hits": 0, "hit_rate": 0.0,
+              # The screen's own thresholds, as the committed summary records
+              # them. `min_burial_depth` is null there, so it is not a filter.
+              "score_threshold": 0.75, "min_plddt": 70.0, "min_basic": 4,
+              "max_sasa": 10.0, "min_burial_depth": None}
+    report.update(overrides)
+    return report
+
+
+def test_without_the_artefact_the_withdrawal_is_called_prose(artefacts):
+    data = copy.deepcopy(artefacts)
+    data["rescreen"] = None
+    text = script.render(data)
+    assert "recorded in the draft and not yet re-derived" in text
+    assert "withdrawal is now measured" not in text
+
+
+def test_with_the_artefact_the_withdrawal_is_measured(artefacts):
+    data = copy.deepcopy(artefacts)
+    data["rescreen"] = _rescreen()
+    text = script.render(data)
+    assert "withdrawal is now measured, not asserted" in text
+    assert "all 499 proteins" in text
+    assert "0 hits in 0 proteins" in text
+
+
+def test_a_short_rescreen_is_refused_rather_than_read_as_a_withdrawal(artefacts):
+    """The mistake this guard exists for was made once on this project.
+
+    `lost: ['P07264']` came off a run whose re-screen column was empty because
+    only 200 of 499 models had downloaded. An absent candidate and an absent
+    structure are indistinguishable from the hit list alone.
+    """
+    data = copy.deepcopy(artefacts)
+    data["rescreen"] = _rescreen(structures_screened=200)
+    with pytest.raises(script.Contradiction, match="200 of 499"):
+        script.render(data)
+
+
+def test_a_rescreen_that_kept_the_candidate_is_reported_as_it_is(artefacts):
+    """The page must not hard-code the withdrawal it currently reports."""
+    data = copy.deepcopy(artefacts)
+    data["rescreen"] = _rescreen(proteins_with_hits=1, total_hits=1,
+                                 hit_rate=0.002004008016032064)
+    text = script.render(data)
+    assert "1 hits in 1 proteins" in text
+    assert "0.2004%" in text
+
+
+def test_the_expected_set_matches_the_committed_checkpoint():
+    """499 is the pilot's own protein count, not a number chosen here."""
+    checkpoint = ROOT / "results" / "yeast_pilot" / "screen_checkpoint.json"
+    if not checkpoint.exists():
+        pytest.skip("the pilot checkpoint is not committed")
+    processed = json.loads(checkpoint.read_text()).get("processed", [])
+    assert len(processed) == script.EXPECTED_YEAST_SET
+
+
+def _leu1(**overrides) -> pd.DataFrame:
+    row = {"pocket_id": 2, "composite_score": 0.627304, "volume": 468.013,
+           "sasa": 8.211222, "basic_residues": 7.0, "burial_depth": 2.843936,
+           "enclosure": 1.0, "plddt_confidence": 93.199091}
+    row.update(overrides)
+    return pd.DataFrame([row, {**row, "pocket_id": 41, "composite_score": 0.49}])
+
+
+def test_the_page_names_the_one_criterion_the_candidate_fails(artefacts):
+    """"No longer passes the filters" is the vagueness this replaces."""
+    data = copy.deepcopy(artefacts)
+    data["rescreen"] = _rescreen()
+    data["rescreen_leu1"] = _leu1()
+    text = script.render(data)
+    assert "1 of 4 criteria failed" in text
+    assert "`composite_score` 0.6273 ≥ 0.75" in text
+    assert "`sasa` 8.211 ≤ 10" in text
+
+
+def test_the_binding_criterion_is_read_not_remembered(artefacts):
+    """A future scorer could make a different criterion the binding one."""
+    data = copy.deepcopy(artefacts)
+    data["rescreen"] = _rescreen()
+    data["rescreen_leu1"] = _leu1(composite_score=0.9, sasa=42.0)
+    text = script.render(data)
+    failed = text.split("misses ")[1].split(", and clears")[0]
+    assert failed == "`sasa` 42 ≤ 10", f"the failed list reads {failed!r}"
+    assert "clears `composite_score` 0.9 ≥ 0.75" in text
+
+
+def test_a_summary_with_no_thresholds_claims_nothing(artefacts):
+    """Different from passing everything, and must not be reported as it."""
+    data = copy.deepcopy(artefacts)
+    data["rescreen"] = {"structures_screened": 499, "proteins_with_hits": 0,
+                        "total_hits": 0, "hit_rate": 0.0}
+    data["rescreen_leu1"] = _leu1()
+    text = script.render(data)
+    assert "withdrawal is now measured" in text
+    assert "What it fails is one criterion" not in text
+
+
+def test_a_pocket_that_passes_everything_fails_the_render(artefacts):
+    """Then the screen rejects it on something the summary does not record."""
+    data = copy.deepcopy(artefacts)
+    data["rescreen"] = _rescreen()
+    data["rescreen_leu1"] = _leu1(composite_score=0.99)
+    with pytest.raises(script.Contradiction, match="passes every criterion"):
+        script.render(data)
+
+
+def test_a_criterion_the_summary_leaves_unset_is_not_invented(artefacts):
+    """`min_burial_depth` is null in the committed summary, so it is not a filter."""
+    data = copy.deepcopy(artefacts)
+    data["rescreen"] = _rescreen()
+    data["rescreen_leu1"] = _leu1()
+    text = script.render(data)
+    assert "burial_depth` 2.844 ≥" not in text, "an unset threshold became a filter"
+
+
+def test_without_the_pocket_table_no_criterion_is_claimed(artefacts):
+    data = copy.deepcopy(artefacts)
+    data["rescreen"] = _rescreen()
+    data["rescreen_leu1"] = None
+    text = script.render(data)
+    assert "withdrawal is now measured" in text
+    assert "What it fails is one criterion" not in text
+
+
+def test_the_committed_artefacts_agree_with_each_other():
+    """The committed pocket table must actually fail the committed thresholds."""
+    summary = ROOT / "results" / "yeast_rescreen" / "yeast_pilot_summary.json"
+    pockets = ROOT / "results" / "yeast_rescreen" / "P07264_pockets.csv"
+    if not (summary.exists() and pockets.exists()):
+        pytest.skip("the re-screen is not committed")
+    report = json.loads(summary.read_text())
+    best = pd.read_csv(pockets).sort_values("composite_score", ascending=False).iloc[0]
+    assert report["total_hits"] == 0
+    assert float(best["composite_score"]) < float(report["score_threshold"])
